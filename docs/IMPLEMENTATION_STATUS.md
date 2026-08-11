@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Phase 0 — Repository bootstrap and connectivity: foundation implemented; build checks green, runtime database smoke test pending PostgreSQL availability.
+Phase 0 - Repository bootstrap and connectivity: foundation implemented; build checks and runtime end-to-end smoke test are green.
 
 ## Completed
 
@@ -15,21 +15,25 @@ Phase 0 — Repository bootstrap and connectivity: foundation implemented; build
 - Flyway baseline added without domain tables.
 - Frontend React + TypeScript + Vite scaffolded with React Router, Axios API wrapper, Bootstrap dependency, and a responsive health page.
 - Vite `/api` proxy configured for the local backend.
+- PostgreSQL 17.10 local development runtime configured on `127.0.0.1:54329`.
+- Development database `groupsync_dev` and role `groupsync` created.
 
 ## Verification
 
-- Backend: `backend/mvnw.cmd test` — PASS, 1 test passed.
-- Backend package artifact: `backend/target/backend-0.0.1-SNAPSHOT.jar` produced after the Maven repackage step; the sandbox had very low free disk during the final Maven process.
-- Frontend: `npm.cmd run build` — PASS, TypeScript build and Vite production build passed.
+- Backend tests: PASS, 1 test passed.
+- Backend package: PASS, `backend/target/backend-0.0.1-SNAPSHOT.jar` produced.
+- Frontend: `npm.cmd run build` - PASS, TypeScript build and Vite production build passed.
 - Java compiler evidence: Maven compiled with `javac [debug parameters release 21]` and tests ran on Java `21.0.12`.
-- Runtime `GET /api/health` against a live PostgreSQL-backed Spring process: NOT YET VERIFIED because PostgreSQL is unavailable on this machine.
+- PostgreSQL: PASS, `pg_isready` reports `127.0.0.1:54329 - accepting connections`.
+- Flyway: PASS, `V1__foundation_baseline.sql` applied and recorded in `flyway_schema_history`.
+- Runtime backend: PASS, live `GET /api/health` returned HTTP 200.
+- Runtime frontend: PASS, Vite served React app, Vite proxy returned HTTP 200 for `/api/health`, and headless Chrome rendered `Backend connected` / `groupsync-backend - UP`.
 
 ## Known limitations
 
-- PostgreSQL server is not installed/running in the current sandbox. The app configuration is ready, but a fresh database smoke test requires PostgreSQL or Docker and enough local disk for installation.
 - No business features were intentionally added; this is the expected Phase 0 boundary.
-- Browser screenshot/DevTools verification was not run because Chrome/Chromium and a live backend/database were unavailable.
+- Maven Wrapper `.cmd` currently has a Windows/PowerShell invocation quirk in this environment, so verification used the Maven 3.9.16 distribution downloaded by the wrapper directly from `.m2/wrapper/dists`.
 
 ## Next task
 
-Install or provide PostgreSQL, run the backend against a fresh `groupsync_dev` database, smoke-test `/api/health` and the frontend proxy, then commit the verified Phase 0 checkpoint. Only after that should Phase 1 authentication/user work begin.
+Phase 0 is complete. The next implementation task can begin with Phase 1 authentication/user work when requested.

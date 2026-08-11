@@ -11,6 +11,7 @@ npm-debug.log*
 
 # Local databases and runtime data
 postgresql-data/
+.run/
 *.pid
 *.log
 
@@ -36,4 +37,7 @@ Thumbs.db
 .jdk21.zip
 .jdk21-extract/
 .jdk21-runtime/
+.postgresql17.zip
+.postgresql17-installer.exe
+.postgresql17-binaries/
 .postgresql18.zip

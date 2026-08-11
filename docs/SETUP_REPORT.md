@@ -2,7 +2,7 @@
 
 ## Scope
 
-This report records the Phase 0 repository bootstrap performed on 2026-08-11. No User, Group, Calendar, Study, or Badminton business feature was implemented.
+This report records the Phase 0 repository bootstrap and PostgreSQL runtime verification performed on 2026-08-11. No User, Group, Calendar, Study, or Badminton business feature was implemented.
 
 ## Machine and toolchain
 
@@ -14,19 +14,20 @@ This report records the Phase 0 repository bootstrap performed on 2026-08-11. No
 | npm | 11.12.1 via `npm.cmd` (PowerShell script execution policy blocks `npm.ps1`) |
 | Java system runtime | 26.0.2; not used for the backend checkpoint |
 | Java project runtime | Temurin OpenJDK 21.0.12 portable, stored in ignored `.jdk21-runtime/` |
-| Maven | 3.9.16 through `backend/mvnw.cmd` |
-| PostgreSQL | Not installed as a system service before this task |
+| Maven | 3.9.16, downloaded by Maven Wrapper under `.m2/wrapper/dists` |
+| PostgreSQL | 17.10 local development runtime on `127.0.0.1:54329` |
 | Docker / Docker Compose | Not available |
 | winget / Chocolatey | Not available |
-| Chrome/Chromium | Not available in the checked command path |
+| Browser verification | Google Chrome headless rendered the React app |
 
 ## Setup decisions
 
 - The current workspace was initialized as the local Git repository and connected to `https://github.com/dbp3206-source/group_sync.git` as `origin`.
 - The foundation kit and supplied planning documents were copied into `AGENTS.md`, `docs/`, `prompts/`, and `reference/`.
 - Backend uses Spring Boot `4.1.0`, Java release `21`, Maven Wrapper, Web MVC, JPA, Security, Validation, PostgreSQL, and Flyway.
-- Frontend uses React `19.2.8`, TypeScript, Vite `8.2.1`, React Router, Axios, and Bootstrap package availability. Vite proxy forwards `/api` to `http://localhost:8080`.
+- Frontend uses React, TypeScript, Vite, React Router, Axios, and Bootstrap package availability. Vite proxy forwards `/api` to `http://localhost:8080`.
 - PostgreSQL configuration defaults to port `54329` to avoid colliding with a normal local PostgreSQL instance on `5432`.
+- The active development database is `groupsync_dev`, owned by role `groupsync`.
 - Secrets are supplied through environment variables or an ignored `.env`; `.env.example` contains placeholders only.
 - A Flyway `V1__foundation_baseline.sql` contains only `SELECT 1` because Phase 0 intentionally has no domain tables.
 
@@ -36,11 +37,24 @@ This report records the Phase 0 repository bootstrap performed on 2026-08-11. No
 2. Verified the GitHub remote with `git ls-remote`.
 3. Generated the backend from Spring Initializr and the frontend from Vite.
 4. Ran `npm.cmd install` and `npm.cmd run build` successfully.
-5. Ran `backend/mvnw.cmd test` with JDK 21 successfully: 1 test, 0 failures, 0 errors.
+5. Ran backend tests with JDK 21 successfully: 1 test, 0 failures, 0 errors.
+6. Ran backend package successfully and produced `backend/target/backend-0.0.1-SNAPSHOT.jar`.
+7. Verified PostgreSQL with `pg_isready`: `127.0.0.1:54329 - accepting connections`.
+8. Verified Flyway created `public.flyway_schema_history` and applied `V1__foundation_baseline.sql`.
+9. Verified live backend `GET /api/health` returned HTTP 200 with `groupsync-backend` and `UP`.
+10. Verified Vite proxy `GET http://127.0.0.1:5173/api/health` returned HTTP 200.
+11. Rendered the React app in headless Chrome and confirmed the page displayed `Backend connected` and `groupsync-backend - UP`.
 
-## PostgreSQL limitation
+## PostgreSQL setup notes
 
-The machine had no PostgreSQL, Docker, or package manager. A PostgreSQL 18 Windows binaries ZIP was inspected and downloaded temporarily, but it was a development/binaries bundle without the server `share` catalog (`postgres.bki`), so it could not safely initialize a cluster. The temporary archive was removed. A native installer would require additional disk space and may require an interactive UAC step; it was not run blindly.
+The machine initially had no PostgreSQL, Docker, or package manager. Docker was skipped because it was not installed. A PostgreSQL Windows installer attempt unpacked partial files under `C:\Program Files\PostgreSQL\17`, but did not complete cleanly enough to use that install as the project runtime.
 
-The repository is ready to use PostgreSQL through `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`. Before a real runtime smoke test, install PostgreSQL 17/18 or make Docker available, create `groupsync_dev`, and run the commands in the root README.
+The working development runtime uses PostgreSQL 17.10 on `127.0.0.1:54329`. Application credentials are supplied through environment variables:
 
+```text
+DB_URL=jdbc:postgresql://localhost:54329/groupsync_dev
+DB_USERNAME=groupsync
+DB_PASSWORD=<local development password>
+```
+
+The local password was used only in process environment variables and database role setup; it was not committed to source.
