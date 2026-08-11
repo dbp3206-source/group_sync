@@ -1,0 +1,39 @@
+# Java / Maven
+backend/target/
+*.class
+*.log
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# Local databases and runtime data
+postgresql-data/
+*.pid
+*.log
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env
+
+# IDE and OS files
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+.DS_Store
+Thumbs.db
+
+# Local Codex/setup scratch files
+.codex/
+.jdk21.zip
+.jdk21-extract/
+.jdk21-runtime/
+.postgresql18.zip

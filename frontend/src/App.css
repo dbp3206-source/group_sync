@@ -1,0 +1,115 @@
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f4f7f6 0%, #e5f0eb 100%);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem;
+}
+
+.brand {
+  color: #164e43;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-decoration: none;
+}
+
+.phase-label,
+.eyebrow {
+  color: #58746b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.app-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 5rem 1.25rem;
+}
+
+.health-page {
+  max-width: 680px;
+}
+
+.health-page h1 {
+  max-width: 10ch;
+  margin: 1rem 0;
+  color: #173b35;
+  font-size: clamp(2.75rem, 8vw, 5.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.07em;
+}
+
+.intro {
+  max-width: 38rem;
+  margin: 0 0 2rem;
+  color: #4e665e;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.status-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  max-width: 30rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #cbd9d3;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.75);
+  color: #315148;
+}
+
+.status-card p {
+  margin: 0.25rem 0 0;
+}
+
+.status-card--success {
+  border-color: #8fc8af;
+  background: #effaf4;
+}
+
+.status-card--error {
+  border-color: #e1a8a0;
+  background: #fff4f2;
+  color: #73382f;
+}
+
+.status-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background: #2b9a65;
+  box-shadow: 0 0 0 0.3rem rgba(43, 154, 101, 0.15);
+}
+
+.hint {
+  font-size: 0.9rem;
+}
+
+@media (max-width: 560px) {
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-top: 1.25rem;
+  }
+
+  .app-main {
+    padding-top: 3rem;
+  }
+}
+
