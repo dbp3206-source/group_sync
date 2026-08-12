@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Phase 5 - Integration and Polish: complete; backend/frontend builds and the PostgreSQL-backed golden runtime flow are green.
+Final Hardening Pass: complete; backend/frontend builds, Flyway startup and the PostgreSQL-backed golden runtime flow are green.
 
 ## Completed
 
@@ -42,6 +42,8 @@ Phase 5 - Integration and Polish: complete; backend/frontend builds and the Post
 - Match confirmation publishes system news and idempotent participant notifications; organizer announcements and READ/UNREAD notification inbox endpoints are available.
 - Group dashboard exposes next activities, registration count, recent matches, leaderboard and news; React now includes dashboard and notification pages.
 - Integration pass added group invitation notifications, unified Study/Badminton home dashboard handling, Badminton session detail and player ranking-history endpoints/pages, and stable `400 INVALID_REQUEST` handling for malformed request parameters.
+- Final hardening fixed the verified Critical gaps: Badminton venue/court and multi-court UI, Study availability timezone conversion, Badminton lifecycle guards, and responsibility unassignment notifications.
+- Final hardening added equal-side/round/player match invariants, match row locking, stable invalid-state errors, valid large-pool pairing output, confirmed-only dashboard results, correct news target IDs, and a working Windows Maven Wrapper invocation.
 
 ## Verification
 
@@ -62,6 +64,7 @@ Phase 5 - Integration and Polish: complete; backend/frontend builds and the Post
 - Phase 4 runtime: PASS, real HTTP flow created four players, checked them in, generated court allocation, generated balanced doubles pairing, created a match, submitted and confirmed a result, then verified leaderboard rows, ranking-derived statistics, system news, participant notifications, and dashboard recent results.
 - Phase 5 golden runtime: PASS, live HTTP flow verified 17 badminton actors, 16 active registrations plus FIFO waitlist promotion, 4-court allocation for 16 checked-in players, four balanced 2-vs-2 pairings, match confirmation, ranking/history/statistics/news/dashboard/session-detail responses, duplicate-registration `409`, member authorization `403`, malformed-parameter `400`, and invitation notification creation.
 - Phase 5 frontend runtime: PASS, Vite served the React app and proxied `/api/health` with HTTP 200; headless Chrome rendered the real login screen.
+- Final hardening verification: PASS, 25 backend tests, backend package, frontend build, Flyway V1-V5 startup, live health, pairing 2-vs-2, ranking/history/dashboard response, confirmed-match mutation rejection `409`, and Vite proxy HTTP 200.
 
 ## Known limitations
 
@@ -75,4 +78,4 @@ Phase 5 - Integration and Polish: complete; backend/frontend builds and the Post
 
 ## Next task
 
-Phase 5 is complete. The next planned boundary is tournament/advanced badminton analytics only if explicitly approved; Google Calendar sync and other out-of-scope integrations remain deferred.
+Final Hardening Pass is complete. Core GroupSync is stable for independent review; tournament/advanced badminton analytics, Google Calendar sync and other out-of-scope integrations remain deferred.

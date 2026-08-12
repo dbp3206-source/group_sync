@@ -39,6 +39,8 @@ class MatchResultAndRankingTest {
         Instant start = Instant.parse("2026-08-20T10:00:00Z");
         BadmintonSession session = new BadmintonSession(group, season, venue, "Play", start, start.plusSeconds(3600), start.minusSeconds(3600), 16, Set.of());
         BadmintonMatch match = new BadmintonMatch(session, null, 1);
+        assertThatThrownBy(() -> match.submitResult(21, 17)).isInstanceOf(IllegalStateException.class);
+        match.start();
         match.submitResult(21, 17);
         assertThat(match.getWinnerSide()).isEqualTo(MatchSideCode.A);
         match.confirmResult();

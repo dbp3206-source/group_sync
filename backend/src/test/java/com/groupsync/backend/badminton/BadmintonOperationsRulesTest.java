@@ -15,6 +15,7 @@ import com.groupsync.backend.badminton.model.BadmintonSessionStatus;
 import com.groupsync.backend.badminton.model.Court;
 import com.groupsync.backend.badminton.model.RegistrationStatus;
 import com.groupsync.backend.badminton.model.Season;
+import com.groupsync.backend.badminton.model.SessionResponsibility;
 import com.groupsync.backend.badminton.model.Venue;
 import com.groupsync.backend.group.model.Group;
 import com.groupsync.backend.group.model.GroupType;
@@ -65,6 +66,19 @@ class BadmintonOperationsRulesTest {
 
         assertThat(registered.getStatus()).isEqualTo(RegistrationStatus.CANCELLED);
         assertThat(waitlisted.getStatus()).isEqualTo(RegistrationStatus.REGISTERED);
+    }
+
+    @Test
+    void unassignedResponsibilityReturnsToNeeded() {
+        Group group = new Group("Badminton", null, GroupType.BADMINTON);
+        UserAccount user = new UserAccount("player@example.com", "hash", "Player");
+        SessionResponsibility responsibility = new SessionResponsibility(session(group), "Shuttlecock", null);
+
+        responsibility.assign(user);
+        responsibility.unassign();
+
+        assertThat(responsibility.getStatus()).isEqualTo(com.groupsync.backend.badminton.model.ResponsibilityStatus.NEEDED);
+        assertThat(responsibility.getAssignee()).isNull();
     }
 
     private BadmintonSession session(Group group) {

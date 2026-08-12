@@ -63,6 +63,16 @@ public class GlobalExceptionHandler {
             .body(new ApiError("DATA_CONFLICT", "The request conflicts with existing data."));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException exception) {
+        return ResponseEntity.badRequest().body(new ApiError("INVALID_REQUEST", exception.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    ResponseEntity<ApiError> handleIllegalState(IllegalStateException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError("INVALID_STATE", exception.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiError> handleUnexpected(Exception exception) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

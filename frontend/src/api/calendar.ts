@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 
-export type CalendarItem = { sourceType: 'MANUAL' | 'RECURRING' | 'STUDY'; sourceId: number; title: string; start: string; end: string; busy: boolean }
+export type CalendarItem = { sourceType: 'MANUAL' | 'RECURRING' | 'STUDY' | 'BADMINTON'; sourceId: number; title: string; start: string; end: string; busy: boolean }
 export type BusyEvent = { id: number; title: string; start: string; end: string }
 export type WeeklySchedule = { id: number; title: string; weekdays: string[]; startTime: string; endTime: string; validFrom: string; validUntil: string; timezone: string }
 

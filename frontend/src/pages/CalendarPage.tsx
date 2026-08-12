@@ -4,6 +4,7 @@ import { getApiErrorMessage } from '../api/errors'
 
 const weekdays = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
 function isoDateTime(value: string) { return new Date(value).toISOString() }
+function localDay(value: string) { const date = new Date(value); const pad = (part: number) => String(part).padStart(2, '0'); return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` }
 function CalendarPage() {
   const today = new Date(); const nextWeek = new Date(today.getTime() + 7 * 86400000)
   const [from, setFrom] = useState(today.toISOString().slice(0, 10)); const [to, setTo] = useState(nextWeek.toISOString().slice(0, 10))
@@ -12,7 +13,7 @@ function CalendarPage() {
   const [scheduleTitle, setScheduleTitle] = useState(''); const [scheduleDays, setScheduleDays] = useState<string[]>(['MONDAY']); const [scheduleStart, setScheduleStart] = useState('09:00'); const [scheduleEnd, setScheduleEnd] = useState('10:00'); const [validFrom, setValidFrom] = useState(from); const [validUntil, setValidUntil] = useState(to)
   async function refresh() { setItems(await getCalendarItems(`${from}T00:00:00+07:00`, `${to}T23:59:59+07:00`)); setSchedules(await getRecurringSchedules()) }
   useEffect(() => { refresh().catch((e) => setError(getApiErrorMessage(e, 'Could not load calendar.'))) }, [from, to])
-  const grouped = useMemo(() => items.reduce<Record<string, CalendarItem[]>>((result, item) => { const key = item.start.slice(0, 10); (result[key] ??= []).push(item); return result }, {}), [items])
+  const grouped = useMemo(() => items.reduce<Record<string, CalendarItem[]>>((result, item) => { const key = localDay(item.start); (result[key] ??= []).push(item); return result }, {}), [items])
   async function addEvent(event: React.FormEvent) { event.preventDefault(); setError(''); try { await createBusyEvent({ title: eventTitle, start: isoDateTime(eventStart), end: isoDateTime(eventEnd) }); setEventTitle(''); setMessage('Busy event added.'); await refresh() } catch (e) { setError(getApiErrorMessage(e, 'Could not add event.')) } }
   async function addSchedule(event: React.FormEvent) { event.preventDefault(); setError(''); try { await createRecurringSchedule({ title: scheduleTitle, weekdays: scheduleDays, startTime: `${scheduleStart}:00`, endTime: `${scheduleEnd}:00`, validFrom, validUntil, timezone: 'Asia/Bangkok' }); setScheduleTitle(''); setMessage('Weekly schedule added.'); await refresh() } catch (e) { setError(getApiErrorMessage(e, 'Could not add recurring schedule.')) } }
   async function removeEvent(id: number) { try { await deleteBusyEvent(id); await refresh() } catch (e) { setError(getApiErrorMessage(e, 'Could not delete event.')) } }

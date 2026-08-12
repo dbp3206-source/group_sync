@@ -37,6 +37,17 @@ class PairingStrategyTest {
         assertThat(ids(result.sideA(), result.sideB(), result.unassigned())).containsExactlyInAnyOrder(1L, 2L, 3L, 4L, 5L, 6L);
     }
 
+    @Test
+    void largeCourtPoolStillProducesOneValidDoublesSuggestion() {
+        var result = new BalancedPairingStrategy().create(java.util.stream.IntStream.rangeClosed(1, 8)
+            .mapToObj(id -> new PairingPlayer((long) id, "P" + id, 1)).toList(), 7L);
+
+        assertThat(result.sideA()).hasSize(2);
+        assertThat(result.sideB()).hasSize(2);
+        assertThat(result.unassigned()).hasSize(4);
+        assertThat(ids(result.sideA(), result.sideB(), result.unassigned())).doesNotHaveDuplicates();
+    }
+
     @SafeVarargs
     private final List<Long> ids(List<PairingPlayer>... groups) { return java.util.Arrays.stream(groups).flatMap(List::stream).map(PairingPlayer::userId).collect(Collectors.toList()); }
 }

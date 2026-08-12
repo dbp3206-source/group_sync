@@ -37,6 +37,6 @@ public class DashboardService {
         var sessions = sessionRepository.findByGroupIdOrderByStartAtDesc(groupId);
         var upcoming = sessions.stream().filter(s -> s.getStartAt().isAfter(Instant.now()) && s.getStatus() != BadmintonSessionStatus.CANCELLED).sorted(Comparator.comparing(s -> s.getStartAt())).limit(3).map(s -> new DashboardResponse.NextActivity(s.getId(), s.getTitle(), s.getStartAt(), s.getEndAt(), s.getStatus().name())).toList();
         long registrations = sessions.stream().mapToLong(s -> registrationRepository.countActiveBySessionId(s.getId())).sum();
-        return new DashboardResponse(upcoming, registrations, matchService.list(actor, groupId).stream().limit(5).toList(), statisticsService.leaderboard(actor, groupId, seasonId).stream().limit(10).toList(), newsService.list(actor, groupId).stream().limit(10).toList());
+        return new DashboardResponse(upcoming, registrations, matchService.list(actor, groupId).stream().filter(match -> "CONFIRMED".equals(match.status())).limit(5).toList(), statisticsService.leaderboard(actor, groupId, seasonId).stream().limit(10).toList(), newsService.list(actor, groupId).stream().limit(10).toList());
     }
 }

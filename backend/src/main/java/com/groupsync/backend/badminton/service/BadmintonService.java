@@ -169,13 +169,15 @@ public class BadmintonService {
     public BadmintonResponses.SessionResponse cancelRegistration(AuthenticatedUser actor, Long id) {
         BadmintonSession s = sessionRepository.findByIdForUpdate(id).orElseThrow(() -> new NotFoundException("Badminton session not found."));
         requireMember(s.getGroup().getId(), actor.getId());
+        if (s.getStatus() != BadmintonSessionStatus.OPEN && s.getStatus() != BadmintonSessionStatus.CONFIRMED) throw new ConflictException("Registration changes are closed for this session.");
         BadmintonRegistration r = registrationRepository.findBySessionIdAndUserId(id, actor.getId()).orElseThrow(() -> new NotFoundException("Registration not found."));
-        boolean active = r.isActive(); r.cancel(); if (active) promoteNext(s); return toResponse(s);
+        boolean active = r.isActive(); r.cancel(); unassignResponsibilities(s, actor.getId()); if (active) promoteNext(s); return toResponse(s);
     }
 
     @Transactional
     public BadmintonResponses.SessionResponse checkIn(AuthenticatedUser actor, Long id, Long userId, boolean noShow) {
         BadmintonSession s = organizerSession(actor, id);
+        if (s.getStatus() != BadmintonSessionStatus.CONFIRMED && s.getStatus() != BadmintonSessionStatus.PLAYING) throw new ConflictException("Check-in is only available for a confirmed or playing session.");
         BadmintonRegistration r = registrationRepository.findBySessionIdAndUserId(id, userId).orElseThrow(() -> new NotFoundException("Registration not found."));
         if (noShow) r.noShow(); else r.checkIn();
         return toResponse(s);
@@ -209,6 +211,7 @@ public class BadmintonService {
         organizerSession(actor, r.getSession().getId()); r.unassign(); return BadmintonResponses.ResponsibilityResponse.from(r);
     }
 
+    private void unassignResponsibilities(BadmintonSession s, Long userId) { responsibilityRepository.findBySessionIdAndAssigneeId(s.getId(), userId).forEach(r -> { r.unassign(); membershipRepository.findByGroupIdOrderByCreatedAtAsc(s.getGroup().getId()).stream().filter(m -> m.getRole() != GroupRole.MEMBER).forEach(m -> notificationService.create(m.getUser().getId(), "RESPONSIBILITY_UNASSIGNED", "Session responsibility needs an owner", r.getItemName() + " is available again for " + s.getTitle() + ".", "BADMINTON_SESSION", s.getId())); }); }
     private void promoteNext(BadmintonSession s) { registrationRepository.findOldestWaitlisted(s.getId()).ifPresent(r -> { r.promote(Instant.now()); notificationService.create(r.getUser().getId(), "WAITLIST_PROMOTED", "You moved off the waitlist", "A place opened in " + s.getTitle() + ".", "BADMINTON_SESSION", s.getId()); }); }
     private void notifyRegistered(BadmintonSession s, String type, String title, String message) { registrationRepository.findBySessionIdAndStatusInOrderByRegisteredAtAscIdAsc(s.getId(), List.of(RegistrationStatus.REGISTERED, RegistrationStatus.CHECKED_IN)).forEach(r -> notificationService.create(r.getUser().getId(), type, title, message, "BADMINTON_SESSION", s.getId())); }
     private BadmintonResponses.SessionResponse toResponse(BadmintonSession s) { return toResponse(s, false, null); }
