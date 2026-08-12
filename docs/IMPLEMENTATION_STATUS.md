@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Final Hardening Pass: complete; backend/frontend builds, Flyway startup and the PostgreSQL-backed golden runtime flow are green.
+Final Demo & OOP Defense Preparation: complete; reproducible demo seed, golden runtime flow, backend/frontend builds and PostgreSQL/Flyway startup are green.
 
 ## Completed
 
@@ -44,10 +44,13 @@ Final Hardening Pass: complete; backend/frontend builds, Flyway startup and the 
 - Integration pass added group invitation notifications, unified Study/Badminton home dashboard handling, Badminton session detail and player ranking-history endpoints/pages, and stable `400 INVALID_REQUEST` handling for malformed request parameters.
 - Final hardening fixed the verified Critical gaps: Badminton venue/court and multi-court UI, Study availability timezone conversion, Badminton lifecycle guards, and responsibility unassignment notifications.
 - Final hardening added equal-side/round/player match invariants, match row locking, stable invalid-state errors, valid large-pool pairing output, confirmed-only dashboard results, correct news target IDs, and a working Windows Maven Wrapper invocation.
+- Final demo preparation added `scripts/reset-demo.ps1` for reproducible local seed data and `scripts/demo-golden.ps1` for the real end-to-end demonstration flow.
+- Final demo data includes 21 local demo users, Study and Badminton groups, recurring/busy calendar data, a Study rehearsal session, Season 1, one venue with four courts, a capacity-16 near-full session, historical match/ranking/news data, and notifications.
+- Final presentation guides added: `docs/DEMO_GUIDE.md` and `docs/OOP_DEFENSE_GUIDE.md`.
 
 ## Verification
 
-- Backend tests: PASS, 23 tests passed, including pairing invariants, match lifecycle, ranking idempotency, and event-driven news/notification behavior.
+- Backend tests: PASS, 25 tests passed, including pairing invariants, match lifecycle, ranking idempotency, and event-driven news/notification behavior.
 - Backend package: PASS, `backend/target/backend-0.0.1-SNAPSHOT.jar` produced after the Phase 4 changes.
 - Frontend: `npm.cmd run build` - PASS, TypeScript build and Vite production build passed with Badminton, dashboard and notification UI integration.
 - Java compiler evidence: Maven compiled with `javac [debug parameters release 21]` and tests ran on Java `21.0.12`.
@@ -65,6 +68,8 @@ Final Hardening Pass: complete; backend/frontend builds, Flyway startup and the 
 - Phase 5 golden runtime: PASS, live HTTP flow verified 17 badminton actors, 16 active registrations plus FIFO waitlist promotion, 4-court allocation for 16 checked-in players, four balanced 2-vs-2 pairings, match confirmation, ranking/history/statistics/news/dashboard/session-detail responses, duplicate-registration `409`, member authorization `403`, malformed-parameter `400`, and invitation notification creation.
 - Phase 5 frontend runtime: PASS, Vite served the React app and proxied `/api/health` with HTTP 200; headless Chrome rendered the real login screen.
 - Final hardening verification: PASS, 25 backend tests, backend package, frontend build, Flyway V1-V5 startup, live health, pairing 2-vs-2, ranking/history/dashboard response, confirmed-match mutation rejection `409`, and Vite proxy HTTP 200.
+- Final demo verification: PASS, `reset-demo.ps1` seeded 21 users and 2 groups; `demo-golden.ps1` verified waitlist promotion, notification, derived calendar, 16 check-ins, 4 allocations, 4 balanced 2-vs-2 pairings, score 21-17, ranking/history/statistics/news/dashboard; final database reseed restored 16 registered players and Flyway version 5.
+- Final frontend runtime: PASS, Vite served the React app on an available local port and proxied `/api/health` with HTTP 200.
 
 ## Known limitations
 
@@ -74,8 +79,9 @@ Final Hardening Pass: complete; backend/frontend builds, Flyway startup and the 
 - The current frontend remains an MVP operations UI; advanced charting, partner/head-to-head analytics and real-time updates are intentionally deferred.
 - Invitation email delivery is intentionally not implemented; invitations target existing GroupSync accounts and are stored in PostgreSQL.
 - Session storage is the default local Spring session; production deployment hardening is a later infrastructure concern.
-- Maven Wrapper `.cmd` currently has a Windows/PowerShell invocation quirk in this environment, so verification used the Maven 3.9.16 distribution downloaded by the wrapper directly from `.m2/wrapper/dists`.
+- The local demo depends on the PostgreSQL development service and its local password being supplied through environment variables; neither is committed.
+- The golden flow mutates session state to PLAYING and creates a result. Run `scripts/reset-demo.ps1` before each rehearsal; the final checkpoint database was reseeded to the near-capacity starting state.
 
 ## Next task
 
-Final Hardening Pass is complete. Core GroupSync is stable for independent review; tournament/advanced badminton analytics, Google Calendar sync and other out-of-scope integrations remain deferred.
+Final Demo & OOP Defense Preparation is complete. Core GroupSync is stable for final presentation and independent review; tournament/advanced badminton analytics, Google Calendar sync and other out-of-scope integrations remain deferred.

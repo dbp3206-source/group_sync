@@ -61,3 +61,5 @@ npm.cmd run build
 ```
 
 See `docs/SETUP_REPORT.md` for the exact machine/tool versions and the PostgreSQL setup decision. See `docs/IMPLEMENTATION_STATUS.md` for the current phase boundary. Google Calendar synchronization, tournament brackets, WebSocket infrastructure and advanced ranking remain intentionally out of scope.
+
+For the final presentation, see `docs/DEMO_GUIDE.md` and `docs/OOP_DEFENSE_GUIDE.md`. Set `GROUPSYNC_DB_PASSWORD` and `GROUPSYNC_DEMO_PASSWORD` locally, then run `scripts/reset-demo.ps1` to restore the reproducible demo state.
