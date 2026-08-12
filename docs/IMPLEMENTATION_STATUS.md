@@ -70,6 +70,7 @@ Final Demo & OOP Defense Preparation: complete; reproducible demo seed, golden r
 - Final hardening verification: PASS, 25 backend tests, backend package, frontend build, Flyway V1-V5 startup, live health, pairing 2-vs-2, ranking/history/dashboard response, confirmed-match mutation rejection `409`, and Vite proxy HTTP 200.
 - Final demo verification: PASS, `reset-demo.ps1` seeded 21 users and 2 groups; `demo-golden.ps1` verified waitlist promotion, notification, derived calendar, 16 check-ins, 4 allocations, 4 balanced 2-vs-2 pairings, score 21-17, ranking/history/statistics/news/dashboard; final database reseed restored 16 registered players and Flyway version 5.
 - Final frontend runtime: PASS, Vite served the React app on an available local port and proxied `/api/health` with HTTP 200.
+- Final rehearsal: PASS, services were started from the guide, login/groups/calendar/study seed checkpoints were verified, the live golden flow passed, and the database was reseeded to the presentation starting state.
 
 ## Known limitations
 

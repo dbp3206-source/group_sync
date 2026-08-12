@@ -78,24 +78,27 @@ The seeded `Demo Golden Session` is already **CONFIRMED**, has four courts, capa
    - Expected: the authenticated home/dashboard opens.
 2. Open **Calendar**.
    - Expected: the `OOP class recurring schedule` appears as recurring busy time; confirmed study and badminton activities appear as derived calendar items.
-3. Open **Groups → Demo Badminton Group → Demo Golden Session**.
-   - Expected: capacity is 16, four courts are visible, and the session has registered participants.
+3. Open **Groups → Demo Badminton Group → Open badminton operations**, then click the `Demo Golden Session` title.
+   - Expected: the session detail shows capacity 16, four courts, responsibilities and registered participants. The actual allocation, pairing and result controls are on the **Badminton** operations page.
 4. Log out and log in as `demo.member17@groupsync.local`; join the golden session.
    - Expected: the member is `WAITLISTED` because the 16 active places are full.
 5. Log in as `demo.member01@groupsync.local`; leave the session.
    - Expected: the oldest waitlisted member is promoted automatically. `member17` becomes `REGISTERED` and receives a `WAITLIST_PROMOTED` notification.
 6. Log back in as the organizer and open session detail.
    - Expected: there are 16 registered players again. The promoted member’s personal calendar contains `Badminton: Demo Golden Session`.
-7. Check in all registered players and start the session.
+7. On the **Badminton** operations page, check in all registered players and start the session.
    - Expected: registration status changes to `CHECKED_IN`, then the session becomes `PLAYING`.
+   - Manual note: this is 16 repeated `check in` clicks and the page refreshes after each action. For an 8–12 minute defense, run `scripts/demo-golden.ps1` for the full real flow and demonstrate one or two visible check-in changes in the UI.
 8. Choose **Generate allocation** for round 1.
    - Expected: 16 checked-in players are distributed across four courts.
 9. Choose **Balanced pairing**.
    - Expected: each court suggests a 2-versus-2 doubles pairing.
 10. Create a match for the first court, start it, enter `21` and `17`, then confirm.
     - Expected: winner side, W/L, points and ranking history are derived from the score. The user does not enter winner or statistics manually.
-11. Open **Leaderboard**, winner **Statistics**, **Ranking history**, **Recent results**, **News**, and **Notifications**.
+11. Open **Leaderboard**, **Recent results**, **News**, and **Notifications**.
     - Expected: the result appears in all relevant views, including system-generated news and participant notifications.
+12. To show the winner’s Statistics and Ranking history, open `http://localhost:5173/badminton/profile?groupId=2&userId=3` for seeded `demo.member01`.
+    - Expected: Season 1 statistics and the confirmed match history are visible. This profile route is currently not linked from the main navigation, so keep the URL ready or use the API result during the defense.
 
 ### One-command verification of the same real flow
 
@@ -148,5 +151,13 @@ The sources normalize different busy information into one calendar view. A confi
 - **Frontend shows an API/network error:** keep backend on port 8080, restart Vite, and reload `http://127.0.0.1:5173`.
 
 The main demo risk is state mutation: after a successful golden run the session is PLAYING and has a match. Resetting the development database restores the rehearsal state. PostgreSQL credentials remain local environment values and are never committed.
+
+## 8. Rehearsal observations
+
+- Backend startup took about 17 seconds on the rehearsal machine; this is normal while Spring initializes JPA and Flyway.
+- Seed reset took about 11 seconds and the complete real golden script took about 7 seconds after services were ready.
+- The manual multi-account waitlist story requires switching organizer, `member17`, and `member01`; it is easy to lose the intended account. Keep the three accounts and password visible.
+- The business rules are clearest on the session card: `16 / 16`, `WAITLISTED`, `REGISTERED`, `CHECKED_IN`, `PLAYING`, court allocation, 2-vs-2 pairing, and the result status are visible. Statistics/history are less discoverable because the profile route has no navigation link.
+- The frontend runtime is available at `http://localhost:5173` when that port is free. If Vite selects another port, use the URL printed by Vite and adjust the profile URL accordingly.
 
 For oral-defense preparation, see [OOP_DEFENSE_GUIDE.md](OOP_DEFENSE_GUIDE.md).
