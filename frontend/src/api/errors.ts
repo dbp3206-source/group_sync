@@ -8,7 +8,15 @@ export type ApiError = {
 
 export function getApiErrorMessage(error: unknown, fallback = 'Something went wrong.') {
   if (axios.isAxiosError<ApiError>(error)) {
-    return error.response?.data?.message ?? fallback
+    const response = error.response
+    if (!response) return 'Cannot reach GroupSync. Start the backend and check the API URL.'
+    const data = response.data
+    if (data?.fieldErrors) {
+      const details = Object.entries(data.fieldErrors).map(([field, message]) => `${field}: ${message}`).join(' ')
+      return `${data.message ?? 'Please check the form.'} ${details}`
+    }
+    if (response.status === 403) return 'Security token expired. Refresh the page and try again.'
+    return data?.message ?? fallback
   }
   return fallback
 }

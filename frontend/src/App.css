@@ -18,6 +18,7 @@ h2 { margin: 0; color: #173b35; font-size: 1.35rem; letter-spacing: -.03em; }
 .auth-page { max-width: 560px; }
 .auth-switch { margin-top: 1.25rem; color: #58746b; }
 .auth-switch a, .back-link { color: #164e43; font-weight: 700; }
+.auth-help { margin: -.25rem 0 0; color: #58746b; font-size: .82rem; line-height: 1.5; }
 .form-stack { display: flex; flex-direction: column; gap: 1rem; }
 .form-column { display: grid; gap: 1.5rem; }
 .calendar-toolbar { display: flex; gap: 1rem; margin-bottom: 1.5rem; }

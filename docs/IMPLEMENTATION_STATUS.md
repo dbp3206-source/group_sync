@@ -76,6 +76,7 @@ Final production-like deployment verification: implementation complete for the r
 - Full feature runtime: PASS after V6 startup; `reset-demo.ps1` plus `demo-golden.ps1` passed again, and a real FINAL tournament match confirmation updated bracket winner and tournament champion automatically.
 - Final regression/hardening: PASS; shared Core, Personal Calendar persistence/privacy, Study derived reschedule/cancel, Badminton advanced analytics, QR validity/idempotency, Tournament champion progression, notification preferences and critical invariants were checked against the live PostgreSQL runtime.
 - Production-like deployment: PASS; Java 21 packaged JAR, React/Vite production build, PostgreSQL 17.10, Flyway V1-V6 startup validation, environment-controlled API URL, CORS and live health were verified. The golden runtime flow passed after deployment configuration changes, then the development database was reseeded to the stable demo state. See `docs/DEPLOYMENT_GUIDE.md` and `docs/PRODUCTION_SMOKE_REPORT.md`.
+- Authentication usability hardening: PASS; local email/Gmail addresses work with the existing password-based auth, browser autofill/recent-email suggestions and demo-account shortcut. Localhost/127.0.0.1 API host normalization, local-port CORS patterns and clearer validation/network errors were verified without adding OAuth.
 
 ## Known limitations
 

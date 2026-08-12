@@ -24,6 +24,8 @@ Copy `.env.example` to `.env` for local values if you do not want to export vari
 
 The development database is expected at `localhost:54329` so it does not collide with a normal PostgreSQL installation on port `5432`.
 
+Authentication accepts normal email addresses, including Gmail addresses, but the password is a separate local GroupSync password. The login form uses browser autofill, remembers recently used GroupSync emails locally, and provides the seeded demo account shortcut. Google OAuth/account selection is intentionally not enabled.
+
 ## Run the backend
 
 From PowerShell:

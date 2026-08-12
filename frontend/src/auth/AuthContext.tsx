@@ -9,6 +9,7 @@ import {
   type RegisterInput,
   type User,
 } from '../api/auth'
+import { rememberEmail } from './emailHistory'
 
 type AuthContextValue = {
   user: User | null
@@ -42,10 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async login(email, password) {
       await getCsrfToken()
       setUser(await loginRequest(email, password))
+      rememberEmail(email)
     },
     async register(input) {
       await getCsrfToken()
       await registerRequest(input)
+      rememberEmail(input.email)
     },
     async logout() {
       await getCsrfToken()

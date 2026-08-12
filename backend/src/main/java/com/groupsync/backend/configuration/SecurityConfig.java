@@ -43,10 +43,10 @@ public class SecurityConfig {
 
     @Bean
     CorsConfigurationSource corsConfigurationSource(
-        @Value("${app.cors.origins:http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173}") String configuredOrigins
+        @Value("${app.cors.origins:http://localhost:*,http://127.0.0.1:*}") String configuredOrigins
     ) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.stream(configuredOrigins.split(","))
+        configuration.setAllowedOriginPatterns(Arrays.stream(configuredOrigins.split(","))
             .map(String::trim).filter(origin -> !origin.isBlank()).toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Accept", "Content-Type", "X-XSRF-TOKEN"));

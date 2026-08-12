@@ -42,6 +42,8 @@ Set these in the process environment or in a local ignored `.env` file. Never co
 | `APP_TIMEZONE` | `Asia/Bangkok` | Application timezone |
 | `VITE_API_URL` | `http://127.0.0.1:8080/api` | Absolute API URL embedded in the production frontend build |
 
+For local development, the default CORS configuration accepts `localhost` and `127.0.0.1` on any port so Vite can move to the next free port. For a real hosted deployment, replace it with the exact frontend origin. Gmail addresses are accepted as ordinary GroupSync usernames; Google OAuth is not part of this project.
+
 ## First deploy / start
 
 Open three PowerShell terminals.
@@ -122,4 +124,3 @@ Personal calendar events and recurring schedules are stored in PostgreSQL. There
 - **CORS error:** use the exact frontend origin in `APP_CORS_ORIGINS`, including port, then restart the backend.
 - **Port collision:** stop the process using `8080` or `4173`, or choose another port and update CORS/API URL consistently.
 - **Demo state changed:** stop using the golden flow and run `reset-demo.ps1` against the development database only.
-
