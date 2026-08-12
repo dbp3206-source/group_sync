@@ -41,6 +41,20 @@ The API listens on `http://localhost:8080`. Health check:
 Invoke-RestMethod http://localhost:8080/api/health
 ```
 
+## Recommended one-command startup
+
+After setting the local database password in the ignored `.env` file, run this from the repository root:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\scripts\start-groupsync.ps1
+```
+
+The script starts the backend first, waits until `/api/health` is green, builds and starts the frontend, then prints `GROUPSYNC_READY`. Local frontend requests use the Vite `/api` proxy, so authentication cookies stay on one origin. Open `http://127.0.0.1:4173/`. Stop only processes started by the script with:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\scripts\stop-groupsync.ps1
+```
+
 ## Run the frontend
 
 ```powershell
