@@ -49,6 +49,32 @@ npm.cmd run dev
 
 Open the Vite URL shown in the terminal. The `/api` Vite proxy forwards requests to the backend.
 
+## Production-like local deployment
+
+The final verified deployment uses the packaged Spring Boot JAR, the React/Vite production build, and the persistent local PostgreSQL service. It is intentionally simple and does not require Docker or a cloud account.
+
+```powershell
+cd backend
+$env:DB_URL='jdbc:postgresql://127.0.0.1:54329/groupsync_dev'
+$env:DB_USERNAME='groupsync'
+$env:DB_PASSWORD='your-local-password'
+$env:APP_CORS_ORIGINS='http://127.0.0.1:4173,http://localhost:4173'
+$env:JAVA_HOME=(Resolve-Path '../.jdk21-runtime').Path
+./mvnw.cmd test package
+& "$env:JAVA_HOME\bin\java.exe" -jar target/backend-0.0.1-SNAPSHOT.jar
+```
+
+In another terminal:
+
+```powershell
+cd frontend
+$env:VITE_API_URL='http://127.0.0.1:8080/api'
+npm.cmd run build
+npm.cmd run preview -- --host 127.0.0.1 --port 4173
+```
+
+Open `http://127.0.0.1:4173/`. Flyway applies pending migrations when the backend starts. See [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) for redeploy and troubleshooting details.
+
 ## Verify
 
 ```powershell

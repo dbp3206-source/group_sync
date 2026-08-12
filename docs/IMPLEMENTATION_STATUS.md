@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Full Feature Completion Pass: implementation complete for the requested local scope; V6 migration, Personal Calendar extensions, Badminton advanced operations, QR check-in, notification preferences and Tournament foundation are included. Google Calendar remains intentionally excluded.
+Final production-like deployment verification: implementation complete for the requested local scope; V6 migration, Personal Calendar extensions, Badminton advanced operations, QR check-in, notification preferences and Tournament foundation are included. The packaged backend JAR and production frontend build were verified against the persistent local PostgreSQL service. Google Calendar remains intentionally excluded.
 
 ## Completed
 
@@ -75,6 +75,7 @@ Full Feature Completion Pass: implementation complete for the requested local sc
 - Final rehearsal: PASS before this feature pass; the feature pass also smoke-tested calendar metadata/duplicate, notification preferences and QR token/idempotent check-in on the live PostgreSQL-backed application.
 - Full feature runtime: PASS after V6 startup; `reset-demo.ps1` plus `demo-golden.ps1` passed again, and a real FINAL tournament match confirmation updated bracket winner and tournament champion automatically.
 - Final regression/hardening: PASS; shared Core, Personal Calendar persistence/privacy, Study derived reschedule/cancel, Badminton advanced analytics, QR validity/idempotency, Tournament champion progression, notification preferences and critical invariants were checked against the live PostgreSQL runtime.
+- Production-like deployment: PASS; Java 21 packaged JAR, React/Vite production build, PostgreSQL 17.10, Flyway V1-V6 startup validation, environment-controlled API URL, CORS and live health were verified. The golden runtime flow passed after deployment configuration changes, then the development database was reseeded to the stable demo state. See `docs/DEPLOYMENT_GUIDE.md` and `docs/PRODUCTION_SMOKE_REPORT.md`.
 
 ## Known limitations
 
@@ -92,4 +93,4 @@ Full Feature Completion Pass: implementation complete for the requested local sc
 
 ## Next task
 
-Final regression/hardening is complete. `docs/FINAL_FULL_BUILD_REPORT.md` records the evidence; remaining work is deployment-specific hardening and presentation polish only. Google Calendar and other explicitly excluded integrations remain out of scope.
+Deployment-specific work is complete for the local production-like target. A public provider deployment would require a chosen provider, account authorization, managed database, DNS/TLS and secret provisioning. Google Calendar and other explicitly excluded integrations remain out of scope.
