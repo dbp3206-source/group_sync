@@ -77,6 +77,7 @@ function GroupDetailPage() {
         </div>
         {canManage && <form className="page-panel form-stack" onSubmit={invite}><div><p className="eyebrow">Grow the group</p><h2>Invite a member</h2></div><label>User email<input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} required /></label><button className="btn btn-primary">Send invitation</button><p className="hint">The person must already have a GroupSync account.</p></form>}
       </div>
+      {group.type === 'STUDY' && <Link className="btn btn-primary study-link" to={`/study?groupId=${group.id}`}>Open study sessions</Link>}
     </section>
   )
 }

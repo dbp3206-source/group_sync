@@ -4,6 +4,8 @@ import { useAuth } from './auth/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import GroupDetailPage from './pages/GroupDetailPage'
 import GroupsPage from './pages/GroupsPage'
+import CalendarPage from './pages/CalendarPage'
+import StudyPage from './pages/StudyPage'
 import HealthPage from './pages/HealthPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -27,7 +29,7 @@ function AppShell() {
     <header className="app-header">
       <Link className="brand" to={user ? '/groups' : '/login'}>GroupSync</Link>
       <nav className="app-nav" aria-label="Main navigation">
-        {user && <Link to="/groups">Groups</Link>}
+        {user && <><Link to="/groups">Groups</Link><Link to="/calendar">Calendar</Link><Link to="/study">Study</Link></>}
         {!loading && !user && <Link to="/login">Sign in</Link>}
         {!loading && !user && <Link className="nav-cta" to="/register">Register</Link>}
         {user && <><span className="user-chip">{user.displayName}</span><button className="link-button" onClick={signOut}>Sign out</button></>}
@@ -36,6 +38,7 @@ function AppShell() {
     <main className="app-main">
       <Routes>
         <Route path="/health" element={<HealthPage />} />
+        <Route element={<ProtectedRoute />}><Route path="/calendar" element={<CalendarPage />} /><Route path="/study" element={<StudyPage />} /></Route>
         <Route path="/login" element={user ? <Navigate to="/groups" replace /> : <LoginPage />} />
         <Route path="/register" element={user ? <Navigate to="/groups" replace /> : <RegisterPage />} />
         <Route element={<ProtectedRoute />}><Route path="/groups" element={<GroupsPage />} /><Route path="/groups/:groupId" element={<GroupDetailPage />} /></Route>

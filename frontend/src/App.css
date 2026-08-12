@@ -19,6 +19,24 @@ h2 { margin: 0; color: #173b35; font-size: 1.35rem; letter-spacing: -.03em; }
 .auth-switch { margin-top: 1.25rem; color: #58746b; }
 .auth-switch a, .back-link { color: #164e43; font-weight: 700; }
 .form-stack { display: flex; flex-direction: column; gap: 1rem; }
+.form-column { display: grid; gap: 1.5rem; }
+.calendar-toolbar { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+.calendar-toolbar label { display: flex; flex-direction: column; gap: .35rem; color: #315148; font-size: .85rem; font-weight: 700; }
+.calendar-toolbar input { padding: .5rem; border: 1px solid #cbd9d3; border-radius: .5rem; background: white; font: inherit; font-weight: 400; }
+.calendar-day { margin-bottom: .8rem; }
+.calendar-day h2 { margin-bottom: .8rem; font-size: 1rem; }
+.calendar-item { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem 0; border-top: 1px solid #e3ebe7; }
+.calendar-item > div { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; }
+.calendar-item strong { color: #173b35; }
+.calendar-item span:last-child { color: #58746b; font-size: .85rem; }
+.source-tag { display: inline-block; margin-right: .5rem; color: #2b9a65; font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.source-recurring { color: #8c6a18; }.source-study { color: #2b6f9a; }
+.weekday-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .4rem; }
+.weekday-check { display: flex !important; flex-direction: row !important; align-items: center; gap: .3rem !important; font-size: .75rem !important; font-weight: 600 !important; }
+.two-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.saved-source { padding: .65rem 0; border-top: 1px solid #e3ebe7; }.saved-source span { display: block; color: #58746b; font-size: .8rem; }
+.group-picker { min-width: 180px; padding: .7rem; border: 1px solid #cbd9d3; border-radius: .5rem; background: white; font: inherit; }
+.study-card { margin-bottom: .8rem; }.study-card-header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }.study-card h2 { display: inline; }.study-card p { margin: .55rem 0; color: #58746b; }.study-actions { display: flex; flex-wrap: wrap; gap: .5rem; }.participant-pills { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .9rem; }.participant-pills span { padding: .3rem .5rem; border-radius: 999px; background: #eff5f2; color: #58746b; font-size: .75rem; }.candidate-slot { padding: .65rem; border: 1px solid #cbd9d3; border-radius: .5rem; background: #f7fbf9; color: #315148; text-align: left; cursor: pointer; }.candidate-slot:hover { border-color: #2b9a65; }.study-link { margin-top: 1.5rem; }
 .form-stack label { display: flex; flex-direction: column; gap: .35rem; color: #315148; font-size: .9rem; font-weight: 700; }
 .form-stack input, .form-stack textarea, .form-stack select, .member-actions select { width: 100%; padding: .7rem .75rem; border: 1px solid #cbd9d3; border-radius: .5rem; background: #fff; color: #1c2a33; font: inherit; font-weight: 400; }
 .form-stack input:focus, .form-stack textarea:focus, .form-stack select:focus { border-color: #2b9a65; outline: 3px solid rgba(43,154,101,.15); }
