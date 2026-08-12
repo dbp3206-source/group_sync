@@ -78,26 +78,28 @@ The seeded `Demo Golden Session` is already **CONFIRMED**, has four courts, capa
    - Expected: the authenticated home/dashboard opens.
 2. Open **Calendar**.
    - Expected: the `OOP class recurring schedule` appears as recurring busy time; confirmed study and badminton activities appear as derived calendar items.
+   - Add a one-time busy event, edit it once, then refresh. The event remains in PostgreSQL and is reused by later availability searches.
 3. Open **Groups → Demo Badminton Group → Open badminton operations**, then click the `Demo Golden Session` title.
    - Expected: the session detail shows capacity 16, four courts, responsibilities and registered participants. The actual allocation, pairing and result controls are on the **Badminton** operations page.
-4. Log out and log in as `demo.member17@groupsync.local`; join the golden session.
+   - Before continuing, open the Study/availability screen and search a short slot for **Demo Study Group**. Busy recurring/manual data affect candidates, while private event details stay hidden.
+5. Log out and log in as `demo.member17@groupsync.local`; join the golden session.
    - Expected: the member is `WAITLISTED` because the 16 active places are full.
-5. Log in as `demo.member01@groupsync.local`; leave the session.
+6. Log in as `demo.member01@groupsync.local`; leave the session.
    - Expected: the oldest waitlisted member is promoted automatically. `member17` becomes `REGISTERED` and receives a `WAITLIST_PROMOTED` notification.
-6. Log back in as the organizer and open session detail.
+7. Log back in as the organizer and open session detail.
    - Expected: there are 16 registered players again. The promoted member’s personal calendar contains `Badminton: Demo Golden Session`.
-7. On the **Badminton** operations page, check in all registered players and start the session.
+8. On the **Badminton** operations page, check in all registered players and start the session.
    - Expected: registration status changes to `CHECKED_IN`, then the session becomes `PLAYING`.
    - Manual note: this is 16 repeated `check in` clicks and the page refreshes after each action. For an 8–12 minute defense, run `scripts/demo-golden.ps1` for the full real flow and demonstrate one or two visible check-in changes in the UI.
-8. Choose **Generate allocation** for round 1.
+9. Choose **Generate allocation** for round 1.
    - Expected: 16 checked-in players are distributed across four courts.
-9. Choose **Balanced pairing**.
+10. Choose **Balanced pairing**.
    - Expected: each court suggests a 2-versus-2 doubles pairing.
-10. Create a match for the first court, start it, enter `21` and `17`, then confirm.
+11. Create a match for the first court, start it, enter `21` and `17`, then confirm.
     - Expected: winner side, W/L, points and ranking history are derived from the score. The user does not enter winner or statistics manually.
-11. Open **Leaderboard**, **Recent results**, **News**, and **Notifications**.
+12. Open **Leaderboard**, **Recent results**, **News**, and **Notifications**.
     - Expected: the result appears in all relevant views, including system-generated news and participant notifications.
-12. To show the winner’s Statistics and Ranking history, open `http://localhost:5173/badminton/profile?groupId=2&userId=3` for seeded `demo.member01`.
+13. To show the winner’s Statistics and Ranking history, open `/badminton/profile?groupId=2&userId=3` for seeded `demo.member01`.
     - Expected: Season 1 statistics and the confirmed match history are visible. This profile route is currently not linked from the main navigation, so keep the URL ready or use the API result during the defense.
 
 ### One-command verification of the same real flow
@@ -110,6 +112,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\demo-golden.ps
 ```
 
 Expected output starts with `GOLDEN_DEMO_PASS` and reports `registered=16`, `allocations=4`, `pairings=4`, `doubles=2v2`, `score=21-17`, plus leaderboard/history/news counts. The script uses the real REST endpoints; it does not insert fake result data.
+
+### Advanced showcase (2–4 minutes)
+
+- **Player profile:** open `/badminton/profile?groupId=2&userId=3` and show Season 1 stats, ranking history, recent form, partner/head-to-head and awards.
+- **QR check-in:** organizer selects **Generate check-in token** on a confirmed session; open the `/check-in?token=...` link as a registered member. A second scan is already checked in.
+- **Tournament:** open **Tournaments**, create/open a knockout tournament, add member IDs, start it, then reuse the Badminton match/result flow for the bracket match. Confirming a FINAL match derives the bracket winner and champion.
+- **Ranking:** Season 1 uses simple Points by default. Elo is an optional season-scoped strategy for OOP explanation, not the default demo.
+- Tournament reuses Badminton session/match calendar data and does not create a separate calendar source in this scope.
 
 ## 5. Study Group and availability story
 

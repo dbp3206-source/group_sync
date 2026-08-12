@@ -74,6 +74,7 @@ Full Feature Completion Pass: implementation complete for the requested local sc
 - Final frontend runtime: PASS, Vite served the React app on an available local port and proxied `/api/health` with HTTP 200.
 - Final rehearsal: PASS before this feature pass; the feature pass also smoke-tested calendar metadata/duplicate, notification preferences and QR token/idempotent check-in on the live PostgreSQL-backed application.
 - Full feature runtime: PASS after V6 startup; `reset-demo.ps1` plus `demo-golden.ps1` passed again, and a real FINAL tournament match confirmation updated bracket winner and tournament champion automatically.
+- Final regression/hardening: PASS; shared Core, Personal Calendar persistence/privacy, Study derived reschedule/cancel, Badminton advanced analytics, QR validity/idempotency, Tournament champion progression, notification preferences and critical invariants were checked against the live PostgreSQL runtime.
 
 ## Known limitations
 
@@ -87,7 +88,8 @@ Full Feature Completion Pass: implementation complete for the requested local sc
 - The golden flow mutates session state to PLAYING and creates a result. Run `scripts/reset-demo.ps1` before each rehearsal; the final checkpoint database was reseeded to the near-capacity starting state.
 - Tournament bracket match creation is intentionally organizer-driven and reuses the existing Badminton match/result flow; the UI does not duplicate every score-entry control.
 - Calendar reminder minutes are persisted metadata only; no external reminder delivery is implemented.
+- Tournament does not create a separate calendar source; it reuses Badminton session/match calendar data.
 
 ## Next task
 
-No additional feature phase is required for the requested local scope. Remaining work is deployment-specific hardening and presentation polish only; Google Calendar and other explicitly excluded integrations remain out of scope.
+Final regression/hardening is complete. `docs/FINAL_FULL_BUILD_REPORT.md` records the evidence; remaining work is deployment-specific hardening and presentation polish only. Google Calendar and other explicitly excluded integrations remain out of scope.
