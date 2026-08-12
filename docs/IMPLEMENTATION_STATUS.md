@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Phase 4 - Badminton Match, Ranking, Statistics and Engagement: implemented; backend/frontend builds and the PostgreSQL-backed runtime smoke flow are green.
+Phase 5 - Integration and Polish: complete; backend/frontend builds and the PostgreSQL-backed golden runtime flow are green.
 
 ## Completed
 
@@ -41,6 +41,7 @@ Phase 4 - Badminton Match, Ranking, Statistics and Engagement: implemented; back
 - Confirmed match results derive the winner, apply simple 3/1 ranking points idempotently, write ranking history, and update player matches/wins/losses/attendance/recent form statistics.
 - Match confirmation publishes system news and idempotent participant notifications; organizer announcements and READ/UNREAD notification inbox endpoints are available.
 - Group dashboard exposes next activities, registration count, recent matches, leaderboard and news; React now includes dashboard and notification pages.
+- Integration pass added group invitation notifications, unified Study/Badminton home dashboard handling, Badminton session detail and player ranking-history endpoints/pages, and stable `400 INVALID_REQUEST` handling for malformed request parameters.
 
 ## Verification
 
@@ -59,6 +60,8 @@ Phase 4 - Badminton Match, Ranking, Statistics and Engagement: implemented; back
 - Phase 3 migration/runtime: PASS, Flyway V4 applied to PostgreSQL 17.10 and Hibernate started with 18 repository interfaces.
 - Phase 3 runtime: PASS, real HTTP flow created a BADMINTON group with default Season 1, venue and court, created/opened/confirmed a capacity-16 session, registered a member, and returned a derived `BADMINTON` calendar item.
 - Phase 4 runtime: PASS, real HTTP flow created four players, checked them in, generated court allocation, generated balanced doubles pairing, created a match, submitted and confirmed a result, then verified leaderboard rows, ranking-derived statistics, system news, participant notifications, and dashboard recent results.
+- Phase 5 golden runtime: PASS, live HTTP flow verified 17 badminton actors, 16 active registrations plus FIFO waitlist promotion, 4-court allocation for 16 checked-in players, four balanced 2-vs-2 pairings, match confirmation, ranking/history/statistics/news/dashboard/session-detail responses, duplicate-registration `409`, member authorization `403`, malformed-parameter `400`, and invitation notification creation.
+- Phase 5 frontend runtime: PASS, Vite served the React app and proxied `/api/health` with HTTP 200; headless Chrome rendered the real login screen.
 
 ## Known limitations
 
@@ -72,4 +75,4 @@ Phase 4 - Badminton Match, Ranking, Statistics and Engagement: implemented; back
 
 ## Next task
 
-Phase 4 is complete. The next planned boundary is tournament/advanced badminton analytics only if explicitly approved; Google Calendar sync and other out-of-scope integrations remain deferred.
+Phase 5 is complete. The next planned boundary is tournament/advanced badminton analytics only if explicitly approved; Google Calendar sync and other out-of-scope integrations remain deferred.

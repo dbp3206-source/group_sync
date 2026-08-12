@@ -12,12 +12,14 @@ export type Pairing = { courtId: number; courtName: string; roundNumber: number;
 export type Match = { id: number; sessionId: number; courtId: number; courtName: string; roundNumber: number; status: string; scoreA: number | null; scoreB: number | null; winnerSide: string | null; sides: { code: string; participants: { userId: number; displayName: string }[] }[] }
 export type Stat = { userId: number; displayName: string; matches: number; wins: number; losses: number; points: number; attended: number; noShows: number; winRate: number; recentForm: string }
 export type News = { id: number; type: string; title: string; content: string; targetId: number | null; createdAt: string }
+export type RankingHistory = { id: number; matchId: number; userId: number; pointsAfter: number; winsAfter: number; matchesAfter: number; createdAt: string }
 
 export async function getBadmintonSeasons(groupId: number) { return (await apiClient.get<BadmintonSeason[]>(`/badminton/groups/${groupId}/seasons`)).data }
 export async function getBadmintonVenues(groupId: number) { return (await apiClient.get<Venue[]>(`/badminton/groups/${groupId}/venues`)).data }
 export async function createBadmintonVenue(groupId: number, input: { name: string; address: string }) { return (await apiClient.post<Venue>(`/badminton/groups/${groupId}/venues`, input)).data }
 export async function createBadmintonCourt(groupId: number, venueId: number, name: string) { return (await apiClient.post<Court>(`/badminton/groups/${groupId}/venues/${venueId}/courts`, { name })).data }
 export async function getBadmintonSessions(groupId: number) { return (await apiClient.get<BadmintonSession[]>(`/badminton/groups/${groupId}/sessions`)).data }
+export async function getBadmintonSession(id: number) { return (await apiClient.get<BadmintonSession>(`/badminton/sessions/${id}`)).data }
 export async function createBadmintonSession(groupId: number, input: { title: string; start: string; end: string; registrationDeadline: string; capacity: number; seasonId: number; venueId: number; courtIds: number[] }) { return (await apiClient.post<BadmintonSession>(`/badminton/groups/${groupId}/sessions`, input)).data }
 export async function openBadmintonSession(id: number) { return (await apiClient.post<BadmintonSession>(`/badminton/sessions/${id}/open`)).data }
 export async function confirmBadmintonSession(id: number) { return (await apiClient.post<BadmintonSession>(`/badminton/sessions/${id}/confirm`)).data }
@@ -36,4 +38,6 @@ export async function startMatch(id: number) { return (await apiClient.post<Matc
 export async function submitMatchScore(id: number, scoreA: number, scoreB: number) { return (await apiClient.post<Match>(`/badminton/matches/${id}/result`, { scoreA, scoreB })).data }
 export async function confirmMatch(id: number) { return (await apiClient.post<Match>(`/badminton/matches/${id}/confirm`)).data }
 export async function getLeaderboard(groupId: number, seasonId: number) { return (await apiClient.get<Stat[]>(`/badminton/groups/${groupId}/leaderboard?seasonId=${seasonId}`)).data }
+export async function getPlayerStats(groupId: number, userId: number, seasonId: number) { return (await apiClient.get<Stat>(`/badminton/groups/${groupId}/players/${userId}/stats?seasonId=${seasonId}`)).data }
+export async function getRankingHistory(groupId: number, userId: number, seasonId: number) { return (await apiClient.get<RankingHistory[]>(`/badminton/groups/${groupId}/players/${userId}/ranking-history?seasonId=${seasonId}`)).data }
 export async function getNews(groupId: number) { return (await apiClient.get<News[]>(`/badminton/groups/${groupId}/news`)).data }

@@ -124,6 +124,13 @@ public class BadmintonService {
         return sessionRepository.findByGroupIdOrderByStartAtDesc(groupId).stream().map(this::toResponse).toList();
     }
 
+    @Transactional(readOnly = true)
+    public BadmintonResponses.SessionResponse session(AuthenticatedUser actor, Long id) {
+        BadmintonSession session = sessionRepository.findById(id).orElseThrow(() -> new NotFoundException("Badminton session not found."));
+        requireMember(session.getGroup().getId(), actor.getId());
+        return toResponse(session);
+    }
+
     @Transactional
     public BadmintonResponses.SessionResponse createSession(AuthenticatedUser actor, Long groupId, CreateSessionRequest request) {
         requireOrganizer(groupId, actor.getId()); requireBadminton(groupId);

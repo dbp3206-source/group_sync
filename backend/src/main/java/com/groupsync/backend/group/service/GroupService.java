@@ -22,6 +22,7 @@ import com.groupsync.backend.group.model.Membership;
 import com.groupsync.backend.group.repository.GroupRepository;
 import com.groupsync.backend.group.repository.InvitationRepository;
 import com.groupsync.backend.group.repository.MembershipRepository;
+import com.groupsync.backend.notification.service.NotificationService;
 import com.groupsync.backend.badminton.model.Season;
 import com.groupsync.backend.badminton.repository.SeasonRepository;
 import java.time.LocalDate;
@@ -38,6 +39,7 @@ public class GroupService {
     private final InvitationRepository invitationRepository;
     private final UserAccountRepository userRepository;
     private final SeasonRepository seasonRepository;
+    private final NotificationService notificationService;
 
     @Autowired
     public GroupService(
@@ -45,13 +47,15 @@ public class GroupService {
         MembershipRepository membershipRepository,
         InvitationRepository invitationRepository,
         UserAccountRepository userRepository,
-        SeasonRepository seasonRepository
+        SeasonRepository seasonRepository,
+        NotificationService notificationService
     ) {
         this.groupRepository = groupRepository;
         this.membershipRepository = membershipRepository;
         this.invitationRepository = invitationRepository;
         this.userRepository = userRepository;
         this.seasonRepository = seasonRepository;
+        this.notificationService = notificationService;
     }
 
     public GroupService(
@@ -60,7 +64,7 @@ public class GroupService {
         InvitationRepository invitationRepository,
         UserAccountRepository userRepository
     ) {
-        this(groupRepository, membershipRepository, invitationRepository, userRepository, null);
+        this(groupRepository, membershipRepository, invitationRepository, userRepository, null, null);
     }
 
     @Transactional
@@ -107,6 +111,9 @@ public class GroupService {
             throw new ConflictException("A pending invitation already exists for this user.");
         }
         Invitation invitation = invitationRepository.save(new Invitation(group, invitee, findUser(actor.getId())));
+        if (notificationService != null) {
+            notificationService.create(invitee.getId(), "GROUP_INVITATION", "New group invitation", "You were invited to join " + group.getName() + ".", "GROUP", groupId);
+        }
         return InvitationResponse.from(invitation);
     }
 

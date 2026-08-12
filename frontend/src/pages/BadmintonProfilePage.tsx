@@ -1,0 +1,13 @@
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { getApiErrorMessage } from '../api/errors'
+import { getBadmintonSeasons, getPlayerStats, getRankingHistory, type BadmintonSeason, type RankingHistory, type Stat } from '../api/badminton'
+
+function BadmintonProfilePage() {
+  const [params] = useSearchParams(); const groupId = Number(params.get('groupId') ?? 0); const userId = Number(params.get('userId') ?? 0)
+  const [season, setSeason] = useState<BadmintonSeason | null>(null); const [stats, setStats] = useState<Stat | null>(null); const [history, setHistory] = useState<RankingHistory[]>([]); const [error, setError] = useState('')
+  useEffect(() => { if (!groupId || !userId) return; async function load() { const seasons = await getBadmintonSeasons(groupId); const active = seasons[0]; setSeason(active ?? null); if (active) { const [nextStats, nextHistory] = await Promise.all([getPlayerStats(groupId, userId, active.id), getRankingHistory(groupId, userId, active.id)]); setStats(nextStats); setHistory(nextHistory) } } load().catch((e) => setError(getApiErrorMessage(e, 'Could not load the badminton profile.'))) }, [groupId, userId])
+  return <section><Link className="back-link" to={`/badminton?groupId=${groupId}`}>← Back to badminton</Link><div className="page-heading"><div><p className="eyebrow">Badminton profile</p><h1>{stats?.displayName || 'Player profile'}</h1></div><span className="subtle">{season?.name || 'No active season'}</span></div>{error && <div className="alert alert-danger">{error}</div>}{!stats && !error && <div className="page-panel empty-state">No statistics have been recorded for this player yet.</div>}{stats && <div className="content-grid"><div className="page-panel"><div className="section-title">Season statistics</div><div className="member-row"><strong>{stats.points} points</strong><span>{stats.wins}W / {stats.losses}L · {stats.winRate.toFixed(1)}% win rate</span></div><div className="member-row"><strong>{stats.matches} matches</strong><span>{stats.attended} attended · {stats.noShows} no-show</span></div><p className="hint">Recent form: {stats.recentForm || '—'}</p></div><div className="page-panel"><div className="section-title">Ranking history</div>{history.length === 0 ? <p className="hint">No ranking history yet.</p> : history.map((item) => <div className="member-row" key={item.id}><strong>Match #{item.matchId}</strong><span>{item.pointsAfter} pts · {item.winsAfter}W · {new Date(item.createdAt).toLocaleString()}</span></div>)}</div></div>}</section>
+}
+
+export default BadmintonProfilePage

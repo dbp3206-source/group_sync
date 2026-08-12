@@ -3,30 +3,20 @@ import { getApiErrorMessage } from '../api/errors'
 import { getGroups, type GroupSummary } from '../api/groups'
 import { getBadmintonSeasons } from '../api/badminton'
 import { getGroupDashboard, type Dashboard } from '../api/dashboard'
+import { getNotifications, type Notification } from '../api/notifications'
+import { getStudySessions, type StudySession } from '../api/study'
 
 function DashboardPage() {
-  const [groups, setGroups] = useState<GroupSummary[]>([])
-  const [groupId, setGroupId] = useState<number | null>(null)
-  const [dashboard, setDashboard] = useState<Dashboard | null>(null)
-  const [error, setError] = useState('')
-
-  useEffect(() => { getGroups().then((items) => { setGroups(items); setGroupId(items[0]?.id ?? null) }).catch((e) => setError(getApiErrorMessage(e, 'Could not load groups.'))) }, [])
-  useEffect(() => {
-    if (!groupId) return
-    getBadmintonSeasons(groupId).then((seasons) => seasons[0] && getGroupDashboard(groupId, seasons[0].id)).then((data) => data && setDashboard(data)).catch((e) => setError(getApiErrorMessage(e, 'Could not load dashboard.')))
-  }, [groupId])
-
-  return <section>
-    <div className="page-heading"><div><p className="eyebrow">Group overview</p><h1>Dashboard</h1></div><select value={groupId ?? ''} onChange={(e) => setGroupId(Number(e.target.value))}>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></div>
-    {error && <div className="alert alert-danger">{error}</div>}
-    {!dashboard && !error && <div className="page-panel empty-state">Choose a group to load its activities.</div>}
-    {dashboard && <div className="content-grid">
-      <div className="page-panel"><div className="section-title">Next activities</div><p className="hint">{dashboard.registrationCount} registrations across upcoming sessions.</p>{dashboard.nextActivities.map((item) => <div className="member-row" key={item.sessionId}><strong>{item.title}</strong><span>{new Date(item.start).toLocaleString()} · {item.status}</span></div>)}</div>
-      <div className="page-panel"><div className="section-title">Leaderboard</div>{dashboard.leaderboard.map((item) => <div className="member-row" key={item.userId}><strong>{item.displayName}</strong><span>{item.points} pts · {item.wins}W/{item.losses}L</span></div>)}</div>
-      <div className="page-panel"><div className="section-title">Recent results</div>{dashboard.recentMatches.map((match) => <div className="member-row" key={match.id}><strong>Match #{match.id}</strong><span>{match.scoreA ?? '—'} : {match.scoreB ?? '—'} · {match.status}</span></div>)}</div>
-      <div className="page-panel"><div className="section-title">News</div>{dashboard.news.map((item) => <div className="news-row" key={item.id}><strong>{item.title}</strong><span>{item.content}</span></div>)}</div>
-    </div>}
-  </section>
+  const [groups, setGroups] = useState<GroupSummary[]>([]); const [groupId, setGroupId] = useState<number | null>(null); const [dashboard, setDashboard] = useState<Dashboard | null>(null); const [studySessions, setStudySessions] = useState<StudySession[]>([]); const [notifications, setNotifications] = useState<Notification[]>([]); const [error, setError] = useState(''); const selectedGroup = groups.find((group) => group.id === groupId)
+  useEffect(() => { Promise.all([getGroups(), getNotifications()]).then(([items, inbox]) => { setGroups(items); setGroupId(items[0]?.id ?? null); setNotifications(inbox) }).catch((e) => setError(getApiErrorMessage(e, 'Could not load your dashboard.'))) }, [])
+  useEffect(() => { if (!selectedGroup) return; setDashboard(null); setStudySessions([]); if (selectedGroup.type === 'BADMINTON') getBadmintonSeasons(selectedGroup.id).then((seasons) => seasons[0] && getGroupDashboard(selectedGroup.id, seasons[0].id)).then((data) => data && setDashboard(data)).catch((e) => setError(getApiErrorMessage(e, 'Could not load the group dashboard.'))); if (selectedGroup.type === 'STUDY') getStudySessions(selectedGroup.id).then(setStudySessions).catch((e) => setError(getApiErrorMessage(e, 'Could not load study activities.'))) }, [selectedGroup])
+  const unread = notifications.filter((item) => !item.read).length
+  const studyUpcoming = studySessions.filter((session) => new Date(session.start) > new Date() && session.status !== 'CANCELLED').sort((a, b) => a.start.localeCompare(b.start)).slice(0, 3)
+  return <section><div className="page-heading"><div><p className="eyebrow">Home</p><h1>Dashboard</h1><p className="intro">Your next activities, group progress and notifications in one place.</p></div>{groups.length > 0 && <select value={groupId ?? ''} onChange={(e) => setGroupId(Number(e.target.value))}>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select>}</div>{error && <div className="alert alert-danger">{error}</div>}<div className="content-grid dashboard-grid"><div className="page-panel"><div className="section-title">My groups</div>{groups.length === 0 ? <p className="hint">Join or create a group to get started.</p> : groups.map((group) => <div className="member-row" key={group.id}><strong>{group.name}</strong><span>{group.type} · {group.role}</span></div>)}</div><div className="page-panel"><div className="section-title">Notifications</div><p className="metric-number">{unread}</p><p className="hint">unread notification{unread === 1 ? '' : 's'}</p></div>
+    {selectedGroup?.type === 'BADMINTON' && dashboard && <><div className="page-panel"><div className="section-title">Next activities</div><p className="hint">{dashboard.registrationCount} active registrations across sessions.</p>{dashboard.nextActivities.length === 0 ? <p className="hint">No upcoming badminton activity.</p> : dashboard.nextActivities.map((item) => <div className="member-row" key={item.sessionId}><strong>{item.title}</strong><span>{new Date(item.start).toLocaleString()} · {item.status}</span></div>)}</div><div className="page-panel"><div className="section-title">Leaderboard</div>{dashboard.leaderboard.length === 0 ? <p className="hint">Results will appear after a confirmed match.</p> : dashboard.leaderboard.slice(0, 5).map((item) => <div className="member-row" key={item.userId}><strong>{item.displayName}</strong><span>{item.points} pts · {item.wins}W/{item.losses}L</span></div>)}</div><div className="page-panel"><div className="section-title">Recent results</div>{dashboard.recentMatches.length === 0 ? <p className="hint">No confirmed matches yet.</p> : dashboard.recentMatches.map((match) => <div className="member-row" key={match.id}><strong>Match #{match.id}</strong><span>{match.scoreA ?? '—'} : {match.scoreB ?? '—'} · {match.status}</span></div>)}</div><div className="page-panel"><div className="section-title">Recent news</div>{dashboard.news.length === 0 ? <p className="hint">No news yet.</p> : dashboard.news.slice(0, 5).map((item) => <div className="news-row" key={item.id}><strong>{item.title}</strong><span>{item.content}</span></div>)}</div></>}
+    {selectedGroup?.type === 'STUDY' && <div className="page-panel"><div className="section-title">Next study activities</div>{studyUpcoming.length === 0 ? <p className="hint">No upcoming study session.</p> : studyUpcoming.map((session) => <div className="member-row" key={session.id}><strong>{session.topic}</strong><span>{new Date(session.start).toLocaleString()} · {session.participants.length} participants</span></div>)}</div>}
+    {!selectedGroup && <div className="page-panel empty-state">Create or join a group to see your next activities.</div>}
+  </div></section>
 }
 
 export default DashboardPage

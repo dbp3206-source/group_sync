@@ -12,6 +12,8 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import NotificationsPage from './pages/NotificationsPage'
 import DashboardPage from './pages/DashboardPage'
+import BadmintonSessionDetailPage from './pages/BadmintonSessionDetailPage'
+import BadmintonProfilePage from './pages/BadmintonProfilePage'
 
 function App() {
   return (
@@ -30,7 +32,7 @@ function AppShell() {
 
   return <div className="app-shell">
     <header className="app-header">
-      <Link className="brand" to={user ? '/groups' : '/login'}>GroupSync</Link>
+      <Link className="brand" to={user ? '/dashboard' : '/login'}>GroupSync</Link>
       <nav className="app-nav" aria-label="Main navigation">
         {user && <><Link to="/dashboard">Dashboard</Link><Link to="/groups">Groups</Link><Link to="/calendar">Calendar</Link><Link to="/study">Study</Link><Link to="/badminton">Badminton</Link><Link to="/notifications">Inbox</Link></>}
         {!loading && !user && <Link to="/login">Sign in</Link>}
@@ -41,11 +43,11 @@ function AppShell() {
     <main className="app-main">
       <Routes>
         <Route path="/health" element={<HealthPage />} />
-        <Route element={<ProtectedRoute />}><Route path="/dashboard" element={<DashboardPage />} /><Route path="/notifications" element={<NotificationsPage />} /><Route path="/calendar" element={<CalendarPage />} /><Route path="/study" element={<StudyPage />} /><Route path="/badminton" element={<BadmintonPage />} /></Route>
+        <Route element={<ProtectedRoute />}><Route path="/dashboard" element={<DashboardPage />} /><Route path="/notifications" element={<NotificationsPage />} /><Route path="/calendar" element={<CalendarPage />} /><Route path="/study" element={<StudyPage />} /><Route path="/badminton" element={<BadmintonPage />} /><Route path="/badminton/sessions/:sessionId" element={<BadmintonSessionDetailPage />} /><Route path="/badminton/profile" element={<BadmintonProfilePage />} /></Route>
         <Route path="/login" element={user ? <Navigate to="/groups" replace /> : <LoginPage />} />
         <Route path="/register" element={user ? <Navigate to="/groups" replace /> : <RegisterPage />} />
         <Route element={<ProtectedRoute />}><Route path="/groups" element={<GroupsPage />} /><Route path="/groups/:groupId" element={<GroupDetailPage />} /></Route>
-        <Route path="*" element={<Navigate to={user ? '/groups' : '/login'} replace />} />
+        <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
       </Routes>
     </main>
   </div>
