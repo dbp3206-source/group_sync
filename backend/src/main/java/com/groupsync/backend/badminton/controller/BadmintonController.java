@@ -21,7 +21,10 @@ import com.groupsync.backend.badminton.dto.BadmintonResponses;
 import com.groupsync.backend.badminton.dto.CreateCourtRequest;
 import com.groupsync.backend.badminton.dto.CreateResponsibilityRequest;
 import com.groupsync.backend.badminton.dto.CreateSessionRequest;
+import com.groupsync.backend.badminton.dto.CreateSeasonRequest;
 import com.groupsync.backend.badminton.dto.CreateVenueRequest;
+import com.groupsync.backend.badminton.dto.CheckinResponses;
+import com.groupsync.backend.badminton.service.CheckinService;
 import com.groupsync.backend.badminton.dto.ProfileRequest;
 import com.groupsync.backend.badminton.dto.RescheduleSessionRequest;
 import com.groupsync.backend.badminton.service.BadmintonService;
@@ -32,9 +35,13 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/badminton")
 public class BadmintonController {
     private final BadmintonService service;
-    public BadmintonController(BadmintonService service) { this.service = service; }
+    private final CheckinService checkinService;
+    public BadmintonController(BadmintonService service, CheckinService checkinService) { this.service = service; this.checkinService = checkinService; }
 
     @GetMapping("/groups/{groupId}/seasons") public List<BadmintonResponses.SeasonResponse> seasons(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long groupId) { return service.seasons(actor, groupId); }
+    @PostMapping("/groups/{groupId}/seasons") @ResponseStatus(HttpStatus.CREATED) public BadmintonResponses.SeasonResponse createSeason(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long groupId, @Valid @RequestBody CreateSeasonRequest request) { return service.createSeason(actor, groupId, request); }
+    @PostMapping("/seasons/{seasonId}/activate") public BadmintonResponses.SeasonResponse activateSeason(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long seasonId) { return service.activateSeason(actor, seasonId); }
+    @PostMapping("/seasons/{seasonId}/deactivate") public BadmintonResponses.SeasonResponse deactivateSeason(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long seasonId) { return service.deactivateSeason(actor, seasonId); }
     @GetMapping("/groups/{groupId}/venues") public List<BadmintonResponses.VenueResponse> venues(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long groupId) { return service.venues(actor, groupId); }
     @PostMapping("/groups/{groupId}/venues") @ResponseStatus(HttpStatus.CREATED) public BadmintonResponses.VenueResponse createVenue(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long groupId, @Valid @RequestBody CreateVenueRequest request) { return service.createVenue(actor, groupId, request); }
     @PostMapping("/groups/{groupId}/venues/{venueId}/courts") @ResponseStatus(HttpStatus.CREATED) public BadmintonResponses.CourtResponse createCourt(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long groupId, @PathVariable Long venueId, @Valid @RequestBody CreateCourtRequest request) { return service.createCourt(actor, groupId, venueId, request); }
@@ -57,4 +64,7 @@ public class BadmintonController {
     @PostMapping("/sessions/{id}/responsibilities") @ResponseStatus(HttpStatus.CREATED) public BadmintonResponses.ResponsibilityResponse addResponsibility(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long id, @Valid @RequestBody CreateResponsibilityRequest request) { return service.addResponsibility(actor, id, request); }
     @PatchMapping("/sessions/{id}/responsibilities/{responsibilityId}") public BadmintonResponses.ResponsibilityResponse assignResponsibility(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long id, @PathVariable Long responsibilityId, @Valid @RequestBody AssignResponsibilityRequest request) { return service.assignResponsibility(actor, id, responsibilityId, request); }
     @DeleteMapping("/responsibilities/{responsibilityId}/assignee") public BadmintonResponses.ResponsibilityResponse unassignResponsibility(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long responsibilityId) { return service.unassignResponsibility(actor, responsibilityId); }
+    @PostMapping("/sessions/{id}/responsibilities/assign-round-robin") public List<BadmintonResponses.ResponsibilityResponse> assignResponsibilitiesRoundRobin(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long id) { return service.assignResponsibilitiesRoundRobin(actor, id); }
+    @PostMapping("/sessions/{id}/checkin-token") public CheckinResponses.Token generateCheckinToken(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long id) { return checkinService.generate(actor, id); }
+    @PostMapping("/check-in") public CheckinResponses.Result checkIn(@AuthenticationPrincipal AuthenticatedUser actor, @RequestBody CheckinResponses.CheckinRequest request) { return checkinService.checkIn(actor, request.token()); }
 }

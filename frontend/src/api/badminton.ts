@@ -30,6 +30,8 @@ export async function checkInBadminton(sessionId: number, userId: number) { retu
 export async function noShowBadminton(sessionId: number, userId: number) { return (await apiClient.post<BadmintonSession>(`/badminton/sessions/${sessionId}/registrations/${userId}/no-show`)).data }
 export async function startBadmintonSession(id: number) { return (await apiClient.post<BadmintonSession>(`/badminton/sessions/${id}/start`)).data }
 export async function completeBadmintonSession(id: number) { return (await apiClient.post<BadmintonSession>(`/badminton/sessions/${id}/complete`)).data }
+export async function generateCheckinToken(id: number) { return (await apiClient.post<{ sessionId: number; sessionTitle: string; token: string; checkInUrl: string; expiresAt: string }>(`/badminton/sessions/${id}/checkin-token`)).data }
+export async function checkInWithToken(token: string) { return (await apiClient.post<{ sessionId: number; sessionTitle: string; status: string; alreadyCheckedIn: boolean }>('/badminton/check-in', { token })).data }
 export async function generateAllocation(id: number, round = 1) { return (await apiClient.post<Allocation[]>(`/badminton/sessions/${id}/allocations/generate?round=${round}`)).data }
 export async function getPairings(id: number, strategy = 'BALANCED', round = 1) { return (await apiClient.get<Pairing[]>(`/badminton/sessions/${id}/pairings?strategy=${strategy}&round=${round}&seed=42`)).data }
 export async function createMatch(sessionId: number, input: { courtId: number; roundNumber: number; sideAUserIds: number[]; sideBUserIds: number[] }) { return (await apiClient.post<Match>(`/badminton/sessions/${sessionId}/matches`, input)).data }

@@ -6,10 +6,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import com.groupsync.backend.auth.security.AuthenticatedUser;
 import com.groupsync.backend.badminton.dto.BadmintonResponses.NotificationResponse;
 import com.groupsync.backend.notification.service.NotificationService;
+import com.groupsync.backend.notification.dto.NotificationPreferenceRequest;
+import com.groupsync.backend.notification.dto.NotificationPreferenceResponse;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/notifications")
@@ -18,4 +22,6 @@ public class NotificationController {
     public NotificationController(NotificationService service) { this.service = service; }
     @GetMapping public List<NotificationResponse> list(@AuthenticationPrincipal AuthenticatedUser actor) { return service.list(actor); }
     @PatchMapping("/{id}/read") public void markRead(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long id) { service.markRead(actor, id); }
+    @GetMapping("/preferences") public List<NotificationPreferenceResponse> preferences(@AuthenticationPrincipal AuthenticatedUser actor) { return service.preferences(actor); }
+    @PatchMapping("/preferences/{type}") public NotificationPreferenceResponse preference(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable String type, @Valid @RequestBody NotificationPreferenceRequest request) { return service.setPreference(actor, type, request.enabled()); }
 }

@@ -59,6 +59,13 @@ public class WeeklySchedule {
     @Column(nullable = false, length = 50)
     private String timezone;
 
+    @Column(length = 500) private String description;
+    @Column(length = 40) private String category;
+    @Column(length = 200) private String location;
+    @Column(nullable = false, length = 20) private String visibility = "PRIVATE";
+    @Column(name = "reminder_minutes") private Integer reminderMinutes;
+    @Column(nullable = false, length = 20) private String frequency = "WEEKLY";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -88,6 +95,11 @@ public class WeeklySchedule {
         this.timezone = timezone;
     }
 
+    public WeeklySchedule(UserAccount user, String title, Set<DayOfWeek> weekdays, LocalTime startTime, LocalTime endTime, LocalDate validFrom, LocalDate validUntil, String timezone, String description, String category, String location, String visibility, Integer reminderMinutes, String frequency) {
+        this(user, title, weekdays, startTime, endTime, validFrom, validUntil, timezone);
+        updateDetails(description, category, location, visibility, reminderMinutes, frequency);
+    }
+
     @PreUpdate
     void touch() { updatedAt = Instant.now(); }
 
@@ -100,7 +112,8 @@ public class WeeklySchedule {
     public LocalDate getValidFrom() { return validFrom; }
     public LocalDate getValidUntil() { return validUntil; }
     public String getTimezone() { return timezone; }
-    public void update(String title, Set<DayOfWeek> weekdays, LocalTime startTime, LocalTime endTime, LocalDate validFrom, LocalDate validUntil, String timezone) {
+    public void update(String title, Set<DayOfWeek> weekdays, LocalTime startTime, LocalTime endTime, LocalDate validFrom, LocalDate validUntil, String timezone) { update(title, weekdays, startTime, endTime, validFrom, validUntil, timezone, description, category, location, visibility, reminderMinutes, frequency); }
+    public void update(String title, Set<DayOfWeek> weekdays, LocalTime startTime, LocalTime endTime, LocalDate validFrom, LocalDate validUntil, String timezone, String description, String category, String location, String visibility, Integer reminderMinutes, String frequency) {
         this.title = title;
         this.weekdays = new LinkedHashSet<>(weekdays);
         this.startTime = startTime;
@@ -108,5 +121,17 @@ public class WeeklySchedule {
         this.validFrom = validFrom;
         this.validUntil = validUntil;
         this.timezone = timezone;
+        updateDetails(description, category, location, visibility, reminderMinutes, frequency);
     }
+    private void updateDetails(String description, String category, String location, String visibility, Integer reminderMinutes, String frequency) {
+        this.description = description; this.category = category; this.location = location;
+        this.visibility = visibility == null || visibility.isBlank() ? "PRIVATE" : visibility;
+        this.reminderMinutes = reminderMinutes; this.frequency = frequency == null || frequency.isBlank() ? "WEEKLY" : frequency;
+    }
+    public String getDescription() { return description; }
+    public String getCategory() { return category; }
+    public String getLocation() { return location; }
+    public String getVisibility() { return visibility; }
+    public Integer getReminderMinutes() { return reminderMinutes; }
+    public String getFrequency() { return frequency; }
 }

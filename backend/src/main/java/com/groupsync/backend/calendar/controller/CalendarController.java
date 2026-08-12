@@ -40,6 +40,9 @@ public class CalendarController {
         return calendarService.getItems(actor, from.toInstant(), to.toInstant());
     }
 
+    @GetMapping("/events")
+    public List<BusyEventResponse> events(@AuthenticationPrincipal AuthenticatedUser actor) { return calendarService.listEvents(actor); }
+
     @GetMapping("/conflicts")
     public ConflictResponse conflicts(@AuthenticationPrincipal AuthenticatedUser actor, @RequestParam OffsetDateTime start, @RequestParam OffsetDateTime end) {
         return calendarService.findConflicts(actor, start.toInstant(), end.toInstant());
@@ -60,6 +63,9 @@ public class CalendarController {
         calendarService.deleteEvent(actor, eventId); return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/events/{eventId}/duplicate")
+    public BusyEventResponse duplicateEvent(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long eventId) { return calendarService.duplicateEvent(actor, eventId); }
+
     @GetMapping("/recurring")
     public List<WeeklyScheduleResponse> schedules(@AuthenticationPrincipal AuthenticatedUser actor) { return calendarService.listSchedules(actor); }
 
@@ -77,4 +83,7 @@ public class CalendarController {
     public ResponseEntity<Void> deleteSchedule(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long scheduleId) {
         calendarService.deleteSchedule(actor, scheduleId); return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/recurring/{scheduleId}/duplicate")
+    public WeeklyScheduleResponse duplicateSchedule(@AuthenticationPrincipal AuthenticatedUser actor, @PathVariable Long scheduleId) { return calendarService.duplicateSchedule(actor, scheduleId); }
 }

@@ -17,6 +17,12 @@ public record CreateWeeklyScheduleRequest(
     @NotNull LocalTime endTime,
     @NotNull LocalDate validFrom,
     @NotNull LocalDate validUntil,
-    @NotBlank @Size(max = 50) String timezone
+    @NotBlank @Size(max = 50) String timezone,
+    @Size(max = 500) String description,
+    @Size(max = 40) String category,
+    @Size(max = 200) String location,
+    @Size(max = 20) String visibility,
+    Integer reminderMinutes,
+    @Size(max = 20) String frequency
 ) {
 }

@@ -24,7 +24,8 @@ public class RecurrenceExpander {
         List<CalendarItem> occurrences = new ArrayList<>();
 
         for (LocalDate date = firstDate; !date.isAfter(lastDate); date = date.plusDays(1)) {
-            if (date.isBefore(schedule.getValidFrom()) || date.isAfter(schedule.getValidUntil()) || !schedule.getWeekdays().contains(date.getDayOfWeek())) {
+            boolean matchesDay = "DAILY".equals(schedule.getFrequency()) || schedule.getWeekdays().contains(date.getDayOfWeek());
+            if (date.isBefore(schedule.getValidFrom()) || date.isAfter(schedule.getValidUntil()) || !matchesDay) {
                 continue;
             }
             Instant start = date.atTime(schedule.getStartTime()).atZone(zone).toInstant();

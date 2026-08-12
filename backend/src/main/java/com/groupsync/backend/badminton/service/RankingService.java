@@ -12,6 +12,8 @@ import com.groupsync.backend.badminton.model.BadmintonMatchParticipant;
 import com.groupsync.backend.badminton.model.BadmintonPlayerStat;
 import com.groupsync.backend.badminton.model.RankingHistory;
 import com.groupsync.backend.badminton.ranking.PointsRankingStrategy;
+import com.groupsync.backend.badminton.ranking.EloRankingStrategy;
+import com.groupsync.backend.badminton.ranking.RankingStrategy;
 import com.groupsync.backend.badminton.repository.BadmintonPlayerStatRepository;
 import com.groupsync.backend.badminton.repository.RankingHistoryRepository;
 
@@ -19,19 +21,22 @@ import com.groupsync.backend.badminton.repository.RankingHistoryRepository;
 public class RankingService {
     private final BadmintonPlayerStatRepository statRepository;
     private final RankingHistoryRepository historyRepository;
-    private final PointsRankingStrategy strategy = new PointsRankingStrategy();
+    private final RankingStrategy points = new PointsRankingStrategy();
+    private final RankingStrategy elo = new EloRankingStrategy();
     public RankingService(BadmintonPlayerStatRepository statRepository, RankingHistoryRepository historyRepository) { this.statRepository = statRepository; this.historyRepository = historyRepository; }
 
     @Transactional
     public void applyConfirmedMatch(BadmintonMatch match) {
         if (match.getId() == null) throw new IllegalStateException("Match must be saved before ranking is applied.");
         Set<Long> seen = new HashSet<>();
+        RankingStrategy strategy = "ELO".equals(match.getSeason().getRankingStrategy()) ? elo : points;
         for (var side : match.getSides()) for (BadmintonMatchParticipant participant : side.getParticipants()) {
             if (!seen.add(participant.getUser().getId())) continue;
             BadmintonPlayerStat stat = statRepository.findByGroupIdAndSeasonIdAndUserId(match.getSession().getGroup().getId(), match.getSeason().getId(), participant.getUser().getId()).orElseGet(() -> statRepository.save(new BadmintonPlayerStat(match.getSession().getGroup(), match.getSeason(), participant.getUser())));
             boolean winner = side.getCode() == match.getWinnerSide();
             if (!historyRepository.existsByMatchIdAndUserId(match.getId(), participant.getUser().getId())) {
-                if (winner) stat.recordWin(strategy.winnerPoints()); else stat.recordLoss(strategy.loserPoints());
+                int opponentPoints = match.getSides().stream().filter(other -> other.getCode() != side.getCode()).flatMap(other -> other.getParticipants().stream()).mapToInt(other -> statRepository.findByGroupIdAndSeasonIdAndUserId(match.getSession().getGroup().getId(), match.getSeason().getId(), other.getUser().getId()).map(BadmintonPlayerStat::getPoints).orElse(0)).findFirst().orElse(0);
+                if (winner) stat.recordWin(strategy.pointsForWin(stat.getPoints(), opponentPoints)); else stat.recordLoss(strategy.pointsForLoss(stat.getPoints(), opponentPoints));
                 statRepository.save(stat);
                 historyRepository.save(new RankingHistory(match, match.getSession().getGroup(), match.getSeason(), participant.getUser(), stat.getPoints(), stat.getWins(), stat.getMatchesPlayed()));
             }

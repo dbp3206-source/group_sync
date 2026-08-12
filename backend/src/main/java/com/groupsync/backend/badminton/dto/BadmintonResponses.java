@@ -14,8 +14,8 @@ import com.groupsync.backend.badminton.model.Venue;
 
 public final class BadmintonResponses {
     private BadmintonResponses() { }
-    public record SeasonResponse(Long id, String name, LocalDate startsOn, LocalDate endsOn, boolean active) {
-        public static SeasonResponse from(Season s) { return new SeasonResponse(s.getId(), s.getName(), s.getStartsOn(), s.getEndsOn(), s.isActive()); }
+    public record SeasonResponse(Long id, String name, LocalDate startsOn, LocalDate endsOn, boolean active, String rankingStrategy) {
+        public static SeasonResponse from(Season s) { return new SeasonResponse(s.getId(), s.getName(), s.getStartsOn(), s.getEndsOn(), s.isActive(), s.getRankingStrategy()); }
     }
     public record CourtResponse(Long id, String name, boolean active) { public static CourtResponse from(Court c) { return new CourtResponse(c.getId(), c.getName(), c.isActive()); } }
     public record VenueResponse(Long id, String name, String address, List<CourtResponse> courts) { public static VenueResponse from(Venue v, List<Court> courts) { return new VenueResponse(v.getId(), v.getName(), v.getAddress(), courts.stream().map(CourtResponse::from).toList()); } }

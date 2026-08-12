@@ -38,6 +38,8 @@ Invoke-RestMethod -UseBasicParsing "$BackendUrl/api/health" | Out-Null
 
 Invoke-Psql @'
 TRUNCATE TABLE
+    tournament_matches, tournament_participants, tournaments,
+    badminton_checkin_tokens, notification_preferences,
     badminton_match_participants, badminton_match_sides, badminton_matches,
     badminton_ranking_history, badminton_player_stats, badminton_allocation_players,
     badminton_allocations, badminton_responsibilities, badminton_registrations,

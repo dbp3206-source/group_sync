@@ -9,4 +9,7 @@ public final class MatchResponses {
     public record Stat(Long userId, String displayName, int matches, int wins, int losses, int points, int attended, int noShows, double winRate, String recentForm) { }
     public record History(Long id, Long matchId, Long userId, int pointsAfter, int winsAfter, int matchesAfter, Instant createdAt) { }
     public record News(Long id, String type, String title, String content, Long targetId, Instant createdAt) { }
+    public record HeadToHead(Long playerId, Long opponentId, int matches, int wins, int losses) { }
+    public record PartnerStat(Long partnerId, String partnerName, int matches, int wins, int losses) { }
+    public record Award(String code, String title, String description) { }
 }

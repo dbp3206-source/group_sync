@@ -25,6 +25,7 @@ public class Season {
     @Column(name = "starts_on", nullable = false) private LocalDate startsOn;
     @Column(name = "ends_on") private LocalDate endsOn;
     @Column(nullable = false) private boolean active;
+    @Column(name = "ranking_strategy", nullable = false, length = 20) private String rankingStrategy = "POINTS";
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt = Instant.now();
 
     protected Season() { }
@@ -37,6 +38,8 @@ public class Season {
     public LocalDate getStartsOn() { return startsOn; }
     public LocalDate getEndsOn() { return endsOn; }
     public boolean isActive() { return active; }
+    public String getRankingStrategy() { return rankingStrategy; }
+    public void setRankingStrategy(String strategy) { rankingStrategy = "ELO".equals(strategy) ? "ELO" : "POINTS"; }
     public void activate() { active = true; }
     public void deactivate() { active = false; }
 }

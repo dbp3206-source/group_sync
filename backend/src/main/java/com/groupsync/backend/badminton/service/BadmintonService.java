@@ -14,6 +14,7 @@ import com.groupsync.backend.badminton.dto.BadmintonResponses;
 import com.groupsync.backend.badminton.dto.CreateCourtRequest;
 import com.groupsync.backend.badminton.dto.CreateResponsibilityRequest;
 import com.groupsync.backend.badminton.dto.CreateSessionRequest;
+import com.groupsync.backend.badminton.dto.CreateSeasonRequest;
 import com.groupsync.backend.badminton.dto.CreateVenueRequest;
 import com.groupsync.backend.badminton.dto.ProfileRequest;
 import com.groupsync.backend.badminton.dto.RescheduleSessionRequest;
@@ -26,6 +27,7 @@ import com.groupsync.backend.badminton.model.RegistrationStatus;
 import com.groupsync.backend.badminton.model.Season;
 import com.groupsync.backend.badminton.model.SessionResponsibility;
 import com.groupsync.backend.badminton.model.Venue;
+import com.groupsync.backend.badminton.responsibility.RoundRobinResponsibilityAssignmentStrategy;
 import com.groupsync.backend.badminton.repository.BadmintonProfileRepository;
 import com.groupsync.backend.badminton.repository.BadmintonRegistrationRepository;
 import com.groupsync.backend.badminton.repository.BadmintonSessionRepository;
@@ -79,6 +81,17 @@ public class BadmintonService {
         requireMember(groupId, actor.getId()); requireBadminton(groupId);
         return seasonRepository.findByGroupIdOrderByStartsOnDesc(groupId).stream().map(BadmintonResponses.SeasonResponse::from).toList();
     }
+
+    @Transactional
+    public BadmintonResponses.SeasonResponse createSeason(AuthenticatedUser actor, Long groupId, CreateSeasonRequest request) {
+        requireOrganizer(groupId, actor.getId()); requireBadminton(groupId);
+        if (request.endsOn() != null && request.startsOn().isAfter(request.endsOn())) throw new BadRequestException("Season start must not be after its end.");
+        Season season = new Season(findGroup(groupId), request.name().trim(), request.startsOn(), request.endsOn(), false); season.setRankingStrategy(request.rankingStrategy());
+        return BadmintonResponses.SeasonResponse.from(seasonRepository.save(season));
+    }
+
+    @Transactional public BadmintonResponses.SeasonResponse activateSeason(AuthenticatedUser actor, Long seasonId) { Season season = seasonForOrganizer(actor, seasonId); seasonRepository.findByGroupIdOrderByStartsOnDesc(season.getGroup().getId()).forEach(other -> { if (!other.getId().equals(seasonId)) other.deactivate(); }); season.activate(); return BadmintonResponses.SeasonResponse.from(season); }
+    @Transactional public BadmintonResponses.SeasonResponse deactivateSeason(AuthenticatedUser actor, Long seasonId) { Season season = seasonForOrganizer(actor, seasonId); season.deactivate(); return BadmintonResponses.SeasonResponse.from(season); }
 
     @Transactional(readOnly = true)
     public List<BadmintonResponses.VenueResponse> venues(AuthenticatedUser actor, Long groupId) {
@@ -211,6 +224,15 @@ public class BadmintonService {
         organizerSession(actor, r.getSession().getId()); r.unassign(); return BadmintonResponses.ResponsibilityResponse.from(r);
     }
 
+    @Transactional
+    public List<BadmintonResponses.ResponsibilityResponse> assignResponsibilitiesRoundRobin(AuthenticatedUser actor, Long sessionId) {
+        BadmintonSession session = organizerSession(actor, sessionId);
+        List<SessionResponsibility> responsibilities = responsibilityRepository.findBySessionIdOrderByItemNameAsc(sessionId).stream().filter(r -> r.getAssignee() == null).toList();
+        List<com.groupsync.backend.user.model.UserAccount> members = registrationRepository.findBySessionIdAndStatusInOrderByRegisteredAtAscIdAsc(sessionId, List.of(RegistrationStatus.REGISTERED, RegistrationStatus.CHECKED_IN)).stream().map(r -> r.getUser()).toList();
+        new RoundRobinResponsibilityAssignmentStrategy().assign(responsibilities, members);
+        return responsibilities.stream().map(BadmintonResponses.ResponsibilityResponse::from).toList();
+    }
+
     private void unassignResponsibilities(BadmintonSession s, Long userId) { responsibilityRepository.findBySessionIdAndAssigneeId(s.getId(), userId).forEach(r -> { r.unassign(); membershipRepository.findByGroupIdOrderByCreatedAtAsc(s.getGroup().getId()).stream().filter(m -> m.getRole() != GroupRole.MEMBER).forEach(m -> notificationService.create(m.getUser().getId(), "RESPONSIBILITY_UNASSIGNED", "Session responsibility needs an owner", r.getItemName() + " is available again for " + s.getTitle() + ".", "BADMINTON_SESSION", s.getId())); }); }
     private void promoteNext(BadmintonSession s) { registrationRepository.findOldestWaitlisted(s.getId()).ifPresent(r -> { r.promote(Instant.now()); notificationService.create(r.getUser().getId(), "WAITLIST_PROMOTED", "You moved off the waitlist", "A place opened in " + s.getTitle() + ".", "BADMINTON_SESSION", s.getId()); }); }
     private void notifyRegistered(BadmintonSession s, String type, String title, String message) { registrationRepository.findBySessionIdAndStatusInOrderByRegisteredAtAscIdAsc(s.getId(), List.of(RegistrationStatus.REGISTERED, RegistrationStatus.CHECKED_IN)).forEach(r -> notificationService.create(r.getUser().getId(), type, title, message, "BADMINTON_SESSION", s.getId())); }
@@ -218,6 +240,7 @@ public class BadmintonService {
     private BadmintonResponses.SessionResponse toResponse(BadmintonSession s, boolean conflict, Long actorId) { return BadmintonResponses.SessionResponse.from(s, registrationRepository.findBySessionIdOrderByRegisteredAtAscIdAsc(s.getId()).stream().map(r -> BadmintonResponses.RegistrationResponse.from(r, conflict && r.getStatus() == RegistrationStatus.REGISTERED && r.getUser().getId().equals(actorId))).toList(), responsibilityRepository.findBySessionIdOrderByItemNameAsc(s.getId()).stream().map(BadmintonResponses.ResponsibilityResponse::from).toList()); }
     private BadmintonSession organizerSession(AuthenticatedUser actor, Long id) { BadmintonSession s = sessionRepository.findById(id).orElseThrow(() -> new NotFoundException("Badminton session not found.")); requireOrganizer(s.getGroup().getId(), actor.getId()); return s; }
     private Membership requireOrganizer(Long groupId, Long userId) { Membership m = requireMember(groupId, userId); if (m.getRole() == GroupRole.MEMBER) throw new ForbiddenException("Only the owner or an organizer can manage badminton operations."); return m; }
+    private Season seasonForOrganizer(AuthenticatedUser actor, Long seasonId) { Season season = seasonRepository.findById(seasonId).orElseThrow(() -> new NotFoundException("Season not found.")); requireOrganizer(season.getGroup().getId(), actor.getId()); return season; }
     private Membership requireMember(Long groupId, Long userId) { return membershipRepository.findByGroupIdAndUserId(groupId, userId).orElseThrow(() -> new ForbiddenException("You are not a member of this group.")); }
     private void requireBadminton(Long groupId) { if (findGroup(groupId).getType() != GroupType.BADMINTON) throw new ConflictException("This operation is only available for BADMINTON groups."); }
     private Group findGroup(Long id) { return groupRepository.findById(id).orElseThrow(() -> new NotFoundException("Group not found.")); }

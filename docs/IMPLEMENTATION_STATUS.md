@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Final Demo & OOP Defense Preparation: complete; reproducible demo seed, golden runtime flow, backend/frontend builds and PostgreSQL/Flyway startup are green.
+Full Feature Completion Pass: implementation complete for the requested local scope; V6 migration, Personal Calendar extensions, Badminton advanced operations, QR check-in, notification preferences and Tournament foundation are included. Google Calendar remains intentionally excluded.
 
 ## Completed
 
@@ -47,15 +47,17 @@ Final Demo & OOP Defense Preparation: complete; reproducible demo seed, golden r
 - Final demo preparation added `scripts/reset-demo.ps1` for reproducible local seed data and `scripts/demo-golden.ps1` for the real end-to-end demonstration flow.
 - Final demo data includes 21 local demo users, Study and Badminton groups, recurring/busy calendar data, a Study rehearsal session, Season 1, one venue with four courts, a capacity-16 near-full session, historical match/ranking/news data, and notifications.
 - Final presentation guides added: `docs/DEMO_GUIDE.md` and `docs/OOP_DEFENSE_GUIDE.md`.
+- Full feature pass added V6 incremental schema changes for calendar metadata, notification preferences, QR check-in tokens and tournament state.
+- Full feature pass added calendar edit/duplicate metadata, daily recurrence, optional season ranking strategy, advanced player analytics, round-robin responsibilities, QR token check-in and tournament registration/bracket/champion derivation.
 
 ## Verification
 
-- Backend tests: PASS, 25 tests passed, including pairing invariants, match lifecycle, ranking idempotency, and event-driven news/notification behavior.
-- Backend package: PASS, `backend/target/backend-0.0.1-SNAPSHOT.jar` produced after the Phase 4 changes.
+- Backend tests: PASS after the full feature pass, including pairing invariants, match lifecycle, ranking idempotency, strategy behavior, and event-driven news/notification behavior.
+- Backend package: PASS, `backend/target/backend-0.0.1-SNAPSHOT.jar` produced after the full feature changes.
 - Frontend: `npm.cmd run build` - PASS, TypeScript build and Vite production build passed with Badminton, dashboard and notification UI integration.
 - Java compiler evidence: Maven compiled with `javac [debug parameters release 21]` and tests ran on Java `21.0.12`.
 - PostgreSQL: PASS, `pg_isready` reports `127.0.0.1:54329 - accepting connections`.
-- Flyway: PASS, V1 through V5 validated; `V5__badminton_match_stats_news.sql` applied and recorded in `flyway_schema_history`.
+- Flyway: PASS, V1 through V6 validated; `V6__calendar_preferences_qr_tournament.sql` applied and recorded in `flyway_schema_history`.
 - Runtime backend: PASS, live `GET /api/health` returned HTTP 200.
 - Runtime frontend: PASS, Vite served React app, Vite proxy returned HTTP 200 for `/api/health`, and headless Chrome rendered `Backend connected` / `groupsync-backend - UP`.
 - Phase 1 runtime: PASS, real HTTP flow completed register A/B, login A/B, current user, create STUDY and OTHER groups, invite, pending invitation, accept, promote to ORGANIZER, member list, logout (204), and post-logout current user rejection (401).
@@ -68,9 +70,10 @@ Final Demo & OOP Defense Preparation: complete; reproducible demo seed, golden r
 - Phase 5 golden runtime: PASS, live HTTP flow verified 17 badminton actors, 16 active registrations plus FIFO waitlist promotion, 4-court allocation for 16 checked-in players, four balanced 2-vs-2 pairings, match confirmation, ranking/history/statistics/news/dashboard/session-detail responses, duplicate-registration `409`, member authorization `403`, malformed-parameter `400`, and invitation notification creation.
 - Phase 5 frontend runtime: PASS, Vite served the React app and proxied `/api/health` with HTTP 200; headless Chrome rendered the real login screen.
 - Final hardening verification: PASS, 25 backend tests, backend package, frontend build, Flyway V1-V5 startup, live health, pairing 2-vs-2, ranking/history/dashboard response, confirmed-match mutation rejection `409`, and Vite proxy HTTP 200.
-- Final demo verification: PASS, `reset-demo.ps1` seeded 21 users and 2 groups; `demo-golden.ps1` verified waitlist promotion, notification, derived calendar, 16 check-ins, 4 allocations, 4 balanced 2-vs-2 pairings, score 21-17, ranking/history/statistics/news/dashboard; final database reseed restored 16 registered players and Flyway version 5.
+- Final demo verification: PASS, `reset-demo.ps1` seeded 21 users and 2 groups; `demo-golden.ps1` verified waitlist promotion, notification, derived calendar, 16 check-ins, 4 allocations, 4 balanced 2-vs-2 pairings, score 21-17, ranking/history/statistics/news/dashboard; final database reseed restored 16 registered players and Flyway version 6.
 - Final frontend runtime: PASS, Vite served the React app on an available local port and proxied `/api/health` with HTTP 200.
-- Final rehearsal: PASS, services were started from the guide, login/groups/calendar/study seed checkpoints were verified, the live golden flow passed, and the database was reseeded to the presentation starting state.
+- Final rehearsal: PASS before this feature pass; the feature pass also smoke-tested calendar metadata/duplicate, notification preferences and QR token/idempotent check-in on the live PostgreSQL-backed application.
+- Full feature runtime: PASS after V6 startup; `reset-demo.ps1` plus `demo-golden.ps1` passed again, and a real FINAL tournament match confirmation updated bracket winner and tournament champion automatically.
 
 ## Known limitations
 
@@ -82,7 +85,9 @@ Final Demo & OOP Defense Preparation: complete; reproducible demo seed, golden r
 - Session storage is the default local Spring session; production deployment hardening is a later infrastructure concern.
 - The local demo depends on the PostgreSQL development service and its local password being supplied through environment variables; neither is committed.
 - The golden flow mutates session state to PLAYING and creates a result. Run `scripts/reset-demo.ps1` before each rehearsal; the final checkpoint database was reseeded to the near-capacity starting state.
+- Tournament bracket match creation is intentionally organizer-driven and reuses the existing Badminton match/result flow; the UI does not duplicate every score-entry control.
+- Calendar reminder minutes are persisted metadata only; no external reminder delivery is implemented.
 
 ## Next task
 
-Final Demo & OOP Defense Preparation is complete. Core GroupSync is stable for final presentation and independent review; tournament/advanced badminton analytics, Google Calendar sync and other out-of-scope integrations remain deferred.
+No additional feature phase is required for the requested local scope. Remaining work is deployment-specific hardening and presentation polish only; Google Calendar and other explicitly excluded integrations remain out of scope.
