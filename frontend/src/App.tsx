@@ -1,26 +1,48 @@
-import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import './App.css'
+import { useAuth } from './auth/AuthContext'
+import ProtectedRoute from './components/ProtectedRoute'
+import GroupDetailPage from './pages/GroupDetailPage'
+import GroupsPage from './pages/GroupsPage'
 import HealthPage from './pages/HealthPage'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 
 function App() {
   return (
-    <BrowserRouter>
-      <div className="app-shell">
-        <header className="app-header">
-          <Link className="brand" to="/">
-            GroupSync
-          </Link>
-          <span className="phase-label">Foundation checkpoint</span>
-        </header>
-        <main className="app-main">
-          <Routes>
-            <Route path="/" element={<HealthPage />} />
-          </Routes>
-        </main>
-      </div>
-    </BrowserRouter>
+    <BrowserRouter><AppShell /></BrowserRouter>
   )
 }
 
-export default App
+function AppShell() {
+  const { user, loading, logout } = useAuth()
+  const navigate = useNavigate()
 
+  async function signOut() {
+    await logout()
+    navigate('/login')
+  }
+
+  return <div className="app-shell">
+    <header className="app-header">
+      <Link className="brand" to={user ? '/groups' : '/login'}>GroupSync</Link>
+      <nav className="app-nav" aria-label="Main navigation">
+        {user && <Link to="/groups">Groups</Link>}
+        {!loading && !user && <Link to="/login">Sign in</Link>}
+        {!loading && !user && <Link className="nav-cta" to="/register">Register</Link>}
+        {user && <><span className="user-chip">{user.displayName}</span><button className="link-button" onClick={signOut}>Sign out</button></>}
+      </nav>
+    </header>
+    <main className="app-main">
+      <Routes>
+        <Route path="/health" element={<HealthPage />} />
+        <Route path="/login" element={user ? <Navigate to="/groups" replace /> : <LoginPage />} />
+        <Route path="/register" element={user ? <Navigate to="/groups" replace /> : <RegisterPage />} />
+        <Route element={<ProtectedRoute />}><Route path="/groups" element={<GroupsPage />} /><Route path="/groups/:groupId" element={<GroupDetailPage />} /></Route>
+        <Route path="*" element={<Navigate to={user ? '/groups' : '/login'} replace />} />
+      </Routes>
+    </main>
+  </div>
+}
+
+export default App

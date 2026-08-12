@@ -1,6 +1,6 @@
 # GroupSync
 
-GroupSync is a beginner-readable modular monolith for personal availability and group activity operations. Phase 0 contains only the runnable foundation: a Spring Boot REST API, a React/Vite frontend, and PostgreSQL development configuration.
+GroupSync is a beginner-readable modular monolith for personal availability and group activity operations. The current foundation application includes a Spring Boot REST API, a React/Vite frontend, PostgreSQL, simple session authentication, and group core operations.
 
 ## Repository layout
 
@@ -60,5 +60,4 @@ cd ..\frontend
 npm.cmd run build
 ```
 
-See `docs/SETUP_REPORT.md` for the exact machine/tool versions and the PostgreSQL setup decision. This checkpoint intentionally does not implement authentication, groups, calendar, Study, or Badminton business features.
-
+See `docs/SETUP_REPORT.md` for the exact machine/tool versions and the PostgreSQL setup decision. See `docs/IMPLEMENTATION_STATUS.md` for the current phase boundary. Calendar, Study, and Badminton vertical features are intentionally still out of scope for this checkpoint.
