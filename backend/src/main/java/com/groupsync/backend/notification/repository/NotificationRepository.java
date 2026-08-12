@@ -10,4 +10,5 @@ import com.groupsync.backend.notification.model.Notification;
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
     List<Notification> findByUserIdOrderByCreatedAtDesc(Long userId);
     Optional<Notification> findByIdAndUserId(Long id, Long userId);
+    Optional<Notification> findBySourceKeyAndUserId(String sourceKey, Long userId);
 }

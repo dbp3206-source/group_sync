@@ -24,12 +24,16 @@ public class Notification {
     @Column(nullable = false, length = 500) private String message;
     @Column(name = "target_type", length = 40) private String targetType;
     @Column(name = "target_id") private Long targetId;
+    @Column(name = "source_key", length = 160) private String sourceKey;
     @Column(name = "is_read", nullable = false) private boolean read;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt = Instant.now();
 
     protected Notification() { }
     public Notification(UserAccount user, String type, String title, String message, String targetType, Long targetId) {
-        this.user = user; this.type = type; this.title = title; this.message = message; this.targetType = targetType; this.targetId = targetId;
+        this(user, type, title, message, targetType, targetId, null);
+    }
+    public Notification(UserAccount user, String type, String title, String message, String targetType, Long targetId, String sourceKey) {
+        this.user = user; this.type = type; this.title = title; this.message = message; this.targetType = targetType; this.targetId = targetId; this.sourceKey = sourceKey;
     }
     public Long getId() { return id; }
     public UserAccount getUser() { return user; }
@@ -38,6 +42,7 @@ public class Notification {
     public String getMessage() { return message; }
     public String getTargetType() { return targetType; }
     public Long getTargetId() { return targetId; }
+    public String getSourceKey() { return sourceKey; }
     public boolean isRead() { return read; }
     public Instant getCreatedAt() { return createdAt; }
     public void markRead() { read = true; }

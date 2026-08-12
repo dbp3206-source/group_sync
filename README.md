@@ -1,6 +1,6 @@
 # GroupSync
 
-GroupSync is a beginner-readable modular monolith for personal availability and group activity operations. The current foundation includes a Spring Boot REST API, a React/Vite frontend, PostgreSQL, simple session authentication, group core operations, personal calendar, availability suggestions, Study sessions, and Badminton Operations Core.
+GroupSync is a beginner-readable modular monolith for personal availability and group activity operations. The current foundation includes a Spring Boot REST API, a React/Vite frontend, PostgreSQL, simple session authentication, group core operations, personal calendar, availability suggestions, Study sessions, and the Badminton operations-to-results flow.
 
 ## Repository layout
 
@@ -60,4 +60,4 @@ cd ..\frontend
 npm.cmd run build
 ```
 
-See `docs/SETUP_REPORT.md` for the exact machine/tool versions and the PostgreSQL setup decision. See `docs/IMPLEMENTATION_STATUS.md` for the current phase boundary. Match, Result, Ranking, Statistics, court allocation/pairing, and external calendar synchronization remain intentionally out of scope for this checkpoint.
+See `docs/SETUP_REPORT.md` for the exact machine/tool versions and the PostgreSQL setup decision. See `docs/IMPLEMENTATION_STATUS.md` for the current phase boundary. Google Calendar synchronization, tournament brackets, WebSocket infrastructure and advanced ranking remain intentionally out of scope.

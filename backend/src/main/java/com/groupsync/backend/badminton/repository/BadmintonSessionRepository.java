@@ -15,6 +15,9 @@ public interface BadmintonSessionRepository extends JpaRepository<BadmintonSessi
     List<BadmintonSession> findByGroupIdOrderByStartAtDesc(Long groupId);
     Optional<BadmintonSession> findByIdAndGroupId(Long id, Long groupId);
 
+    @Query("select s from BadmintonSession s where s.id = :id")
+    Optional<BadmintonSession> findForOperations(Long id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from BadmintonSession s where s.id = :id")
     Optional<BadmintonSession> findByIdForUpdate(Long id);

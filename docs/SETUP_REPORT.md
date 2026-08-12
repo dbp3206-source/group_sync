@@ -2,7 +2,7 @@
 
 ## Scope
 
-This report records the Phase 0 repository bootstrap and PostgreSQL runtime verification performed on 2026-08-11. No User, Group, Calendar, Study, or Badminton business feature was implemented.
+This report started as the Phase 0 repository bootstrap and PostgreSQL runtime verification performed on 2026-08-11. It was updated after Phase 4 to retain the machine setup evidence and record the current verification state.
 
 ## Machine and toolchain
 
@@ -29,7 +29,7 @@ This report records the Phase 0 repository bootstrap and PostgreSQL runtime veri
 - PostgreSQL configuration defaults to port `54329` to avoid colliding with a normal local PostgreSQL instance on `5432`.
 - The active development database is `groupsync_dev`, owned by role `groupsync`.
 - Secrets are supplied through environment variables or an ignored `.env`; `.env.example` contains placeholders only.
-- A Flyway `V1__foundation_baseline.sql` contains only `SELECT 1` because Phase 0 intentionally has no domain tables.
+- Flyway migrations are incremental through V5; V5 contains the badminton allocation, match, ranking, statistics, news and notification-source tables added in Phase 4.
 
 ## Commands and evidence
 
@@ -40,10 +40,13 @@ This report records the Phase 0 repository bootstrap and PostgreSQL runtime veri
 5. Ran backend tests with JDK 21 successfully: 1 test, 0 failures, 0 errors.
 6. Ran backend package successfully and produced `backend/target/backend-0.0.1-SNAPSHOT.jar`.
 7. Verified PostgreSQL with `pg_isready`: `127.0.0.1:54329 - accepting connections`.
-8. Verified Flyway created `public.flyway_schema_history` and applied `V1__foundation_baseline.sql`.
+8. Verified Flyway created `public.flyway_schema_history` and applied the incremental migration chain through `V5__badminton_match_stats_news.sql`.
 9. Verified live backend `GET /api/health` returned HTTP 200 with `groupsync-backend` and `UP`.
 10. Verified Vite proxy `GET http://127.0.0.1:5173/api/health` returned HTTP 200.
 11. Rendered the React app in headless Chrome and confirmed the page displayed `Backend connected` and `groupsync-backend - UP`.
+12. Ran backend tests and package after Phase 4: 23 tests passed and the executable jar was produced.
+13. Ran `npm.cmd run build` after adding badminton match, dashboard and notification UI: TypeScript and Vite build passed.
+14. Ran a real Phase 4 HTTP smoke flow: checked-in players → allocation → balanced doubles pairing → match → score → confirmation → leaderboard/statistics → news/notifications → dashboard.
 
 ## PostgreSQL setup notes
 
@@ -57,4 +60,4 @@ DB_USERNAME=groupsync
 DB_PASSWORD=<local development password>
 ```
 
-The local password was used only in process environment variables and database role setup; it was not committed to source.
+The local password was used only in process environment variables and database role setup; it was not committed to source. The runtime smoke test used the same ignored local environment configuration.

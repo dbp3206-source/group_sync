@@ -62,15 +62,16 @@ public class BadmintonService {
     private final ResponsibilityRepository responsibilityRepository;
     private final CalendarAggregatorService calendarAggregator;
     private final NotificationService notificationService;
+    private final StatisticsService statisticsService;
 
     public BadmintonService(GroupRepository groupRepository, MembershipRepository membershipRepository, UserAccountRepository userRepository,
         SeasonRepository seasonRepository, BadmintonProfileRepository profileRepository, VenueRepository venueRepository, CourtRepository courtRepository,
         BadmintonSessionRepository sessionRepository, BadmintonRegistrationRepository registrationRepository, ResponsibilityRepository responsibilityRepository,
-        CalendarAggregatorService calendarAggregator, NotificationService notificationService) {
+        CalendarAggregatorService calendarAggregator, NotificationService notificationService, StatisticsService statisticsService) {
         this.groupRepository = groupRepository; this.membershipRepository = membershipRepository; this.userRepository = userRepository;
         this.seasonRepository = seasonRepository; this.profileRepository = profileRepository; this.venueRepository = venueRepository;
         this.courtRepository = courtRepository; this.sessionRepository = sessionRepository; this.registrationRepository = registrationRepository;
-        this.responsibilityRepository = responsibilityRepository; this.calendarAggregator = calendarAggregator; this.notificationService = notificationService;
+        this.responsibilityRepository = responsibilityRepository; this.calendarAggregator = calendarAggregator; this.notificationService = notificationService; this.statisticsService = statisticsService;
     }
 
     @Transactional(readOnly = true)
@@ -139,6 +140,7 @@ public class BadmintonService {
 
     @Transactional public BadmintonResponses.SessionResponse open(AuthenticatedUser actor, Long id) { BadmintonSession s = organizerSession(actor, id); s.open(); return toResponse(s); }
     @Transactional public BadmintonResponses.SessionResponse confirm(AuthenticatedUser actor, Long id) { BadmintonSession s = organizerSession(actor, id); s.confirm(); notifyRegistered(s, "SESSION_CONFIRMED", "Badminton session confirmed", "The session is confirmed and added to your calendar."); return toResponse(s); }
+    @Transactional public BadmintonResponses.SessionResponse start(AuthenticatedUser actor, Long id) { BadmintonSession s = organizerSession(actor, id); s.start(); return toResponse(s); }
     @Transactional public BadmintonResponses.SessionResponse cancel(AuthenticatedUser actor, Long id) { BadmintonSession s = organizerSession(actor, id); s.cancel(); notifyRegistered(s, "SESSION_CANCELLED", "Badminton session cancelled", s.getTitle() + " was cancelled."); return toResponse(s); }
     @Transactional public BadmintonResponses.SessionResponse reschedule(AuthenticatedUser actor, Long id, RescheduleSessionRequest request) { BadmintonSession s = organizerSession(actor, id); Instant start = request.start().toInstant(), end = request.end().toInstant(), deadline = request.registrationDeadline().toInstant(); validateTimes(start, end, deadline); s.reschedule(start, end, deadline); notifyRegistered(s, "SESSION_CHANGED", "Badminton session changed", "The time of " + s.getTitle() + " changed; your calendar was updated."); return toResponse(s); }
 
@@ -169,6 +171,14 @@ public class BadmintonService {
         BadmintonSession s = organizerSession(actor, id);
         BadmintonRegistration r = registrationRepository.findBySessionIdAndUserId(id, userId).orElseThrow(() -> new NotFoundException("Registration not found."));
         if (noShow) r.noShow(); else r.checkIn();
+        return toResponse(s);
+    }
+
+    @Transactional
+    public BadmintonResponses.SessionResponse complete(AuthenticatedUser actor, Long id) {
+        BadmintonSession s = organizerSession(actor, id);
+        s.complete();
+        statisticsService.recordAttendance(s);
         return toResponse(s);
     }
 
