@@ -31,6 +31,7 @@ h2 { margin: 0; color: #173b35; font-size: 1.35rem; letter-spacing: -.03em; }
 .calendar-item span:last-child { color: #58746b; font-size: .85rem; }
 .source-tag { display: inline-block; margin-right: .5rem; color: #2b9a65; font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .source-recurring { color: #8c6a18; }.source-study { color: #2b6f9a; }
+.source-badminton { color: #b25b2a; }
 .weekday-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .4rem; }
 .weekday-check { display: flex !important; flex-direction: row !important; align-items: center; gap: .3rem !important; font-size: .75rem !important; font-weight: 600 !important; }
 .two-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }

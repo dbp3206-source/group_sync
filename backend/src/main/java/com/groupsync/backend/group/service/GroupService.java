@@ -3,6 +3,7 @@ package com.groupsync.backend.group.service;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.groupsync.backend.auth.security.AuthenticatedUser;
@@ -21,6 +22,9 @@ import com.groupsync.backend.group.model.Membership;
 import com.groupsync.backend.group.repository.GroupRepository;
 import com.groupsync.backend.group.repository.InvitationRepository;
 import com.groupsync.backend.group.repository.MembershipRepository;
+import com.groupsync.backend.badminton.model.Season;
+import com.groupsync.backend.badminton.repository.SeasonRepository;
+import java.time.LocalDate;
 import com.groupsync.backend.shared.exception.ConflictException;
 import com.groupsync.backend.shared.exception.ForbiddenException;
 import com.groupsync.backend.shared.exception.NotFoundException;
@@ -33,6 +37,22 @@ public class GroupService {
     private final MembershipRepository membershipRepository;
     private final InvitationRepository invitationRepository;
     private final UserAccountRepository userRepository;
+    private final SeasonRepository seasonRepository;
+
+    @Autowired
+    public GroupService(
+        GroupRepository groupRepository,
+        MembershipRepository membershipRepository,
+        InvitationRepository invitationRepository,
+        UserAccountRepository userRepository,
+        SeasonRepository seasonRepository
+    ) {
+        this.groupRepository = groupRepository;
+        this.membershipRepository = membershipRepository;
+        this.invitationRepository = invitationRepository;
+        this.userRepository = userRepository;
+        this.seasonRepository = seasonRepository;
+    }
 
     public GroupService(
         GroupRepository groupRepository,
@@ -40,10 +60,7 @@ public class GroupService {
         InvitationRepository invitationRepository,
         UserAccountRepository userRepository
     ) {
-        this.groupRepository = groupRepository;
-        this.membershipRepository = membershipRepository;
-        this.invitationRepository = invitationRepository;
-        this.userRepository = userRepository;
+        this(groupRepository, membershipRepository, invitationRepository, userRepository, null);
     }
 
     @Transactional
@@ -51,6 +68,9 @@ public class GroupService {
         Group group = groupRepository.save(new Group(request.name().trim(), normalizeDescription(request.description()), request.type()));
         UserAccount user = findUser(actor.getId());
         membershipRepository.save(new Membership(group, user, GroupRole.OWNER));
+        if (group.getType() == com.groupsync.backend.group.model.GroupType.BADMINTON && seasonRepository != null) {
+            seasonRepository.save(new Season(group, "Season 1", LocalDate.now(), null, true));
+        }
         return getGroup(actor, group.getId());
     }
 
