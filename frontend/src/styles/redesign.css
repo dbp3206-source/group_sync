@@ -110,6 +110,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--gs-green) !impor
 .badminton-operations .participant-pills span { background: var(--gs-surface-2); border: 1px solid var(--gs-rule); border-radius: 999px; }
 .badminton-operations .form-column { display: grid; gap: 12px; }
 .badminton-operations .form-column .page-panel { border-top: 3px solid var(--gs-orange); }
+.organizer-toolbox { align-content: start; }
+.organizer-toolbox__toggle { width: 100%; border-color: var(--gs-orange); color: var(--gs-orange-dark); background: var(--gs-orange-soft); }
+.organizer-toolbox__body { display: grid; gap: 12px; }
 .leaderboard-list li:nth-child(-n+3), .leaderboard-table tbody tr:nth-child(-n+3) { background: var(--gs-orange-soft); }
 .leaderboard-list li:first-child, .leaderboard-table tbody tr:first-child { box-shadow: inset 4px 0 0 var(--gs-gold); }
 .session-detail-page { max-width: 1420px; margin-inline: auto; }
