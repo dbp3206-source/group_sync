@@ -91,7 +91,7 @@ Current redesign and workflow checkpoint: Flyway V8 is applied. The product now 
 
 ## Known limitations
 
-- KnowledgeOS migration checkpoint: the Spring Boot resource pipeline supports Gemini embeddings, pgvector retrieval, persistent chat/citations, deterministic Focus Next, and real Insights. React now has KnowledgeOS Home, Library, Resource Workspace, Ask, Focus, and Insights routes. Collection creation and resource-note editing endpoints are not yet exposed, so their controls are deliberately unavailable rather than simulated.
+- KnowledgeOS migration checkpoint: the Spring Boot resource pipeline supports Gemini embeddings, pgvector retrieval, persistent chat/citations, deterministic Focus Next, and real Insights. The workspace now exposes authenticated collections, collection-scoped retrieval, persisted chat history, notes, explicit related resources, and truthful reading-progress/activity data. The production JAR rebuild remains blocked only by the running Java process holding its existing output file.
 
 - Google Calendar and other external calendar synchronization remain intentionally out of scope.
 - Google Calendar sync and advanced ranking algorithms remain intentionally out of scope.

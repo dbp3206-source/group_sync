@@ -22,5 +22,5 @@ public class ChatSession {
     protected ChatSession() { }
     public ChatSession(UserAccount owner, String title, RetrievalScope scopeType, Long collectionId, Set<Resource> resources) { this.owner = owner; this.title = title; this.scopeType = scopeType; this.collectionId = collectionId; this.resources = new LinkedHashSet<>(resources); }
     @PreUpdate void touch() { updatedAt = Instant.now(); }
-    public Long getId() { return id; } public UserAccount getOwner() { return owner; } public String getTitle() { return title; } public RetrievalScope getScopeType() { return scopeType; } public Long getCollectionId() { return collectionId; } public Set<Resource> getResources() { return Set.copyOf(resources); }
+    public Long getId() { return id; } public UserAccount getOwner() { return owner; } public String getTitle() { return title; } public RetrievalScope getScopeType() { return scopeType; } public Long getCollectionId() { return collectionId; } public Set<Resource> getResources() { return Set.copyOf(resources); } public Instant getUpdatedAt() { return updatedAt; }
 }

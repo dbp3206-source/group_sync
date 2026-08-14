@@ -22,13 +22,14 @@ public class KnowledgeChatService {
     private final UserAccountRepository userRepository;
     private final SemanticRetrievalService retrievalService;
     private final LanguageModelClient languageModelClient;
+    private final KnowledgeWorkspaceService workspaceService;
 
     public KnowledgeChatService(ChatSessionRepository sessionRepository, ChatMessageRepository messageRepository,
             CitationRepository citationRepository, DocumentChunkRepository chunkRepository, ResourceRepository resourceRepository,
-            UserAccountRepository userRepository, SemanticRetrievalService retrievalService, LanguageModelClient languageModelClient) {
+            UserAccountRepository userRepository, SemanticRetrievalService retrievalService, LanguageModelClient languageModelClient, KnowledgeWorkspaceService workspaceService) {
         this.sessionRepository = sessionRepository; this.messageRepository = messageRepository; this.citationRepository = citationRepository;
         this.chunkRepository = chunkRepository; this.resourceRepository = resourceRepository; this.userRepository = userRepository;
-        this.retrievalService = retrievalService; this.languageModelClient = languageModelClient;
+        this.retrievalService = retrievalService; this.languageModelClient = languageModelClient; this.workspaceService = workspaceService;
     }
 
     @Transactional
@@ -62,12 +63,33 @@ public class KnowledgeChatService {
         return new AskKnowledgeResponse(session.getId(), answer, true, citations);
     }
 
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> sessions(Long ownerId) {
+        return sessionRepository.findByOwnerIdOrderByUpdatedAtDesc(ownerId).stream().map(session -> Map.<String,Object>of(
+                "id", session.getId(), "title", session.getTitle(), "scope", session.getScopeType().name(),
+                "collectionId", session.getCollectionId() == null ? 0L : session.getCollectionId(), "updatedAt", session.getUpdatedAt())).toList();
+    }
+    @Transactional(readOnly = true)
+    public Map<String, Object> session(Long ownerId, Long sessionId) {
+        ChatSession session = sessionRepository.findByIdAndOwnerId(sessionId, ownerId).orElseThrow(() -> new NotFoundException("Chat session not found."));
+        List<Map<String,Object>> messages = messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId).stream().map(message -> {
+            List<CitationResponse> citations = citationRepository.findByMessageIdOrderByCitationOrderAsc(message.getId()).stream().map(citation -> new CitationResponse(
+                citation.getChunk().getId(), citation.getChunk().getResource().getId(), citation.getChunk().getResource().getTitle(), citation.getChunk().getPageNumber(), citation.getChunk().getSection(), citation.getCitationOrder(), citation.getRelevanceScore(), citation.getEvidenceExcerpt())).toList();
+            return Map.<String,Object>of("id", message.getId(), "role", message.getRole().name(), "content", message.getContent(), "createdAt", message.getCreatedAt(), "citations", citations);
+        }).toList();
+        return Map.of("id",session.getId(),"title",session.getTitle(),"scope",session.getScopeType().name(),"collectionId",session.getCollectionId()==null?0L:session.getCollectionId(),"resourceIds",session.getResources().stream().map(Resource::getId).toList(),"messages",messages);
+    }
+
     private ChatSession resolveSession(Long ownerId, AskKnowledgeRequest request) {
         if (request.sessionId() != null) {
             return sessionRepository.findByIdAndOwnerId(request.sessionId(), ownerId)
                     .orElseThrow(() -> new NotFoundException("Chat session not found."));
         }
         if (request.scope() == null) throw new IllegalArgumentException("A retrieval scope is required for a new chat.");
+        if (request.scope() == RetrievalScope.COLLECTION) {
+            if (request.collectionId() == null) throw new IllegalArgumentException("COLLECTION chats require a collection.");
+            workspaceService.requireCollection(ownerId, request.collectionId());
+        }
         Set<Resource> resources = selectedResources(ownerId, request);
         UserAccount owner = userRepository.findById(ownerId).orElseThrow(() -> new NotFoundException("User not found."));
         String title = request.sessionTitle() == null || request.sessionTitle().isBlank()
