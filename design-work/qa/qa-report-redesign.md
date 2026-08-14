@@ -32,7 +32,7 @@ The supplied references were the primary visual direction. Hallmark was used as 
 - Login desktop at 1440px: visually inspected.
 - Login mobile at 390px: inspected, then revised so the form appears in the first viewport.
 - Public registration: passed and created a QA account.
-- Profile setup: exposed a mandatory-avatar blocker; fixed in frontend by accepting the initials fallback.
+- Profile setup: exposed a mandatory-avatar blocker; fixed by making avatar setup optional and removing the profile-completion route gate.
 - Backend files changed: 0.
 
 ## Quality score

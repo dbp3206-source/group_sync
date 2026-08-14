@@ -69,7 +69,7 @@ function ProfileSetupPage() {
   }
 
   return <section className="profile-setup-page">
-    <div className="profile-setup-copy"><p className="eyebrow">BƯỚC CUỐI CÙNG</p><h1>Tạo dấu hiệu nhận biết của bạn.</h1><p className="intro">Bạn có thể thêm ảnh ngay hoặc dùng chữ cái đầu làm ảnh đại diện mặc định.</p></div>
+    <div className="profile-setup-copy"><p className="eyebrow">THIẾT LẬP TÙY CHỌN</p><h1>Tạo dấu hiệu nhận biết của bạn.</h1><p className="intro">Bạn có thể thêm ảnh ngay hoặc tiếp tục dùng chữ cái đầu làm ảnh đại diện.</p></div>
     <form className="profile-setup-card form-stack" onSubmit={submit}>
       {error && <div className="status-card status-card--error" role="alert">{error}</div>}
       <button type="button" className="avatar-upload" onClick={() => inputRef.current?.click()} aria-label="Chọn ảnh đại diện">

@@ -25,7 +25,7 @@ function RegisterPage() {
     setSaving(true)
     try {
       await register({ displayName, email, password })
-      navigate('/profile/setup', { replace: true })
+      navigate('/dashboard', { replace: true })
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'Không thể tạo tài khoản. Vui lòng thử lại.'))
     } finally {

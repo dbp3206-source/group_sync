@@ -7,7 +7,6 @@ function ProtectedRoute() {
 
   if (loading) return <div className="page-panel">Đang mở không gian của bạn…</div>
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />
-  if (!user.profileCompleted && location.pathname !== '/profile/setup') return <Navigate to="/profile/setup" replace />
   return <Outlet />
 }
 
