@@ -306,3 +306,32 @@ body:has(.groups-page) .app-main { background: transparent; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Final visual corrections: use the latest supplied themes and separate today from events. */
+body:has(.auth-layout) { background: var(--gs-green-dark) url('/backgrounds/auth-gradient-green.png') center / cover fixed; }
+body:has(.auth-layout) .auth-layout::before { display: none; }
+body:has(.auth-layout) .auth-intro-block { padding: 28px; border-radius: 26px; background: color-mix(in srgb, var(--gs-green-dark) 78%, transparent); box-shadow: 0 22px 60px oklch(18% .05 165 / .22); }
+body:has(.auth-layout--register) { background-image: url('/backgrounds/auth-gradient-green.png'); }
+
+body:has(.home-page) { background: var(--gs-paper) url('/backgrounds/home-green-facets.png') center top / cover fixed; }
+body:has(.home-page) .home-page { background: color-mix(in srgb, var(--gs-paper) 82%, transparent); }
+
+body:has(.schedule-page) { background-image: url('/backgrounds/calendar-grid.png'); }
+.schedule-page { max-width: 1440px; width: 100%; }
+.calendar-surface { width: 100%; max-width: none; }
+.calendar-surface .fc { --fc-today-bg-color: color-mix(in srgb, var(--gs-green) 13%, var(--gs-surface)); }
+.calendar-surface .fc .fc-timegrid-slot { height: 40px; }
+.calendar-surface .fc .fc-event { min-height: 30px; padding: 4px 7px; border-left-width: 4px; border-radius: 6px; font-size: .75rem; font-weight: 850; line-height: 1.25; }
+.calendar-surface .fc .fc-event-main, .calendar-surface .fc .fc-event-title { color: inherit; font-weight: 850; overflow-wrap: anywhere; }
+.calendar-event--manual { background: var(--gs-orange-soft) !important; color: var(--gs-orange-dark) !important; border-color: var(--gs-orange) !important; }
+.calendar-event--recurring { background: color-mix(in srgb, var(--gs-gold) 34%, var(--gs-surface)) !important; color: var(--gs-orange-dark) !important; border-color: var(--gs-gold) !important; }
+.calendar-event--study { background: var(--gs-indigo-soft) !important; color: var(--gs-indigo) !important; border-color: var(--gs-indigo) !important; }
+.calendar-event--badminton { background: var(--gs-orange) !important; color: var(--gs-surface) !important; border-color: var(--gs-orange-dark) !important; }
+.calendar-event--badminton .fc-event-main, .calendar-event--badminton .fc-event-title { color: var(--gs-surface) !important; }
+.schedule-sources { width: 100%; max-width: none; }
+
+@media (max-width: 720px) {
+  .schedule-page { width: 100%; }
+  .calendar-surface { overflow-x: auto; }
+  .calendar-surface .fc { min-width: 760px; }
+}
