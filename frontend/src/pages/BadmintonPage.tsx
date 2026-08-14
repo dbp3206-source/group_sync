@@ -10,6 +10,12 @@ import {
 } from '../api/badminton'
 import { useAuth } from '../auth/AuthContext'
 
+function localDateTime(value: string) {
+  const date = new Date(value)
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 function BadmintonPage() {
   const { user } = useAuth()
   const [params] = useSearchParams()
@@ -28,8 +34,8 @@ function BadmintonPage() {
   const [message, setMessage] = useState('')
   const [scores, setScores] = useState<Record<number, [string, string]>>({})
   const [title, setTitle] = useState('')
-  const [start, setStart] = useState('')
-  const [end, setEnd] = useState('')
+  const [start, setStart] = useState(params.get('start') ? localDateTime(params.get('start')!) : '')
+  const [end, setEnd] = useState(params.get('end') ? localDateTime(params.get('end')!) : '')
   const [deadline, setDeadline] = useState('')
   const [venueId, setVenueId] = useState(0)
   const [courtIds, setCourtIds] = useState<number[]>([])
@@ -88,7 +94,7 @@ function BadmintonPage() {
     await act(() => submitMatchScore(match.id, Number(scoreA), Number(scoreB)), 'Score submitted.')
   }
 
-  return <section>
+  return <section className="activity-page activity-page--badminton badminton-operations">
     <div className="page-heading"><div><p className="eyebrow">Badminton operations</p><h1>Play sessions</h1><p className="intro">Checked-in players move from courts to pairings, matches and confirmed results. W/L, points and news are derived automatically.</p></div><select className="group-picker" value={groupId} onChange={(e) => setGroupId(Number(e.target.value))}>{badmintonGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></div>
     {error && <div className="alert alert-danger">{error}</div>}{message && <div className="alert alert-success">{message}</div>}{!groupId && <div className="page-panel empty-state">Create or join a BADMINTON group first.</div>}
     {groupId && <>

@@ -5,8 +5,9 @@ function ProtectedRoute() {
   const { user, loading } = useAuth()
   const location = useLocation()
 
-  if (loading) return <div className="page-panel">Loading your workspace…</div>
+  if (loading) return <div className="page-panel">Đang mở không gian của bạn…</div>
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  if (!user.profileCompleted && location.pathname !== '/profile/setup') return <Navigate to="/profile/setup" replace />
   return <Outlet />
 }
 

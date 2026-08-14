@@ -1,9 +1,46 @@
 package com.groupsync.backend.tournament.dto;
-import java.time.Instant; import java.util.List;
-import com.groupsync.backend.tournament.model.*;
+
+import java.time.Instant;
+import java.util.List;
+
+import com.groupsync.backend.tournament.model.Tournament;
+import com.groupsync.backend.tournament.model.TournamentEntry;
+import com.groupsync.backend.tournament.model.TournamentMatch;
+
 public final class TournamentResponses {
-    private TournamentResponses() { }
-    public record Tournament(Long id, Long groupId, Long seasonId, Long sessionId, String name, String format, String status, int maxParticipants, Long championId, int participants) { public static Tournament from(com.groupsync.backend.tournament.model.Tournament t, int participants) { return new Tournament(t.getId(), t.getGroup().getId(), t.getSeason().getId(), t.getSession().getId(), t.getName(), t.getFormat(), t.getStatus().name(), t.getMaxParticipants(), t.getChampion() == null ? null : t.getChampion().getId(), participants); } }
-    public record Participant(Long userId, String displayName, Integer seedNumber, Instant registeredAt) { public static Participant from(TournamentParticipant p) { return new Participant(p.getUser().getId(), p.getUser().getDisplayName(), p.getSeedNumber(), p.getRegisteredAt()); } }
-    public record Bracket(Long id, String stage, int matchNumber, Integer nextMatchNumber, Long matchId, String status, Long winnerId) { public static Bracket from(TournamentMatch m) { return new Bracket(m.getId(), m.getStage().name(), m.getMatchNumber(), m.getNextMatchNumber(), m.getMatch().getId(), m.getMatch().getStatus().name(), m.getWinner() == null ? null : m.getWinner().getId()); } }
+    private TournamentResponses() {
+    }
+
+    public record Tournament(
+        Long id,
+        Long groupId,
+        Long seasonId,
+        Long sessionId,
+        String name,
+        String competitionMode,
+        String status,
+        int maxEntries,
+        Long championEntryId,
+        int entries
+    ) {
+        public static Tournament from(com.groupsync.backend.tournament.model.Tournament tournament, int entries) {
+            return new Tournament(tournament.getId(), tournament.getGroup().getId(), tournament.getSeason().getId(), tournament.getSession().getId(), tournament.getName(), tournament.getCompetitionMode().name(), tournament.getStatus().name(), tournament.getMaxParticipants(), tournament.getChampionEntry() == null ? null : tournament.getChampionEntry().getId(), entries);
+        }
+    }
+
+    public record EntryMember(Long userId, String displayName) {
+    }
+
+    public record Entry(Long id, String displayName, Integer seedNumber, Instant createdAt, List<EntryMember> members) {
+        public static Entry from(TournamentEntry entry) {
+            return new Entry(entry.getId(), entry.getDisplayName(), entry.getSeedNumber(), entry.getCreatedAt(), entry.getMembers().stream().map(member -> new EntryMember(member.getUser().getId(), member.getUser().getDisplayName())).toList());
+        }
+    }
+
+    public record Bracket(Long id, String stage, int matchNumber, Integer nextMatchNumber, Entry entryA, Entry entryB, Entry winnerEntry, String status) {
+        public static Bracket from(TournamentMatch match) {
+            String status = match.getWinnerEntry() != null ? "COMPLETED" : match.getEntryA() != null && match.getEntryB() != null ? "READY" : "PENDING";
+            return new Bracket(match.getId(), match.getStage().name(), match.getMatchNumber(), match.getNextMatchNumber(), match.getEntryA() == null ? null : Entry.from(match.getEntryA()), match.getEntryB() == null ? null : Entry.from(match.getEntryB()), match.getWinnerEntry() == null ? null : Entry.from(match.getWinnerEntry()), status);
+        }
+    }
 }

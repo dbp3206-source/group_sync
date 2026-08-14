@@ -52,8 +52,16 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(authService.register(request)));
+    public ResponseEntity<UserResponse> register(
+        @Valid @RequestBody RegisterRequest request,
+        HttpServletRequest httpRequest,
+        HttpServletResponse httpResponse
+    ) {
+        authService.register(request);
+        Authentication authentication = authenticationManager.authenticate(
+            new UsernamePasswordAuthenticationToken(authService.normalizeEmail(request.email()), request.password()));
+        saveAuthentication(authentication, httpRequest, httpResponse);
+        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(authService.getUser(authenticatedUser(authentication).getId())));
     }
 
     @PostMapping("/login")
@@ -65,16 +73,13 @@ public class AuthController {
         String email = authService.normalizeEmail(request.email());
         Authentication authentication = authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(email, request.password()));
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(authentication);
-        SecurityContextHolder.setContext(context);
-        securityContextRepository.saveContext(context, httpRequest, httpResponse);
-        return UserResponse.from(authenticatedUser(authentication));
+        saveAuthentication(authentication, httpRequest, httpResponse);
+        return UserResponse.from(authService.getUser(authenticatedUser(authentication).getId()));
     }
 
     @GetMapping("/me")
     public UserResponse currentUser(Authentication authentication) {
-        return UserResponse.from(authenticatedUser(authentication));
+        return UserResponse.from(authService.getUser(authenticatedUser(authentication).getId()));
     }
 
     @GetMapping("/current-user")
@@ -95,5 +100,12 @@ public class AuthController {
 
     private AuthenticatedUser authenticatedUser(Authentication authentication) {
         return (AuthenticatedUser) authentication.getPrincipal();
+    }
+
+    private void saveAuthentication(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authentication);
+        SecurityContextHolder.setContext(context);
+        securityContextRepository.saveContext(context, request, response);
     }
 }

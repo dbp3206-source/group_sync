@@ -56,7 +56,7 @@ Open the printed Vite URL, normally `http://127.0.0.1:5173`.
 
 ## 3. Demo accounts
 
-All demo accounts use the same local-only password: `DemoOnly-GroupSync-2026!`. It is intentionally a demo credential, not a production secret. Do not reuse it outside this local presentation.
+All demo accounts use the same local-only password: `DemoOnly-GroupSync-2026!`. The reset script marks their profile setup complete so the rehearsal starts directly at the product flow; new real accounts still complete profile setup and avatar upload. This is intentionally a demo credential, not a production secret. Do not reuse it outside this local presentation.
 
 | Account | Purpose |
 |---|---|

@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/errors'
 import { getGroups, type GroupSummary } from '../api/groups'
-import { searchAvailability, type AvailabilityCandidate } from '../api/availability'
 import { cancelStudySession, confirmStudySession, createStudySession, getStudySessions, joinStudySession, type StudySession } from '../api/study'
 import { useAuth } from '../auth/AuthContext'
 
@@ -18,68 +17,32 @@ function StudyPage() {
   const [groups, setGroups] = useState<GroupSummary[]>([])
   const [groupId, setGroupId] = useState(Number(params.get('groupId') ?? 0))
   const [sessions, setSessions] = useState<StudySession[]>([])
-  const [candidates, setCandidates] = useState<AvailabilityCandidate[]>([])
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
   const [topic, setTopic] = useState('')
   const [goal, setGoal] = useState('')
   const [location, setLocation] = useState('')
-  const [start, setStart] = useState('')
-  const [end, setEnd] = useState('')
+  const [start, setStart] = useState(params.get('start') ? localDateTime(params.get('start')!) : '')
+  const [end, setEnd] = useState(params.get('end') ? localDateTime(params.get('end')!) : '')
   const [capacity, setCapacity] = useState('')
-  const [searchFrom, setSearchFrom] = useState('')
-  const [searchTo, setSearchTo] = useState('')
-  const [duration, setDuration] = useState('60')
-
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const studyGroups = groups.filter((group) => group.type === 'STUDY')
   const selectedGroup = groups.find((group) => group.id === groupId)
-  const organizer = selectedGroup?.role !== 'MEMBER'
+  const canManage = selectedGroup?.role === 'OWNER' || selectedGroup?.role === 'ORGANIZER'
 
-  async function refreshSessions() {
-    if (groupId) setSessions(await getStudySessions(groupId))
-  }
-
-  useEffect(() => {
-    getGroups().then((data) => {
-      setGroups(data)
-      if (!groupId) setGroupId(data.find((group) => group.type === 'STUDY')?.id ?? 0)
-    }).catch((e) => setError(getApiErrorMessage(e, 'Could not load groups.')))
-  }, [])
-
-  useEffect(() => {
-    refreshSessions().catch((e) => setError(getApiErrorMessage(e, 'Could not load study sessions.')))
-  }, [groupId])
+  async function refresh() { if (groupId) setSessions(await getStudySessions(groupId)) }
+  useEffect(() => { getGroups().then((items) => { setGroups(items); if (!groupId) setGroupId(items.find((item) => item.type === 'STUDY')?.id ?? 0) }).catch((requestError) => setError(getApiErrorMessage(requestError, 'Không thể tải nhóm học tập.'))) }, [])
+  useEffect(() => { refresh().catch((requestError) => setError(getApiErrorMessage(requestError, 'Không thể tải các buổi học.'))) }, [groupId])
 
   async function create(event: React.FormEvent) {
-    event.preventDefault()
-    try {
-      await createStudySession(groupId, { topic, goal, location, start: new Date(start).toISOString(), end: new Date(end).toISOString(), capacity: capacity ? Number(capacity) : null })
-      setMessage('Study session created.')
-      setTopic('')
-      await refreshSessions()
-    } catch (e) { setError(getApiErrorMessage(e, 'Could not create study session.')) }
+    event.preventDefault(); setError(''); setMessage('')
+    try { await createStudySession(groupId, { topic, goal, location, start: new Date(start).toISOString(), end: new Date(end).toISOString(), capacity: capacity ? Number(capacity) : null }); setTopic(''); setGoal(''); setLocation(''); setCapacity(''); setMessage('Đã tạo buổi học ở trạng thái mở.'); await refresh() } catch (requestError) { setError(getApiErrorMessage(requestError, 'Không thể tạo buổi học.')) }
   }
+  async function act(action: () => Promise<StudySession>, success: string) { setError(''); setMessage(''); try { await action(); setMessage(success); await refresh() } catch (requestError) { setError(getApiErrorMessage(requestError, 'Không thể cập nhật buổi học.')) } }
 
-  async function action(fn: () => Promise<StudySession>, success: string) {
-    try { await fn(); setMessage(success); await refreshSessions() } catch (e) { setError(getApiErrorMessage(e, 'Study action failed.')) }
-  }
-
-  async function findAvailability(event: React.FormEvent) {
-    event.preventDefault()
-    try {
-      setCandidates(await searchAvailability(groupId, { from: new Date(searchFrom).toISOString(), to: new Date(searchTo).toISOString(), durationMinutes: Number(duration), requiredMemberIds: [], minimumAttendance: 1, strategy: 'MAXIMUM' }))
-      setMessage('Availability suggestions updated.')
-    } catch (e) { setError(getApiErrorMessage(e, 'Could not search availability.')) }
-  }
-
-  return <section>
-    <div className="page-heading"><div><p className="eyebrow">Study vertical</p><h1>Study sessions</h1><p className="intro">Find a slot, create a session, and let confirmed participation appear on the calendar automatically.</p></div><select className="group-picker" value={groupId} onChange={(e) => setGroupId(Number(e.target.value))}>{studyGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></div>
-    {error && <div className="alert alert-danger">{error}</div>}{message && <div className="alert alert-success">{message}</div>}
-    {!groupId && <div className="page-panel empty-state">Create or join a STUDY group first.</div>}
-    {groupId && <div className="content-grid"><div><div className="section-title">Sessions</div>{sessions.length === 0 && <div className="page-panel empty-state">No study sessions yet.</div>}{sessions.map((session) => { const joined = session.participants.some((participant) => participant.userId === user?.id); return <div className="page-panel study-card" key={session.id}><div className="study-card-header"><div><span className="source-tag source-study">{session.status}</span><h2>{session.topic}</h2><p>{new Date(session.start).toLocaleString()} – {new Date(session.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p></div><span className="subtle">{session.participants.length}{session.capacity ? ` / ${session.capacity}` : ''} joined</span></div><p>{session.goal || 'No goal added.'}{session.location ? ` · ${session.location}` : ''}</p><div className="study-actions">{session.status === 'OPEN' && !joined && <button className="btn btn-outline-primary" onClick={() => action(() => joinStudySession(session.id), 'Joined study session.')}>Join</button>}{session.status === 'OPEN' && organizer && <button className="btn btn-primary" onClick={() => action(() => confirmStudySession(session.id), 'Session confirmed; participants are now busy.')}>Confirm</button>}{(session.status === 'OPEN' || session.status === 'CONFIRMED') && organizer && <button className="btn btn-outline-danger" onClick={() => action(() => cancelStudySession(session.id), 'Session cancelled; derived calendar item removed.')}>Cancel</button>}</div><div className="participant-pills">{session.participants.map((participant) => <span key={participant.userId}>{participant.displayName} · {participant.attendance}</span>)}</div></div>})}</div>
-      <div className="form-column"><form className="page-panel form-stack" onSubmit={findAvailability}><div><p className="eyebrow">Suggest a slot</p><h2>Availability search</h2></div><label>From<input type="datetime-local" value={searchFrom} onChange={(e) => setSearchFrom(e.target.value)} required /></label><label>To<input type="datetime-local" value={searchTo} onChange={(e) => setSearchTo(e.target.value)} required /></label><label>Duration<select value={duration} onChange={(e) => setDuration(e.target.value)}><option value="30">30 minutes</option><option value="60">1 hour</option><option value="90">90 minutes</option><option value="120">2 hours</option></select></label><button className="btn btn-outline-primary">Find candidate slots</button>{candidates.slice(0, 6).map((candidate) => <button type="button" className="candidate-slot" key={candidate.start} onClick={() => { setStart(localDateTime(candidate.start)); setEnd(localDateTime(candidate.end)) }}>{new Date(candidate.start).toLocaleString()} · {candidate.attendance} available</button>)}</form>
-      <form className="page-panel form-stack" onSubmit={create}><div><p className="eyebrow">Manual or suggested</p><h2>Create session</h2></div><label>Topic<input value={topic} onChange={(e) => setTopic(e.target.value)} required /></label><label>Goal<textarea value={goal} onChange={(e) => setGoal(e.target.value)} rows={2} /></label><label>Location / link<input value={location} onChange={(e) => setLocation(e.target.value)} /></label><label>Starts<input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} required /></label><label>Ends<input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} required /></label><label>Capacity<input type="number" min="1" value={capacity} onChange={(e) => setCapacity(e.target.value)} placeholder="Optional" /></label><button className="btn btn-primary" disabled={!organizer}>Create study session</button></form></div>
-    </div>}
+  return <section className="activity-page activity-page--study"><header className="activity-hero"><div><p className="eyebrow">STUDY WORKSPACE</p><h1>Học cùng nhau, đúng nhịp.</h1><p>Từ lịch chung đến buổi học được xác nhận: mọi thành viên nhìn thấy cùng một kế hoạch, không phải nhắn tin dò lịch.</p></div><div className="activity-hero__actions"><select value={groupId} onChange={(event) => setGroupId(Number(event.target.value))} aria-label="Chọn nhóm học tập">{studyGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select>{groupId && <Link className="button button--secondary" to={`/groups/${groupId}/availability`}>Tìm lịch chung</Link>}</div></header>
+    {(error || message) && <div className={`status-card ${error ? 'status-card--error' : 'status-card--success'}`} role={error ? 'alert' : 'status'}>{error || message}</div>}
+    {!groupId ? <div className="activity-empty"><h2>Bạn chưa có nhóm học tập.</h2><p>Tạo hoặc nhận lời mời vào một nhóm để lên lịch buổi học đầu tiên.</p><Link className="button button--primary" to="/groups">Đi tới nhóm</Link></div> : <div className="activity-layout"><section className="activity-feed"><div className="panel-heading"><div><p className="eyebrow">BUỔI HỌC</p><h2>Kế hoạch sắp tới</h2></div><span>{sessions.length} buổi</span></div>{sessions.length ? <div className="session-list">{sessions.map((session) => { const joined = session.participants.some((participant) => participant.userId === user?.id); return <article className="session-card" key={session.id}><div className="session-card__time"><time>{new Date(session.start).toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' })}</time><b>{new Date(session.start).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</b></div><div className="session-card__body"><div><span className={`activity-status activity-status--${session.status.toLowerCase()}`}>{session.status === 'OPEN' ? 'Đang mở' : session.status === 'CONFIRMED' ? 'Đã chốt' : 'Đã hủy'}</span><h3>{session.topic}</h3></div><p>{session.goal || 'Chưa có mục tiêu cụ thể.'}{session.location ? ` · ${session.location}` : ''}</p><small>{session.participants.length}{session.capacity ? `/${session.capacity}` : ''} người tham gia · kết thúc {new Date(session.end).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</small><div className="session-card__actions">{session.status === 'OPEN' && !joined && <button className="button button--secondary" onClick={() => act(() => joinStudySession(session.id), 'Bạn đã đăng ký tham gia buổi học.')}>Tham gia</button>}{session.status === 'OPEN' && canManage && <button className="button button--primary" onClick={() => act(() => confirmStudySession(session.id), 'Buổi học đã được chốt và đồng bộ vào lịch người tham gia.')}>Chốt buổi học</button>}{(session.status === 'OPEN' || session.status === 'CONFIRMED') && canManage && <button className="button button--danger" onClick={() => act(() => cancelStudySession(session.id), 'Buổi học đã hủy; lịch liên quan đã được gỡ.')}>Hủy</button>}</div></div></article> })}</div> : <p className="panel-empty">Chưa có buổi học nào. Hãy dùng form bên phải hoặc bắt đầu từ công cụ tìm lịch chung.</p>}</section>
+      <aside className="activity-form"><form className="form-stack" onSubmit={create}><div><p className="eyebrow">TẠO BUỔI HỌC</p><h2>Thêm một kế hoạch rõ ràng</h2></div><label>Chủ đề<input value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="Ví dụ: Ôn chương 4" required /></label><label>Mục tiêu<textarea value={goal} onChange={(event) => setGoal(event.target.value)} rows={2} placeholder="Kết quả cả nhóm cần hoàn thành" /></label><label>Địa điểm hoặc link<input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Thư viện / Google Meet" /></label><label>Bắt đầu<input type="datetime-local" value={start} onChange={(event) => setStart(event.target.value)} required /></label><label>Kết thúc<input type="datetime-local" value={end} onChange={(event) => setEnd(event.target.value)} required /></label><label>Sức chứa <small>(tùy chọn)</small><input type="number" min="1" value={capacity} onChange={(event) => setCapacity(event.target.value)} /></label><button className="button button--primary" disabled={!canManage}>Tạo buổi học</button>{!canManage && <p className="form-note">Chỉ owner hoặc organizer có thể tạo và chốt buổi học.</p>}</form></aside></div>}
   </section>
 }
 

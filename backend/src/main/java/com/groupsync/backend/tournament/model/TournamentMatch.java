@@ -8,13 +8,25 @@ import jakarta.persistence.*;
 public class TournamentMatch {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "tournament_id", nullable = false) private Tournament tournament;
-    @OneToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "match_id", nullable = false, unique = true) private BadmintonMatch match;
+    @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "match_id", unique = true) private BadmintonMatch match;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20) private TournamentStage stage;
     @Column(name = "match_number", nullable = false) private int matchNumber;
     @Column(name = "next_match_number") private Integer nextMatchNumber;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "winner_user_id") private UserAccount winner;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "entry_a_id") private TournamentEntry entryA;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "entry_b_id") private TournamentEntry entryB;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "winner_entry_id") private TournamentEntry winnerEntry;
     protected TournamentMatch() { }
     public TournamentMatch(Tournament tournament, BadmintonMatch match, TournamentStage stage, int matchNumber, Integer nextMatchNumber) { this.tournament = tournament; this.match = match; this.stage = stage; this.matchNumber = matchNumber; this.nextMatchNumber = nextMatchNumber; }
-    public Long getId() { return id; } public Tournament getTournament() { return tournament; } public BadmintonMatch getMatch() { return match; } public TournamentStage getStage() { return stage; } public int getMatchNumber() { return matchNumber; } public Integer getNextMatchNumber() { return nextMatchNumber; } public UserAccount getWinner() { return winner; }
+    public TournamentMatch(Tournament tournament, TournamentStage stage, int matchNumber, Integer nextMatchNumber, TournamentEntry entryA, TournamentEntry entryB) { this.tournament = tournament; this.stage = stage; this.matchNumber = matchNumber; this.nextMatchNumber = nextMatchNumber; this.entryA = entryA; this.entryB = entryB; }
+    public Long getId() { return id; } public Tournament getTournament() { return tournament; } public BadmintonMatch getMatch() { return match; } public TournamentStage getStage() { return stage; } public int getMatchNumber() { return matchNumber; } public Integer getNextMatchNumber() { return nextMatchNumber; } public UserAccount getWinner() { return winner; } public TournamentEntry getEntryA() { return entryA; } public TournamentEntry getEntryB() { return entryB; } public TournamentEntry getWinnerEntry() { return winnerEntry; }
     public void setWinner(UserAccount winner) { this.winner = winner; }
+    public void setWinnerEntry(TournamentEntry entry) { this.winnerEntry = entry; }
+    public boolean hasExactlyOneEntry() { return (entryA == null) != (entryB == null); }
+    public TournamentEntry getOnlyEntry() { return entryA == null ? entryB : entryA; }
+    public void receiveWinner(TournamentEntry entry) {
+        if (entryA == null) { entryA = entry; return; }
+        if (entryB == null) { entryB = entry; return; }
+        throw new IllegalStateException("The next tournament match already has two entries.");
+    }
 }

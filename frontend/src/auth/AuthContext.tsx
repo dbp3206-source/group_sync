@@ -16,6 +16,7 @@ type AuthContextValue = {
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   register: (input: RegisterInput) => Promise<void>
+  updateCurrentUser: (user: User) => void
   logout: () => Promise<void>
 }
 
@@ -47,8 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async register(input) {
       await getCsrfToken()
-      await registerRequest(input)
+      setUser(await registerRequest(input))
       rememberEmail(input.email)
+    },
+    updateCurrentUser(updatedUser) {
+      setUser(updatedUser)
     },
     async logout() {
       await getCsrfToken()

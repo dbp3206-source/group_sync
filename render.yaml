@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: groupsync-backend
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: groupsync-db
+          property: connectionString
+      - key: DB_USERNAME
+        fromDatabase:
+          name: groupsync-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: groupsync-db
+          property: password
+      - key: APP_CORS_ORIGINS
+        sync: false
+      - key: APP_TIMEZONE
+        value: Asia/Bangkok
+      - key: FLYWAY_ENABLED
+        value: "true"
+
+databases:
+  - name: groupsync-db
+    plan: free
+    region: singapore
+    postgresMajorVersion: "17"
+    databaseName: groupsync
+    user: groupsync

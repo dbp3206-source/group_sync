@@ -5,6 +5,9 @@ export type User = {
   email: string
   displayName: string
   systemRole: string
+  timeZone: string
+  profileCompleted: boolean
+  avatarUrl: string
 }
 
 export type RegisterInput = {

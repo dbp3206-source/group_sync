@@ -10,6 +10,7 @@ import com.groupsync.backend.auth.dto.RegisterRequest;
 import com.groupsync.backend.shared.exception.ConflictException;
 import com.groupsync.backend.user.model.UserAccount;
 import com.groupsync.backend.user.repository.UserAccountRepository;
+import com.groupsync.backend.shared.exception.NotFoundException;
 
 @Service
 public class AuthService {
@@ -33,5 +34,10 @@ public class AuthService {
 
     public String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    @Transactional(readOnly = true)
+    public UserAccount getUser(Long userId) {
+        return userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found."));
     }
 }

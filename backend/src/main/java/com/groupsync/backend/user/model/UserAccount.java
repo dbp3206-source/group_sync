@@ -28,6 +28,12 @@ public class UserAccount {
     @Column(name = "display_name", nullable = false, length = 100)
     private String displayName;
 
+    @Column(name = "time_zone", nullable = false, length = 64)
+    private String timeZone = "Asia/Ho_Chi_Minh";
+
+    @Column(name = "profile_completed", nullable = false)
+    private boolean profileCompleted;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "system_role", nullable = false, length = 20)
     private SystemRole systemRole = SystemRole.USER;
@@ -56,7 +62,26 @@ public class UserAccount {
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
     public String getDisplayName() { return displayName; }
+    public String getTimeZone() { return timeZone; }
+    public boolean isProfileCompleted() { return profileCompleted; }
     public SystemRole getSystemRole() { return systemRole; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+
+    public void updateProfile(String displayName, String timeZone) {
+        this.displayName = displayName;
+        this.timeZone = timeZone;
+    }
+
+    public void changePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void markProfileCompleted() {
+        this.profileCompleted = true;
+    }
+
+    public void markProfileIncomplete() {
+        this.profileCompleted = false;
+    }
 }

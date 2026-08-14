@@ -10,6 +10,26 @@ React production build -> Vite preview -> Spring Boot executable JAR -> PostgreS
 
 Docker is not installed on the target machine, and no cloud provider or account was selected. A provider login, plan confirmation, DNS/TLS setup, or external secret was therefore not required. This guide describes the verified local deployment, not a public Internet deployment.
 
+## Public hosting target
+
+The frontend is ready to be hosted on Vercel. In the Vercel project, set the root directory
+to `frontend`, use `npm run build` as the build command, use `dist` as the output directory,
+and define `VITE_API_URL` as the public backend URL ending in `/api`.
+
+`frontend/vercel.json` keeps React Router routes working after a direct page refresh.
+Vercel hosts only the frontend; the Spring Boot API and PostgreSQL database still need a
+public backend host and a managed PostgreSQL instance. The backend must allow the exact
+Vercel origin through `APP_CORS_ORIGINS`.
+
+The repository also includes `render.yaml` and `backend/Dockerfile` for the backend side.
+The Blueprint creates a Singapore Render web service and PostgreSQL database, connects the
+database credentials without committing them, and prompts for `APP_CORS_ORIGINS` during the
+first Blueprint creation. Set that value to the final Vercel production origin, for example
+`https://your-project.vercel.app`.
+
+Render's public PostgreSQL connection string is normalized to the JDBC format by the Docker
+entrypoint before Spring Boot starts. Flyway then applies the repository migrations on startup.
+
 ## Verified local URLs
 
 - Frontend: `http://127.0.0.1:4173/`

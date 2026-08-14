@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Final production-like deployment verification: implementation complete for the requested local scope; V6 migration, Personal Calendar extensions, Badminton advanced operations, QR check-in, notification preferences and Tournament foundation are included. The packaged backend JAR and production frontend build were verified against the persistent local PostgreSQL service. Google Calendar remains intentionally excluded.
+Current redesign and workflow checkpoint: Flyway V8 is applied. The product now includes profile completion/avatar storage, a responsive application shell, FullCalendar, a dedicated group-availability workspace, and organizer-managed Singles/Doubles knockout entries with automatic byes and bracket progression. The packaged backend JAR and production frontend build were verified against the persistent local PostgreSQL service. Google Calendar remains intentionally excluded.
 
 ## Completed
 
@@ -49,6 +49,8 @@ Final production-like deployment verification: implementation complete for the r
 - Final presentation guides added: `docs/DEMO_GUIDE.md` and `docs/OOP_DEFENSE_GUIDE.md`.
 - Full feature pass added V6 incremental schema changes for calendar metadata, notification preferences, QR check-in tokens and tournament state.
 - Full feature pass added calendar edit/duplicate metadata, daily recurrence, optional season ranking strategy, advanced player analytics, round-robin responsibilities, QR token check-in and tournament registration/bracket/champion derivation.
+- Product redesign added a Vietnamese responsive app shell, improved login/register/profile flows, PostgreSQL-backed compressed avatar storage, visual group workspaces, FullCalendar, and an organizer-only availability screen that sends a selected slot directly to Study or Badminton creation.
+- Tournament redesign added explicit `SINGLES` and `DOUBLES` entries, organizer roster/seed management, power-of-two knockout generation, automatic bye advancement, server-side winner recording and champion completion. The former participant-only tournament model remains migration-compatible for existing data.
 
 ## Verification
 
@@ -57,7 +59,8 @@ Final production-like deployment verification: implementation complete for the r
 - Frontend: `npm.cmd run build` - PASS, TypeScript build and Vite production build passed with Badminton, dashboard and notification UI integration.
 - Java compiler evidence: Maven compiled with `javac [debug parameters release 21]` and tests ran on Java `21.0.12`.
 - PostgreSQL: PASS, `pg_isready` reports `127.0.0.1:54329 - accepting connections`.
-- Flyway: PASS, V1 through V6 validated; `V6__calendar_preferences_qr_tournament.sql` applied and recorded in `flyway_schema_history`.
+- Flyway: PASS, V1 through V8 validated; V7 user profile/avatar storage and V8 tournament-entry/knockout schema were applied and recorded in `flyway_schema_history`.
+- Redesign runtime: PASS; local backend health returned HTTP 200 after V8 validation and Vite served the rebuilt production frontend on `127.0.0.1:4173`.
 - Runtime backend: PASS, live `GET /api/health` returned HTTP 200.
 - Runtime frontend: PASS, Vite served React app, Vite proxy returned HTTP 200 for `/api/health`, and headless Chrome rendered `Backend connected` / `groupsync-backend - UP`.
 - Phase 1 runtime: PASS, real HTTP flow completed register A/B, login A/B, current user, create STUDY and OTHER groups, invite, pending invitation, accept, promote to ORGANIZER, member list, logout (204), and post-logout current user rejection (401).
@@ -82,14 +85,14 @@ Final production-like deployment verification: implementation complete for the r
 ## Known limitations
 
 - Google Calendar and other external calendar synchronization remain intentionally out of scope.
-- Google Calendar sync, tournament brackets, and advanced ranking algorithms remain intentionally out of scope.
+- Google Calendar sync and advanced ranking algorithms remain intentionally out of scope.
 - Pairing is deliberately lightweight: Random and Balanced suggestions are available, while manual pairing is entered only when creating a match.
 - The current frontend remains an MVP operations UI; advanced charting, partner/head-to-head analytics and real-time updates are intentionally deferred.
 - Invitation email delivery is intentionally not implemented; invitations target existing GroupSync accounts and are stored in PostgreSQL.
 - Session storage is the default local Spring session; production deployment hardening is a later infrastructure concern.
 - The local demo depends on the PostgreSQL development service and its local password being supplied through environment variables; neither is committed.
 - The golden flow mutates session state to PLAYING and creates a result. Run `scripts/reset-demo.ps1` before each rehearsal; the final checkpoint database was reseeded to the near-capacity starting state.
-- Tournament bracket match creation is intentionally organizer-driven and reuses the existing Badminton match/result flow; the UI does not duplicate every score-entry control.
+- Tournament winner recording is organizer-controlled. It currently records the bracket result directly; connecting each bracket match to a detailed Badminton scorecard is a later enhancement.
 - Calendar reminder minutes are persisted metadata only; no external reminder delivery is implemented.
 - Tournament does not create a separate calendar source; it reuses Badminton session/match calendar data.
 

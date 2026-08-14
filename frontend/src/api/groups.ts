@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 
-export type GroupType = 'STUDY' | 'BADMINTON' | 'OTHER'
+export type GroupType = 'STUDY' | 'BADMINTON'
 export type GroupRole = 'OWNER' | 'ORGANIZER' | 'MEMBER'
 
 export type GroupSummary = {
@@ -13,7 +13,6 @@ export type GroupSummary = {
 
 export type GroupMember = {
   userId: number
-  email: string
   displayName: string
   role: GroupRole
 }

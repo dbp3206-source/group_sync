@@ -58,6 +58,8 @@ New-DemoAccount 'demo.study01@groupsync.local' 'Demo Study Guest 01'
 New-DemoAccount 'demo.study02@groupsync.local' 'Demo Study Guest 02'
 
 Invoke-Psql @'
+UPDATE users SET profile_completed = TRUE, time_zone = 'Asia/Bangkok';
+
 UPDATE users SET system_role = 'ADMIN' WHERE email = 'demo.admin@groupsync.local';
 
 INSERT INTO groups (name, description, group_type, created_at)
