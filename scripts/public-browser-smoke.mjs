@@ -42,7 +42,8 @@ page.on('response', (response) => {
 async function waitForApp() {
   await page.waitForLoadState('domcontentloaded')
   await page.locator('main').waitFor({ state: 'visible', timeout: 30000 })
-  await page.waitForTimeout(500)
+  await page.waitForLoadState('networkidle', { timeout: 30000 })
+  await page.waitForTimeout(750)
 }
 
 async function inspectRoute(route, label, screenshot = false) {
