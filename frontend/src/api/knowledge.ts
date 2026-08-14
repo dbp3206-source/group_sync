@@ -18,8 +18,12 @@ export async function getResourceContent(id: number) { return (await apiClient.g
 export async function getFocusNext() { return (await apiClient.get<FocusNext | null>('/focus/next')).data }
 export async function getInsights() { return (await apiClient.get<InsightOverview>('/insights/overview')).data }
 export async function createNote(title: string, content: string) { return (await apiClient.post<Resource>('/resources/notes', { title, content })).data }
+export async function uploadResource(file: File, title?: string) { const body = new FormData(); body.append('file', file); if (title) body.append('title', title); return (await apiClient.post<Resource>('/resources', body)).data }
 export async function askKnowledge(input: AskInput) { return (await apiClient.post<AskResponse>('/ask', input)).data }
 export async function getCollections() { return (await apiClient.get<KnowledgeCollection[]>('/collections')).data }
+export async function createCollection(name:string, description='') { return (await apiClient.post<KnowledgeCollection>('/collections', { name, description })).data }
+export async function assignResourceToCollection(collectionId:number, resourceId:number) { await apiClient.put(`/collections/${collectionId}/resources/${resourceId}`) }
+export async function getCollectionResources(collectionId:number) { return (await apiClient.get<Resource[]>(`/collections/${collectionId}/resources`)).data }
 export async function getChatSessions() { return (await apiClient.get<ChatSession[]>('/ask/sessions')).data }
 export async function getChatSession(id:number) { return (await apiClient.get<ChatDetail>(`/ask/sessions/${id}`)).data }
 export async function getResourceNotes(id:number) { return (await apiClient.get<ResourceNote[]>(`/resources/${id}/notes`)).data }

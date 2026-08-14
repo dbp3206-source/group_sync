@@ -1,6 +1,5 @@
 package com.groupsync.backend.knowledge.service;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -20,13 +19,13 @@ public class KnowledgeWorkspaceService {
     }
     @Transactional
     public Map<String, Object> createCollection(Long ownerId, String name, String description) {
-        jdbc.update("insert into collections(owner_id,name,description,created_at,updated_at) values(:owner,:name,:description,:now,:now)", Map.of("owner", ownerId, "name", required(name), "description", blankToNull(description), "now", Instant.now()));
+        jdbc.update("insert into collections(owner_id,name,description,created_at,updated_at) values(:owner,:name,:description,now(),now())", Map.of("owner", ownerId, "name", required(name), "description", blankToNull(description)));
         return jdbc.queryForMap("select id,name,description,created_at,updated_at from collections where owner_id=:owner and name=:name", Map.of("owner", ownerId, "name", required(name)));
     }
     @Transactional
     public Map<String, Object> updateCollection(Long ownerId, Long id, String name, String description) {
         requireCollection(ownerId, id);
-        jdbc.update("update collections set name=:name,description=:description,updated_at=:now where id=:id", Map.of("id", id, "name", required(name), "description", blankToNull(description), "now", Instant.now()));
+        jdbc.update("update collections set name=:name,description=:description,updated_at=now() where id=:id", Map.of("id", id, "name", required(name), "description", blankToNull(description)));
         return jdbc.queryForMap("select id,name,description,created_at,updated_at from collections where id=:id", Map.of("id", id));
     }
     @Transactional public void deleteCollection(Long ownerId, Long id) { requireCollection(ownerId, id); jdbc.update("delete from collections where id=:id", Map.of("id", id)); }
@@ -53,12 +52,12 @@ public class KnowledgeWorkspaceService {
     @Transactional
     public Map<String, Object> createNote(Long ownerId, Long resourceId, String content) {
         requireResource(ownerId, resourceId);
-        jdbc.update("insert into resource_notes(resource_id,owner_id,content,created_at,updated_at) values(:resource,:owner,:content,:now,:now)", Map.of("resource", resourceId,"owner",ownerId,"content",required(content),"now",Instant.now()));
+        jdbc.update("insert into resource_notes(resource_id,owner_id,content,created_at,updated_at) values(:resource,:owner,:content,now(),now())", Map.of("resource", resourceId,"owner",ownerId,"content",required(content)));
         return jdbc.queryForMap("select id,content,created_at,updated_at from resource_notes where owner_id=:owner and resource_id=:resource order by id desc limit 1", Map.of("owner",ownerId,"resource",resourceId));
     }
     @Transactional
     public Map<String, Object> updateNote(Long ownerId, Long resourceId, Long noteId, String content) {
-        int updated = jdbc.update("update resource_notes set content=:content,updated_at=:now where id=:id and owner_id=:owner and resource_id=:resource", Map.of("id",noteId,"owner",ownerId,"resource",resourceId,"content",required(content),"now",Instant.now()));
+        int updated = jdbc.update("update resource_notes set content=:content,updated_at=now() where id=:id and owner_id=:owner and resource_id=:resource", Map.of("id",noteId,"owner",ownerId,"resource",resourceId,"content",required(content)));
         if (updated == 0) throw new NotFoundException("Resource note not found.");
         return jdbc.queryForMap("select id,content,created_at,updated_at from resource_notes where id=:id", Map.of("id",noteId));
     }
@@ -76,7 +75,7 @@ public class KnowledgeWorkspaceService {
     @Transactional
     public Map<String, Object> updateProgress(Long ownerId, Long resourceId, int progress) {
         requireResource(ownerId, resourceId); if (progress < 0 || progress > 100) throw new IllegalArgumentException("Progress must be between 0 and 100.");
-        jdbc.update("insert into learning_progress(resource_id,owner_id,progress_percent,last_opened_at,updated_at) values(:resource,:owner,:progress,:now,:now) on conflict(resource_id,owner_id) do update set progress_percent=excluded.progress_percent,last_opened_at=excluded.last_opened_at,updated_at=excluded.updated_at", Map.of("resource",resourceId,"owner",ownerId,"progress",progress,"now",Instant.now()));
+        jdbc.update("insert into learning_progress(resource_id,owner_id,progress_percent,last_opened_at,updated_at) values(:resource,:owner,:progress,now(),now()) on conflict(resource_id,owner_id) do update set progress_percent=excluded.progress_percent,last_opened_at=excluded.last_opened_at,updated_at=excluded.updated_at", Map.of("resource",resourceId,"owner",ownerId,"progress",progress));
         return activity(ownerId, resourceId);
     }
     public void requireCollection(Long ownerId, Long id) { if (jdbc.queryForObject("select count(*) from collections where id=:id and owner_id=:owner", Map.of("id",id,"owner",ownerId), Integer.class) == 0) throw new NotFoundException("Collection not found."); }

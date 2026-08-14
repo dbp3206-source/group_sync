@@ -7,6 +7,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.event.TransactionalEventListener;
 import com.groupsync.backend.knowledge.chunking.RecursiveChunkingStrategy;
 import com.groupsync.backend.knowledge.ingestion.ParsedResourceContent;
@@ -44,6 +45,7 @@ public class ResourceIngestionService {
 
     @Async
     @TransactionalEventListener
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processAfterUpload(ResourceProcessingRequestedEvent event) {
         process(event.resourceId());
     }
