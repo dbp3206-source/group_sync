@@ -13,10 +13,11 @@ Docker is not installed on the target machine, and no cloud provider or account 
 ## Public hosting target
 
 The frontend is ready to be hosted on Vercel. In the Vercel project, set the root directory
-to `frontend`, use `npm run build` as the build command, use `dist` as the output directory,
-and define `VITE_API_URL` as the public backend URL ending in `/api`.
+to `frontend`, use `npm run build` as the build command, and use `dist` as the output directory.
 
-`frontend/vercel.json` keeps React Router routes working after a direct page refresh.
+`frontend/vercel.json` proxies `/api/*` to the Render backend before applying the React Router
+fallback. The browser therefore uses first-party session and CSRF cookies on the Vercel origin.
+The frontend does not require `VITE_API_URL`; any old value can be removed from Vercel.
 Vercel hosts only the frontend; the Spring Boot API and PostgreSQL database still need a
 public backend host and a managed PostgreSQL instance. The backend must allow the exact
 Vercel origin through `APP_CORS_ORIGINS`.

@@ -1,23 +1,10 @@
 import axios from 'axios'
 
-function getApiBaseUrl() {
-  const configured = import.meta.env.VITE_API_URL
-  if (!configured || typeof window === 'undefined') return configured || '/api'
-
-  try {
-    const apiUrl = new URL(configured, window.location.origin)
-    const localHosts = new Set(['localhost', '127.0.0.1'])
-    if (localHosts.has(window.location.hostname) && localHosts.has(apiUrl.hostname)) {
-      apiUrl.hostname = window.location.hostname
-    }
-    return apiUrl.toString().replace(/\/$/, '')
-  } catch {
-    return configured
-  }
-}
-
 export const apiClient = axios.create({
-  baseURL: getApiBaseUrl(),
+  // Keep every browser request on the frontend origin. Vite proxies this path
+  // locally and Vercel rewrites it to the Render backend in production, so
+  // session and CSRF cookies are always first-party.
+  baseURL: '/api',
   withCredentials: true,
   xsrfCookieName: 'XSRF-TOKEN',
   xsrfHeaderName: 'X-XSRF-TOKEN',
