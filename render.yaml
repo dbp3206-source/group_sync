@@ -29,6 +29,10 @@ services:
         sync: false
       - key: APP_TIMEZONE
         value: Asia/Bangkok
+      - key: APP_COOKIE_SAME_SITE
+        value: none
+      - key: APP_COOKIE_SECURE
+        value: "true"
       - key: FLYWAY_ENABLED
         value: "true"
 
