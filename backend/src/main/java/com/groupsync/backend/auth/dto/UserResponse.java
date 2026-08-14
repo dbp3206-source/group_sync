@@ -19,7 +19,7 @@ public record UserResponse(
             user.getSystemRole().name(),
             user.getTimeZone(),
             user.isProfileCompleted(),
-            "/api/users/" + user.getId() + "/avatar"
+            user.isProfileCompleted() ? "/api/users/" + user.getId() + "/avatar" : null
         );
     }
 }
