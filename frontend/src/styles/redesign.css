@@ -159,6 +159,67 @@ input:focus, select:focus, textarea:focus { border-color: var(--gs-green) !impor
 .profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .profile-panel { padding: 26px; }
 
+/* Visual refinement pass: stronger contrast, calmer page framing, and supplied image motifs. */
+body:has(.auth-layout) { background: var(--gs-green-dark); }
+body:has(.auth-layout) .app-shell--guest { background: transparent; }
+body:has(.auth-layout) .guest-header { background: transparent; }
+body:has(.auth-layout) .auth-layout { position: relative; max-width: 1280px; margin-inline: auto; }
+body:has(.auth-layout) .auth-layout::before { content: ''; position: absolute; z-index: 0; inset: 3% 46% 3% 0; border-radius: 30px; background: linear-gradient(135deg, var(--gs-green-dark), color-mix(in srgb, var(--gs-green) 72%, var(--gs-green-dark))), url('/backgrounds/auth-green.png') center / cover; background-blend-mode: normal, soft-light; opacity: .84; filter: saturate(.72) blur(10px); transform: scale(1.015); }
+body:has(.auth-layout) .auth-intro-block, body:has(.auth-layout) .auth-card-wrap { position: relative; z-index: 1; }
+body:has(.auth-layout) .auth-intro-block .eyebrow, body:has(.auth-layout) .auth-intro-block h1, body:has(.auth-layout) .auth-intro-block .intro, body:has(.auth-layout) .auth-value-list { color: var(--gs-surface); }
+body:has(.auth-layout) .app-shell--guest .brand, body:has(.auth-layout) .app-shell--guest .guest-nav a:not(.button) { color: var(--gs-surface); }
+body:has(.auth-layout) .auth-card-wrap { background: color-mix(in srgb, var(--gs-green-dark) 28%, transparent); border-color: color-mix(in srgb, var(--gs-surface) 34%, transparent); box-shadow: 0 24px 70px oklch(14% .05 165 / .28); }
+body:has(.auth-layout) .auth-page { box-shadow: 0 18px 40px oklch(18% .04 165 / .12); }
+
+body:has(.home-page) { background: var(--gs-paper) url('/backgrounds/home-mint.png') center top / cover fixed; }
+body:has(.home-page) .app-shell--signed-in, body:has(.schedule-page) .app-shell--signed-in, body:has(.groups-page) .app-shell--signed-in { background: transparent; }
+body:has(.home-page) .app-main { background: transparent; }
+.home-page { padding: 18px 22px 34px; border-radius: 28px; background: color-mix(in srgb, var(--gs-paper) 76%, transparent); }
+.overview-card--notice { background: var(--gs-orange-soft); color: var(--gs-ink); }
+.overview-card--notice small, .overview-card--notice p, .overview-card--notice span { color: var(--gs-muted); }
+.overview-card--schedule { background: var(--gs-indigo-soft); color: var(--gs-ink); }
+.overview-card--schedule small, .overview-card--schedule p, .overview-card--schedule span { color: var(--gs-muted); }
+.overview-card strong { color: var(--gs-green-dark); }
+
+body:has(.schedule-page) { background: var(--gs-paper) url('/backgrounds/calendar-grid.png') center top / cover fixed; }
+body:has(.schedule-page) .app-main { background: transparent; }
+.schedule-page { max-width: 1180px; margin-inline: auto; gap: 14px; padding: 10px 18px 28px; border-radius: 28px; background: color-mix(in srgb, var(--gs-paper) 82%, transparent); }
+.schedule-header { padding-bottom: 18px; }
+.calendar-legend { margin-top: -2px; color: var(--gs-ink); }
+.calendar-legend span { color: var(--gs-ink); }
+.calendar-surface { width: min(100%, 1080px); margin-inline: auto; padding: 12px; background: var(--gs-surface); box-shadow: 0 16px 38px oklch(24% .03 165 / .08); }
+.calendar-surface .fc { font-size: .8rem; }
+.calendar-surface .fc .fc-timegrid-slot { height: 62px; }
+.calendar-surface .fc .fc-timegrid-slot-label-cushion { color: var(--gs-ink); font-weight: 700; }
+.calendar-surface .fc .fc-col-header-cell-cushion { color: var(--gs-ink); font-weight: 800; }
+.calendar-surface .fc .fc-event { min-height: 32px; padding: 5px 7px; border-left-width: 4px; font-weight: 750; }
+.calendar-event--manual { background: var(--gs-green-soft) !important; color: var(--gs-green-dark) !important; border-color: var(--gs-green) !important; }
+.calendar-event--recurring { background: var(--gs-indigo-soft) !important; color: var(--gs-indigo) !important; border-color: var(--gs-indigo) !important; }
+.calendar-event--study { background: var(--gs-indigo-soft) !important; color: var(--gs-indigo) !important; border-color: var(--gs-indigo) !important; }
+.calendar-event--badminton { background: var(--gs-orange-soft) !important; color: var(--gs-orange-dark) !important; border-color: var(--gs-orange) !important; }
+.schedule-sources { width: min(100%, 1080px); margin-inline: auto; }
+
+body:has(.groups-page) { background: var(--gs-paper) url('/backgrounds/group-sage-lines.png') center top / cover fixed; }
+body:has(.groups-page) .app-main { background: transparent; }
+.groups-page { padding: 24px 26px 36px; border-radius: 28px; background: color-mix(in srgb, var(--gs-paper) 80%, transparent); }
+.groups-hero { padding: 24px 26px; border: 1px solid color-mix(in srgb, var(--gs-green-dark) 20%, var(--gs-rule)); background: color-mix(in srgb, var(--gs-surface) 86%, transparent); }
+.workspace-card { position: relative; overflow: hidden; }
+.workspace-card--study { background: color-mix(in srgb, var(--gs-surface) 90%, var(--gs-green-soft)); }
+.workspace-card--badminton { background: color-mix(in srgb, var(--gs-surface) 90%, var(--gs-orange-soft)); }
+.workspace-card__mark { width: 48px; height: 48px; border-radius: 14px; }
+.workspace-card--study .workspace-card__mark { background: var(--gs-green-soft); color: var(--gs-green-dark); }
+.workspace-card--badminton .workspace-card__mark { background: var(--gs-gold); color: var(--gs-green-dark); }
+.workspace-card__mark svg { display: block; }
+.create-group-modal { background: var(--gs-surface) url('/backgrounds/group-sage-lines.png') center / cover; }
+.group-type-choice label { background: color-mix(in srgb, var(--gs-surface) 92%, transparent); }
+.group-type-choice label.is-selected { background: var(--gs-green-soft); border-color: var(--gs-green); }
+.group-type-choice label:last-child.is-selected { background: var(--gs-orange-soft); border-color: var(--gs-orange); }
+
+@media (max-width: 720px) {
+  .home-page, .groups-page, .schedule-page { padding: 12px 12px 24px; border-radius: 20px; }
+  .calendar-surface { width: calc(100% + 0px); }
+}
+
 @media (hover: hover) {
   .overview-card:hover, .workspace-card:hover, .home-panel:hover { border-color: oklch(68% .05 160); transform: translateY(-1px); }
   .overview-card, .workspace-card, .home-panel { transition: border-color 150ms ease, transform 150ms ease; }
