@@ -21,6 +21,10 @@ services:
         fromDatabase:
           name: groupsync-db
           property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: groupsync-db
+          property: database
       - key: APP_CORS_ORIGINS
         sync: false
       - key: APP_TIMEZONE
