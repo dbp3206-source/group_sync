@@ -35,15 +35,15 @@ function RegisterPage() {
 
   return <section className="auth-layout auth-layout--register">
     <div className="auth-intro-block">
-      <p className="eyebrow">BẮT ĐẦU ĐƠN GIẢN</p>
-      <h1>Nhập lịch một lần. Cả nhóm cùng vận hành.</h1>
-      <p className="intro">Tạo không gian cho nhóm học tập hoặc cầu lông, rồi để GroupSync kết nối lịch, đăng ký và kết quả.</p>
+      <p className="eyebrow">PERSONAL KNOWLEDGE INTELLIGENCE</p>
+      <h1>Make room for what you are learning.</h1>
+      <p className="intro">Collect your sources, find evidence later, and keep the next useful thing close.</p>
     </div>
     <div className="auth-card-wrap">
       <div className="auth-page">
-        <p className="eyebrow">Tạo tài khoản</p>
-        <h2>Bắt đầu với GroupSync</h2>
-        <p className="auth-copy">Chỉ mất một phút để thiết lập không gian của bạn.</p>
+        <p className="eyebrow">CREATE ACCOUNT</p>
+        <h2>Start with KnowledgeOS</h2>
+        <p className="auth-copy">Create your personal space for the things you are learning.</p>
         <form className="page-panel form-stack" onSubmit={submit}>
           {error && <div className="status-card status-card--error" role="alert">{error}</div>}
           <label htmlFor="register-name">Tên hiển thị<input id="register-name" name="name" autoComplete="name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} minLength={2} maxLength={100} required /></label>
@@ -51,7 +51,7 @@ function RegisterPage() {
           <datalist id="saved-register-emails">{getEmailHistory().map((savedEmail) => <option key={savedEmail} value={savedEmail} />)}</datalist>
           <label htmlFor="register-password">Mật khẩu<span className="password-field"><input id="register-password" type={showPassword ? 'text' : 'password'} name="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} maxLength={72} required /><button type="button" className="password-toggle" onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? 'Ẩn' : 'Hiện'}</button></span></label>
           <label htmlFor="register-confirm-password">Xác nhận mật khẩu<input id="register-confirm-password" type={showPassword ? 'text' : 'password'} name="confirmPassword" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} maxLength={72} required /></label>
-          <p className="auth-help">Tối thiểu 8 ký tự. Đây là mật khẩu riêng của GroupSync; đăng nhập Gmail/OAuth chưa được hỗ trợ.</p>
+          <p className="auth-help">At least 8 characters. This is a KnowledgeOS password; Gmail and OAuth sign-in are not used.</p>
           <button className="button button--primary" disabled={saving}>{saving ? 'Đang tạo tài khoản…' : 'Tạo tài khoản'}</button>
         </form>
         <p className="auth-switch">Đã có tài khoản? <Link to="/login">Đăng nhập</Link></p>

@@ -91,6 +91,8 @@ Current redesign and workflow checkpoint: Flyway V8 is applied. The product now 
 
 ## Known limitations
 
+- KnowledgeOS migration checkpoint: the Spring Boot resource pipeline supports Gemini embeddings, pgvector retrieval, persistent chat/citations, deterministic Focus Next, and real Insights. React now has KnowledgeOS Home, Library, Resource Workspace, Ask, Focus, and Insights routes. Collection creation and resource-note editing endpoints are not yet exposed, so their controls are deliberately unavailable rather than simulated.
+
 - Google Calendar and other external calendar synchronization remain intentionally out of scope.
 - Google Calendar sync and advanced ranking algorithms remain intentionally out of scope.
 - Pairing is deliberately lightweight: Random and Balanced suggestions are available, while manual pairing is entered only when creating a match.

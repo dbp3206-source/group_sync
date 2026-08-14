@@ -1,5 +1,5 @@
 import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { Bell, CalendarDays, Home, LogOut, Menu, Users, UserRound } from 'lucide-react'
+import { BrainCircuit, BookOpenText, ChartNoAxesCombined, Home, LogOut, Menu, Sparkles } from 'lucide-react'
 import '../tokens.css'
 import './App.css'
 import './styles/app-shell.css'
@@ -15,7 +15,6 @@ import HealthPage from './pages/HealthPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import NotificationsPage from './pages/NotificationsPage'
-import DashboardPage from './pages/DashboardPage'
 import BadmintonSessionDetailPage from './pages/BadmintonSessionDetailPage'
 import BadmintonProfilePage from './pages/BadmintonProfilePage'
 import CheckinPage from './pages/CheckinPage'
@@ -24,6 +23,12 @@ import ProfileSetupPage from './pages/ProfileSetupPage'
 import ProfilePage from './pages/ProfilePage'
 import AvailabilityPage from './pages/AvailabilityPage'
 import Avatar from './components/Avatar'
+import KnowledgeHomePage from './pages/KnowledgeHomePage'
+import KnowledgeLibraryPage from './pages/KnowledgeLibraryPage'
+import KnowledgeAskPage from './pages/KnowledgeAskPage'
+import KnowledgeFocusPage from './pages/KnowledgeFocusPage'
+import KnowledgeInsightsPage from './pages/KnowledgeInsightsPage'
+import ResourceWorkspacePage from './pages/ResourceWorkspacePage'
 
 function App() {
   return (
@@ -41,33 +46,33 @@ function AppShell() {
   }
 
   const navItems = [
-    { to: '/dashboard', label: 'Trang chủ', icon: Home },
-    { to: '/calendar', label: 'Lịch của tôi', icon: CalendarDays },
-    { to: '/groups', label: 'Nhóm', icon: Users },
-    { to: '/notifications', label: 'Thông báo', icon: Bell },
-    { to: '/profile', label: 'Hồ sơ', icon: UserRound },
+    { to: '/dashboard', label: 'Home', icon: Home },
+    { to: '/library', label: 'Library', icon: BookOpenText },
+    { to: '/ask', label: 'Ask', icon: BrainCircuit },
+    { to: '/focus', label: 'Focus', icon: Sparkles },
+    { to: '/insights', label: 'Insights', icon: ChartNoAxesCombined },
   ]
 
   return <div className={`app-shell${user ? ' app-shell--signed-in' : ' app-shell--guest'}`}>
     {user && <aside className="app-sidebar" aria-label="Điều hướng chính">
-      <Link className="brand" to="/dashboard"><span className="brand-mark" aria-hidden="true">G</span><span>GroupSync</span></Link>
+      <Link className="brand" to="/dashboard"><span className="brand-mark" aria-hidden="true">K</span><span>KnowledgeOS</span></Link>
       <nav className="sidebar-nav">
         {navItems.map((item) => { const Icon = item.icon; return <NavLink key={item.to} to={item.to} className={({ isActive }) => `sidebar-link${isActive ? ' is-active' : ''}`}><Icon aria-hidden="true" size={19} strokeWidth={1.8} /><span>{item.label}</span></NavLink> })}
       </nav>
       <div className="sidebar-foot">
-        <Link className="account-link" to="/profile" aria-label="Mở hồ sơ của bạn"><Avatar displayName={user.displayName} avatarUrl={user.avatarUrl} /><span><strong>{user.displayName}</strong><small>Tài khoản của bạn</small></span></Link>
-        <button className="sign-out-button" onClick={signOut}><LogOut size={17} aria-hidden="true" />Đăng xuất</button>
+        <Link className="account-link" to="/profile" aria-label="Open your profile"><Avatar displayName={user.displayName} avatarUrl={user.avatarUrl} /><span><strong>{user.displayName}</strong><small>Personal library</small></span></Link>
+        <button className="sign-out-button" onClick={signOut}><LogOut size={17} aria-hidden="true" />Sign out</button>
       </div>
     </aside>}
     {user && <nav className="mobile-nav" aria-label="Điều hướng di động">
       {navItems.map((item) => { const Icon = item.icon; return <NavLink key={item.to} to={item.to} className={({ isActive }) => `mobile-nav-link${isActive ? ' is-active' : ''}`}><Icon aria-hidden="true" size={20} strokeWidth={1.8} /><span>{item.label}</span></NavLink> })}
     </nav>}
-    {user && <header className="mobile-app-header"><Link className="brand" to="/dashboard"><span className="brand-mark" aria-hidden="true">G</span><span>GroupSync</span></Link><Menu size={20} aria-hidden="true" /></header>}
-    {!user && <header className="guest-header"><Link className="brand" to="/login"><span className="brand-mark" aria-hidden="true">G</span><span>GroupSync</span></Link><nav className="guest-nav"><Link to="/login">Đăng nhập</Link><Link className="button button--quiet" to="/register">Tạo tài khoản</Link></nav></header>}
+    {user && <header className="mobile-app-header"><Link className="brand" to="/dashboard"><span className="brand-mark" aria-hidden="true">K</span><span>KnowledgeOS</span></Link><Menu size={20} aria-hidden="true" /></header>}
+    {!user && <header className="guest-header"><Link className="brand" to="/login"><span className="brand-mark" aria-hidden="true">K</span><span>KnowledgeOS</span></Link><nav className="guest-nav"><Link to="/login">Sign in</Link><Link className="button button--quiet" to="/register">Create account</Link></nav></header>}
     <main className="app-main">
       <Routes>
         <Route path="/health" element={<HealthPage />} />
-        <Route element={<ProtectedRoute />}><Route path="/dashboard" element={<DashboardPage />} /><Route path="/notifications" element={<NotificationsPage />} /><Route path="/calendar" element={<CalendarPage />} /><Route path="/study" element={<StudyPage />} /><Route path="/badminton" element={<BadmintonPage />} /><Route path="/groups/:groupId/availability" element={<AvailabilityPage />} /><Route path="/badminton/sessions/:sessionId" element={<BadmintonSessionDetailPage />} /><Route path="/badminton/profile" element={<BadmintonProfilePage />} /><Route path="/profile/setup" element={<ProfileSetupPage />} /><Route path="/profile" element={<ProfilePage />} /></Route>
+        <Route element={<ProtectedRoute />}><Route path="/dashboard" element={<KnowledgeHomePage />} /><Route path="/library" element={<KnowledgeLibraryPage />} /><Route path="/library/:resourceId" element={<ResourceWorkspacePage />} /><Route path="/ask" element={<KnowledgeAskPage />} /><Route path="/focus" element={<KnowledgeFocusPage />} /><Route path="/insights" element={<KnowledgeInsightsPage />} /><Route path="/notifications" element={<NotificationsPage />} /><Route path="/calendar" element={<CalendarPage />} /><Route path="/study" element={<StudyPage />} /><Route path="/badminton" element={<BadmintonPage />} /><Route path="/groups/:groupId/availability" element={<AvailabilityPage />} /><Route path="/badminton/sessions/:sessionId" element={<BadmintonSessionDetailPage />} /><Route path="/badminton/profile" element={<BadmintonProfilePage />} /><Route path="/profile/setup" element={<ProfileSetupPage />} /><Route path="/profile" element={<ProfilePage />} /></Route>
         <Route path="/check-in" element={user ? <CheckinPage /> : <Navigate to="/login" replace />} />
         <Route element={<ProtectedRoute />}><Route path="/tournaments" element={<TournamentPage />} /></Route>
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
