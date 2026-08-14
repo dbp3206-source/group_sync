@@ -170,6 +170,9 @@ body:has(.auth-layout) .auth-intro-block .eyebrow, body:has(.auth-layout) .auth-
 body:has(.auth-layout) .app-shell--guest .brand, body:has(.auth-layout) .app-shell--guest .guest-nav a:not(.button) { color: var(--gs-surface); }
 body:has(.auth-layout) .auth-card-wrap { background: color-mix(in srgb, var(--gs-green-dark) 28%, transparent); border-color: color-mix(in srgb, var(--gs-surface) 34%, transparent); box-shadow: 0 24px 70px oklch(14% .05 165 / .28); }
 body:has(.auth-layout) .auth-page { box-shadow: 0 18px 40px oklch(18% .04 165 / .12); }
+body:has(.auth-layout--register) { background: var(--gs-green-dark) url('/backgrounds/register-green-pattern.png') center / cover fixed; }
+body:has(.auth-layout--register) .auth-layout--register::before { display: none; }
+body:has(.auth-layout--register) .auth-layout--register .auth-intro-block { padding: 28px; border-radius: 26px; background: color-mix(in srgb, var(--gs-green-dark) 82%, transparent); box-shadow: 0 22px 60px oklch(18% .05 165 / .22); }
 
 body:has(.home-page) { background: var(--gs-paper) url('/backgrounds/home-mint.png') center top / cover fixed; }
 body:has(.home-page) .app-shell--signed-in, body:has(.schedule-page) .app-shell--signed-in, body:has(.groups-page) .app-shell--signed-in { background: transparent; }
