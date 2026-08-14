@@ -12,8 +12,8 @@
     "rendered": true,
     "visual_review": true,
     "content_fidelity": true,
-    "target_environment": false
+    "target_environment": true
   },
-  "quality_score": 86,
-  "known_limitations": ["Production verification will be recorded after Vercel finishes deploying the pushed commit."]
+  "quality_score": 92,
+  "known_limitations": ["The production bundle is functional but still triggers Vite's 500 kB chunk-size optimization warning."]
 }

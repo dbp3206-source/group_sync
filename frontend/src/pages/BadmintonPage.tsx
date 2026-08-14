@@ -119,11 +119,11 @@ function BadmintonPage() {
         if (!groupId)
           setGroupId(data.find((group) => group.type === "BADMINTON")?.id ?? 0);
       })
-      .catch((e) => setError(getApiErrorMessage(e, "Could not load groups.")));
+      .catch((e) => setError(getApiErrorMessage(e, "Không thể tải nhóm cầu lông.")));
   }, []);
   useEffect(() => {
     refresh().catch((e) =>
-      setError(getApiErrorMessage(e, "Could not load badminton data.")),
+      setError(getApiErrorMessage(e, "Không thể tải dữ liệu cầu lông.")),
     );
   }, [groupId]);
 
@@ -136,7 +136,7 @@ function BadmintonPage() {
       setMessage(text);
       await refresh();
     } catch (e) {
-      setError(getApiErrorMessage(e, "Badminton action failed."));
+      setError(getApiErrorMessage(e, "Không thể cập nhật hoạt động cầu lông."));
     }
   }
 
@@ -151,10 +151,10 @@ function BadmintonPage() {
       setVenueAddress("");
       setVenueId(venue.id);
       setCourtIds([]);
-      setMessage("Venue created.");
+      setMessage("Đã thêm địa điểm.");
       await refresh();
     } catch (e) {
-      setError(getApiErrorMessage(e, "Could not create venue."));
+      setError(getApiErrorMessage(e, "Không thể thêm địa điểm."));
     }
   }
 
@@ -166,10 +166,10 @@ function BadmintonPage() {
       setCourtIds((current) =>
         current.includes(court.id) ? current : [...current, court.id],
       );
-      setMessage("Court created.");
+      setMessage("Đã thêm sân.");
       await refresh();
     } catch (e) {
-      setError(getApiErrorMessage(e, "Could not create court."));
+      setError(getApiErrorMessage(e, "Không thể thêm sân."));
     }
   }
 
@@ -186,11 +186,11 @@ function BadmintonPage() {
         venueId,
         courtIds,
       });
-      setMessage("Badminton session created as draft.");
+      setMessage("Đã tạo buổi chơi ở trạng thái nháp.");
       setTitle("");
       await refresh();
     } catch (e) {
-      setError(getApiErrorMessage(e, "Could not create session."));
+      setError(getApiErrorMessage(e, "Không thể tạo buổi chơi."));
     }
   }
 
@@ -204,10 +204,10 @@ function BadmintonPage() {
         sideAUserIds: pairing.sideA.map((player) => player.userId),
         sideBUserIds: pairing.sideB.map((player) => player.userId),
       });
-      setMessage("Match created from pairing suggestion.");
+      setMessage("Đã tạo trận đấu từ đề xuất ghép cặp.");
       await refresh();
     } catch (e) {
-      setError(getApiErrorMessage(e, "Could not create match."));
+      setError(getApiErrorMessage(e, "Không thể tạo trận đấu."));
     }
   }
   async function makeCheckinToken(sessionId: number) {
@@ -217,9 +217,9 @@ function BadmintonPage() {
         ...current,
         [sessionId]: `${window.location.origin}/check-in?token=${result.token}`,
       }));
-      setMessage("Check-in token generated.");
+      setMessage("Đã tạo liên kết check-in.");
     } catch (e) {
-      setError(getApiErrorMessage(e, "Could not generate check-in token."));
+      setError(getApiErrorMessage(e, "Không thể tạo liên kết check-in."));
     }
   }
 
@@ -227,7 +227,7 @@ function BadmintonPage() {
     const [scoreA, scoreB] = scores[match.id] ?? ["", ""];
     await act(
       () => submitMatchScore(match.id, Number(scoreA), Number(scoreB)),
-      "Score submitted.",
+      "Đã gửi tỷ số để xác nhận.",
     );
   }
 
@@ -825,7 +825,7 @@ function BadmintonPage() {
           <div className="page-panel">
             <div className="section-title">TIN TRONG NHÓM</div>
             {news.length === 0 && (
-              <p className="hint">No announcements or results yet.</p>
+              <p className="hint">Chưa có thông báo hoặc kết quả mới.</p>
             )}
             {news.map((item) => (
               <div className="saved-source" key={item.id}>
