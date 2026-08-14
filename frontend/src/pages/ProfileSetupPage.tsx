@@ -55,14 +55,10 @@ function ProfileSetupPage() {
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     setError('')
-    if (!selectedFile) {
-      setError('Ảnh đại diện là bước bắt buộc để hoàn tất hồ sơ.')
-      return
-    }
     setSaving(true)
     try {
-      await updateProfile({ displayName, timeZone })
-      const updatedUser = await uploadAvatar(selectedFile)
+      const profileUser = await updateProfile({ displayName, timeZone })
+      const updatedUser = selectedFile ? await uploadAvatar(selectedFile) : profileUser
       updateCurrentUser(updatedUser)
       navigate('/dashboard', { replace: true })
     } catch (requestError) {
@@ -73,7 +69,7 @@ function ProfileSetupPage() {
   }
 
   return <section className="profile-setup-page">
-    <div className="profile-setup-copy"><p className="eyebrow">BƯỚC CUỐI CÙNG</p><h1>Tạo dấu hiệu nhận biết của bạn.</h1><p className="intro">Ảnh đại diện giúp thành viên nhận ra bạn trong lịch nhóm, danh sách đăng ký và kết quả trận đấu.</p></div>
+    <div className="profile-setup-copy"><p className="eyebrow">BƯỚC CUỐI CÙNG</p><h1>Tạo dấu hiệu nhận biết của bạn.</h1><p className="intro">Bạn có thể thêm ảnh ngay hoặc dùng chữ cái đầu làm ảnh đại diện mặc định.</p></div>
     <form className="profile-setup-card form-stack" onSubmit={submit}>
       {error && <div className="status-card status-card--error" role="alert">{error}</div>}
       <button type="button" className="avatar-upload" onClick={() => inputRef.current?.click()} aria-label="Chọn ảnh đại diện">
@@ -81,7 +77,7 @@ function ProfileSetupPage() {
         <b>Chọn ảnh</b>
       </button>
       <input ref={inputRef} className="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => selectAvatar(event.target.files?.[0])} />
-      <p className="avatar-help">Ảnh được cắt vuông và nén trước khi lưu. PNG, JPEG hoặc WebP; tối đa 512 KB.</p>
+      <p className="avatar-help">Không bắt buộc · PNG, JPEG hoặc WebP; tối đa 512 KB.</p>
       <label htmlFor="setup-name">Tên hiển thị<input id="setup-name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} minLength={2} maxLength={100} required /></label>
       <label htmlFor="setup-time-zone">Múi giờ<select id="setup-time-zone" value={timeZone} onChange={(event) => setTimeZone(event.target.value)}><option value="Asia/Ho_Chi_Minh">Việt Nam (GMT+7)</option><option value="Asia/Bangkok">Bangkok (GMT+7)</option><option value="Asia/Singapore">Singapore (GMT+8)</option></select></label>
       <button className="button button--primary" disabled={saving}>{saving ? 'Đang hoàn tất…' : 'Hoàn tất hồ sơ'}</button>

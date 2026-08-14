@@ -31,3 +31,13 @@ session. It uses purposeful colour and familiar controls instead of decorative e
 - Cards are used to group information, not to wrap every sentence.
 - Statuses use text and colour together.
 - Empty states explain the next useful action without inventing product metrics or testimonials.
+
+## Operational workspace refinement
+
+- Global navigation stays limited to Home, My Schedule, Groups, Notifications, and Profile.
+- Group tools use contextual tabs: Overview, Group Availability, Activity, and Tournament where relevant.
+- The primary journey is visible in the interface: My Schedule → Group Availability → Group Activity → Results / Progress.
+- Home behaves as a command center: next activity, current group, attention, and recent updates lead.
+- Study uses calm indigo surfaces and academic pacing; Badminton uses orange accents, lifecycle states, court visuals, and score-first hierarchy; Tournament uses deep green with restrained gold.
+- Mobile shows the current task first, converts wide content into ranked or horizontal flows, and never requires the desktop sidebar.
+- Lucide is the sole production icon family. Initial-based avatars remain the fallback when no image is supplied.
