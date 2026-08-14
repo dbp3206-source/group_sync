@@ -1,5 +1,12 @@
 # Implementation Status
 
+## KnowledgeOS migration
+
+- Migration branch: `codex/knowledgeos-migration` from verified GroupSync baseline `01c1297`.
+- Knowledge foundation: V9 adds user-owned resources, collections, tags, resource links, notes, and learning progress without changing V1-V8.
+- Resource import: controlled local `StorageService`, ownership-scoped resource CRUD, duplicate checksum protection, note resources, and protected content access are implemented.
+- Next: parser/chunking lifecycle, then V10 pgvector and the Gemini-backed retrieval slice.
+
 ## Current checkpoint
 
 Current redesign and workflow checkpoint: Flyway V8 is applied. The product now includes profile completion/avatar storage, a responsive application shell, FullCalendar, a dedicated group-availability workspace, and organizer-managed Singles/Doubles knockout entries with automatic byes and bracket progression. The packaged backend JAR and production frontend build were verified against the persistent local PostgreSQL service. Google Calendar remains intentionally excluded.
