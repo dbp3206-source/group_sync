@@ -11,7 +11,10 @@ if [ -n "${DATABASE_URL:-}" ]; then
     *@*) host_and_port="${database_url#*@}" ;;
     *) host_and_port="${database_url%%/*}" ;;
   esac
-  database_name="${database_url#*/}"
+  # Keep only the final database segment in case the provider connection
+  # string already contains an extra database path segment.
+  database_name="${database_url##*/}"
+  database_name="${database_name%%\?*}"
   export DB_URL="jdbc:postgresql://${host_and_port}/${database_name}"
 fi
 
