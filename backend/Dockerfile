@@ -14,7 +14,9 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 COPY --from=build /workspace/target/backend-0.0.1-SNAPSHOT.jar app.jar
+COPY render-start.sh /app/render-start.sh
+RUN chmod +x /app/render-start.sh
 
 EXPOSE 8080
 
-ENTRYPOINT ["sh", "-c", "if [ -n \"${DATABASE_URL:-}\" ]; then export DB_URL=\"jdbc:${DATABASE_URL#jdbc:}\"; fi; exec java ${JAVA_OPTS:-} -Dserver.port=${PORT:-8080} -jar /app/app.jar"]
+ENTRYPOINT ["/app/render-start.sh"]
