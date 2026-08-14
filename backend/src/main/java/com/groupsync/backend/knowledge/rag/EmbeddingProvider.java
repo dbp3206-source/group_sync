@@ -1,2 +1,6 @@
 package com.groupsync.backend.knowledge.rag;
-public interface EmbeddingProvider { float[] embed(String content); }
+
+public interface EmbeddingProvider {
+    float[] embedDocument(String content);
+    float[] embedQuery(String content);
+}
