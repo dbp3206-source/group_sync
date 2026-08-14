@@ -313,7 +313,7 @@ body:has(.auth-layout) .auth-layout::before { display: none; }
 body:has(.auth-layout) .auth-intro-block { padding: 28px; border-radius: 26px; background: color-mix(in srgb, var(--gs-green-dark) 78%, transparent); box-shadow: 0 22px 60px oklch(18% .05 165 / .22); }
 body:has(.auth-layout--register) { background-image: url('/backgrounds/auth-gradient-green.png'); }
 
-body:has(.home-page) { background: var(--gs-paper) url('/backgrounds/home-green-facets.png') center top / cover fixed; }
+body:has(.home-page) { background: var(--gs-paper) url('/backgrounds/home-green-glow.png') center top / cover fixed; }
 body:has(.home-page) .home-page { background: color-mix(in srgb, var(--gs-paper) 82%, transparent); }
 
 body:has(.schedule-page) { background-image: url('/backgrounds/calendar-grid.png'); }
