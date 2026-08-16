@@ -112,10 +112,10 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 .map(entry -> {
                     RetrievedChunk source = representatives.get(entry.getKey());
                     double rrfScore = entry.getValue()[0];
-                    // Normalize distance: higher RRF score → lower distance → better match.
-                    // RRF score can exceed 1 when a chunk appears in both branches at high ranks.
-                    // Cap distance at 0 (floor).
-                    double normalizedDistance = Math.max(0.0, 1.0 - rrfScore);
+                    // Normalize score relative to theoretical maximum (rank 1 in both branches = 2.0 / (RRF_K + 1))
+                    double maxPossibleRrf = 2.0 / (RRF_K + 1.0);
+                    double normalizedScore = Math.min(1.0, rrfScore / maxPossibleRrf);
+                    double normalizedDistance = Math.max(0.0, 1.0 - normalizedScore);
                     return new RetrievedChunk(
                             source.chunkId(), source.resourceId(), source.resourceTitle(),
                             source.chunkIndex(), source.pageNumber(), source.section(),
