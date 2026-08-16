@@ -207,10 +207,11 @@ Important checkpoints:
 - `f44f5dc`: Step Two workspace flows.
 - `abf3bd1`: acceptance organization, filters, and RAG QA checkpoint.
 
-At handoff creation, the working tree also contains legitimate source changes to be checkpointed:
-the duplicate-safe Vietnamese lexical-anchor fix in `KnowledgeChatService`, the expanded live
-RAG benchmark safety checks, and the user-owned QA/runtime artefacts listed in the final receipt.
-Do not discard them. Do not stage `.env.local` or unrelated runtime files.
+The duplicate-safe Vietnamese lexical-anchor fix in `KnowledgeChatService`, the expanded live
+RAG benchmark safety checks, and this handoff are already committed and pushed in `a87ba1c`.
+The remaining working-tree items are user-owned local/runtime evidence: the modified
+`scripts/start-groupsync.ps1`, untracked `design-work/qa/` artefacts, and
+`knowledgeos-storage/`. Preserve them. Do not stage `.env.local` or runtime storage.
 
 ## H. Current Prompt 3 / Local Acceptance status
 
@@ -246,9 +247,9 @@ Latest evidence is source-backed and should supersede older numbers in pre-exist
 | Critical bugs | 0 known | no unresolved critical defect recorded |
 | Major bugs | 0 known | browser file chooser is an environment limitation, not a known app failure |
 
-The current code change that was discovered during the final live benchmark was a real bug:
+The code change discovered during the final live benchmark was a real bug:
 `Set.of` contained duplicate Vietnamese stopword `là`, causing an exception on some unsupported
-questions. It is fixed in the working tree. The benchmark now reports:
+questions. It is fixed and committed. The benchmark now reports:
 
 `total=7 recallAt5=1.000 mrr=1.000 citationValidity=1.000 groundedAnswerRate=1.000 scopeLeakage=0 unsupportedHallucinations=0 vietnamese=PASS promptInjection=PASS`.
 
@@ -436,18 +437,17 @@ merge main, or rename during this handoff.
 The new agent should not restart Phase 0 or add a major feature. The safe continuation order is:
 
 1. Read this handoff, inspect `git status`, and preserve all listed user-owned files.
-2. Commit the current coherent source checkpoint, including the Vietnamese lexical-anchor fix
-   and expanded benchmark, plus this handoff/manifest and corrected QA numbers. Push the migration
-   branch; do not stage `.env.local`, runtime storage, or untracked browser evidence unless a
-   later explicit evidence policy permits it.
-3. Run the ordinary full backend test/package and frontend build once after that checkpoint if
+2. Confirm local HEAD and `origin/codex/knowledgeos-migration` include `a87ba1c` or a later
+   verified handoff correction. Do not stage `.env.local`, runtime storage, or untracked browser
+   evidence unless a later explicit evidence policy permits it.
+3. Run the ordinary full backend test/package and frontend build once after the handoff checkpoint if
    the environment is available; compare results to the recorded PASS evidence.
 4. If Local Acceptance requires a final browser pass, retest the binary file chooser in a browser
    that permits safe disposable fixtures; otherwise record the protected harness limitation.
 5. Stop after Local Acceptance documentation is truthful. Production Prompt 4 is a separate stage.
 
-Remaining task count at transfer: **3** — final checkpoint commit/push, one final regression/build
-confirmation, and optional binary-upload browser E2E recheck. No architecture rewrite is pending.
+Remaining task count at transfer: **2** — one final regression/build confirmation and optional
+binary-upload browser E2E recheck. No architecture rewrite is pending.
 
 ## Q. Do-not-change contract
 
