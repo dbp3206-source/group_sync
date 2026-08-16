@@ -46,7 +46,7 @@ public class ResourceService {
             return ResourceResponse.from(saved);
         } catch (IOException exception) { throw new BadRequestException("The note could not be stored."); }
     }
-    @Transactional(readOnly = true) public List<ResourceResponse> list(Long ownerId, String query) { List<Resource> resources = query == null || query.isBlank() ? resourceRepository.findByOwnerIdOrderByUpdatedAtDesc(ownerId) : resourceRepository.findByOwnerIdAndTitleContainingIgnoreCaseOrderByUpdatedAtDesc(ownerId, query.trim()); return resources.stream().map(ResourceResponse::from).toList(); }
+    @Transactional(readOnly = true) public List<ResourceResponse> list(Long ownerId, String query, Long tagId, Long collectionId) { List<Resource> resources = resourceRepository.search(ownerId, query == null || query.isBlank() ? null : query.trim(), tagId, collectionId); return resources.stream().map(ResourceResponse::from).toList(); }
     @Transactional(readOnly = true) public ResourceResponse get(Long ownerId, Long resourceId) { return ResourceResponse.from(find(ownerId, resourceId)); }
     @Transactional public ResourceResponse update(Long ownerId, Long resourceId, UpdateResourceRequest request) { Resource resource = find(ownerId, resourceId); resource.updateMetadata(request.title().trim(), normalize(request.description()), request.favorite(), request.priority()); return ResourceResponse.from(resource); }
     @Transactional public void delete(Long ownerId, Long resourceId) { Resource resource = find(ownerId, resourceId); try { storageService.delete(resource.getStorageKey()); } catch (IOException exception) { throw new BadRequestException("The resource file could not be deleted."); } resourceRepository.delete(resource); }

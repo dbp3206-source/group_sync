@@ -14,6 +14,7 @@ import com.groupsync.backend.user.repository.UserAccountRepository;
 @Service
 public class KnowledgeChatService {
     private static final String INSUFFICIENT_CONTEXT = "I don't have enough evidence in the selected KnowledgeOS sources to answer that yet.";
+    private static final double MIN_RELEVANCE = 0.25d;
     private final ChatSessionRepository sessionRepository;
     private final ChatMessageRepository messageRepository;
     private final CitationRepository citationRepository;
@@ -41,12 +42,13 @@ public class KnowledgeChatService {
                 ? selectedIds.stream().findFirst().orElse(null) : null;
         List<RetrievedChunk> chunks = retrievalService.retrieve(ownerId, request.question(), session.getScopeType(),
                 thisResourceId, selectedIds, session.getCollectionId());
-        if (chunks.isEmpty()) {
+        if (chunks.isEmpty() || chunks.getFirst().distance() > 1 - MIN_RELEVANCE
+                || (!hasLexicalAnchor(request.question(), chunks.getFirst()) && chunks.getFirst().distance() > 0.25d)) {
             messageRepository.save(new ChatMessage(session, ChatMessageRole.ASSISTANT, INSUFFICIENT_CONTEXT));
             return new AskKnowledgeResponse(session.getId(), INSUFFICIENT_CONTEXT, false, List.of());
         }
 
-        String answer = languageModelClient.answer(prompt(request.question(), chunks));
+        String answer = languageModelClient.answer(GroundedPromptBuilder.build(request.question(), chunks));
         ChatMessage assistantMessage = messageRepository.save(new ChatMessage(session, ChatMessageRole.ASSISTANT, answer));
         Map<Long, DocumentChunk> persistedChunks = new HashMap<>();
         chunkRepository.findAllById(chunks.stream().map(RetrievedChunk::chunkId).toList())
@@ -114,17 +116,18 @@ public class KnowledgeChatService {
         return new LinkedHashSet<>(resources);
     }
 
-    private String prompt(String question, List<RetrievedChunk> chunks) {
-        StringBuilder prompt = new StringBuilder("You are KnowledgeOS. Answer only from the supplied evidence. ")
-                .append("If the evidence is insufficient, say so plainly. Cite sources using [1], [2], and so on.\n\nEvidence:\n");
-        for (int index = 0; index < chunks.size(); index++) {
-            RetrievedChunk chunk = chunks.get(index);
-            prompt.append('[').append(index + 1).append("] ").append(chunk.resourceTitle()).append(": ")
-                    .append(chunk.content()).append("\n\n");
-        }
-        return prompt.append("Question: ").append(question.trim()).toString();
-    }
-
     private String excerpt(String content) { return truncate(content, 500); }
     private String truncate(String content, int max) { return content.length() <= max ? content : content.substring(0, max - 1).trim() + "…"; }
+    private boolean hasLexicalAnchor(String question, RetrievedChunk chunk) {
+        Set<String> ignored = Set.of("what", "when", "where", "which", "who", "why", "how", "does", "did", "the", "is", "are", "was", "this", "that", "from", "with", "for", "and", "or", "là", "gì", "bao", "nhiêu", "nào", "của", "ở", "trong", "từ", "và", "là");
+        Set<String> evidence = tokens(chunk.resourceTitle() + " " + chunk.content(), ignored);
+        return tokens(question, ignored).stream().anyMatch(evidence::contains);
+    }
+    private Set<String> tokens(String value, Set<String> ignored) {
+        Set<String> result = new HashSet<>();
+        for (String token : value.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+")) {
+            if (token.length() >= 3 && !ignored.contains(token)) result.add(token);
+        }
+        return result;
+    }
 }

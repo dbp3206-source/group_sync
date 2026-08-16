@@ -17,6 +17,40 @@ public class KnowledgeWorkspaceService {
     public List<Map<String, Object>> collections(Long ownerId) {
         return jdbc.queryForList("select id, name, description, created_at, updated_at from collections where owner_id=:owner order by updated_at desc", Map.of("owner", ownerId));
     }
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> tags(Long ownerId) {
+        return jdbc.queryForList("select id, name, created_at from tags where owner_id=:owner order by name", Map.of("owner", ownerId));
+    }
+    @Transactional
+    public Map<String, Object> createTag(Long ownerId, String name) {
+        String normalized = normalizeTag(name);
+        jdbc.update("insert into tags(owner_id,name,created_at) values(:owner,:name,now()) on conflict(owner_id,name) do nothing", Map.of("owner", ownerId, "name", normalized));
+        return jdbc.queryForMap("select id,name,created_at from tags where owner_id=:owner and name=:name", Map.of("owner", ownerId, "name", normalized));
+    }
+    @Transactional
+    public Map<String, Object> updateTag(Long ownerId, Long id, String name) {
+        requireTag(ownerId, id);
+        String normalized = normalizeTag(name);
+        jdbc.update("update tags set name=:name where id=:id and owner_id=:owner", Map.of("owner", ownerId, "id", id, "name", normalized));
+        return jdbc.queryForMap("select id,name,created_at from tags where id=:id and owner_id=:owner", Map.of("owner", ownerId, "id", id));
+    }
+    @Transactional
+    public void deleteTag(Long ownerId, Long id) { requireTag(ownerId, id); jdbc.update("delete from tags where id=:id", Map.of("id", id)); }
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> resourceTags(Long ownerId, Long resourceId) {
+        requireResource(ownerId, resourceId);
+        return jdbc.queryForList("select t.id,t.name,t.created_at from tags t join resource_tags rt on rt.tag_id=t.id where t.owner_id=:owner and rt.resource_id=:resource order by t.name", Map.of("owner", ownerId, "resource", resourceId));
+    }
+    @Transactional
+    public void assignTag(Long ownerId, Long resourceId, Long tagId) {
+        requireResource(ownerId, resourceId); requireTag(ownerId, tagId);
+        jdbc.update("insert into resource_tags(resource_id,tag_id) values(:resource,:tag) on conflict do nothing", Map.of("resource", resourceId, "tag", tagId));
+    }
+    @Transactional
+    public void removeTag(Long ownerId, Long resourceId, Long tagId) {
+        requireResource(ownerId, resourceId); requireTag(ownerId, tagId);
+        jdbc.update("delete from resource_tags where resource_id=:resource and tag_id=:tag", Map.of("resource", resourceId, "tag", tagId));
+    }
     @Transactional
     public Map<String, Object> createCollection(Long ownerId, String name, String description) {
         jdbc.update("insert into collections(owner_id,name,description,created_at,updated_at) values(:owner,:name,:description,now(),now())", Map.of("owner", ownerId, "name", required(name), "description", blankToNull(description)));
@@ -80,6 +114,8 @@ public class KnowledgeWorkspaceService {
     }
     public void requireCollection(Long ownerId, Long id) { if (jdbc.queryForObject("select count(*) from collections where id=:id and owner_id=:owner", Map.of("id",id,"owner",ownerId), Integer.class) == 0) throw new NotFoundException("Collection not found."); }
     private void requireResource(Long ownerId, Long id) { if (jdbc.queryForObject("select count(*) from resources where id=:id and owner_id=:owner", Map.of("id",id,"owner",ownerId), Integer.class) == 0) throw new NotFoundException("Resource not found."); }
+    public void requireTag(Long ownerId, Long id) { if (jdbc.queryForObject("select count(*) from tags where id=:id and owner_id=:owner", Map.of("id",id,"owner",ownerId), Integer.class) == 0) throw new NotFoundException("Tag not found."); }
     private String required(String value) { if (value == null || value.isBlank()) throw new IllegalArgumentException("A value is required."); return value.trim(); }
     private String blankToNull(String value) { return value == null || value.isBlank() ? "" : value.trim(); }
+    private String normalizeTag(String value) { return required(value).toLowerCase(java.util.Locale.ROOT).replaceAll("\\s+", "-"); }
 }
