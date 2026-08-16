@@ -6,9 +6,9 @@ import java.security.*;
 import java.util.HexFormat;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-@Service
+@Component("localStorageService")
 public class LocalStorageService implements StorageService {
     private final Path storageRoot;
     public LocalStorageService(@Value("${knowledge.storage.local-root:./knowledgeos-storage}") String root) {
