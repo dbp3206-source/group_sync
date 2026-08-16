@@ -11,6 +11,26 @@
 - Resource deletion with persisted citations: `ResourceService.delete()` now calls `citationRepository.deleteByChunkResourceId()` before deleting the resource, resolving the `ON DELETE RESTRICT` FK violation on `citations.document_chunk_id`. Historical chat sessions and messages are preserved; only citation rows referencing deleted chunks are removed. Verified by `ResourceDeleteWithCitationsTest` (2/2 PASS).
 - Final Local Acceptance: PASS (see `docs/qa/FINAL_LOCAL_ACCEPTANCE.md`). Backend 46 tests, 0 failures. Frontend build and lint PASS. All mandatory Prompt 3 gates pass. Production candidate: YES.
 
+## KnowledgeOS Prompt 4 — Hybrid RAG + Final Pre-Production Pass
+
+- **Hybrid Retrieval (RRF):** Introduced `RetrievalStrategy` interface + three implementations: `SemanticRetrievalStrategy` (pgvector cosine), `KeywordRetrievalStrategy` (PostgreSQL FTS, `simple` dictionary, `plainto_tsquery`), and `HybridRetrievalStrategy` (Reciprocal Rank Fusion, k=60). `KnowledgeChatService` is now wired to `@Qualifier("hybridRetrieval")`.
+- **V12 Flyway migration:** Added `fts_content tsvector GENERATED ALWAYS AS` column + GIN index on `document_chunks`. Language-agnostic `simple` dictionary preserves exact Vietnamese tokens and technical identifiers (CVE codes, RFC numbers).
+- **Backward compatibility:** `SemanticRetrievalService` retained as a thin delegation façade for integration tests that `@Autowire` it. No test changes required.
+- **Evaluation dataset:** Expanded from 25 to 34 controlled cases. Nine new hybrid-specific categories: `EXACT_IDENTIFIER`, `EXACT_STANDARD`, `EXACT_PROJECT_TERM`, `SEMANTIC_PARAPHRASE`, `VIETNAMESE_EXACT`, `VIETNAMESE_PARAPHRASE`, `MIXED_EN_VI_TECHNICAL`, `DISTRACTOR_RESOURCE`, `OUT_OF_SCOPE_EXACT_MATCH`. New fixture: `qa/fixtures/security-notes.md`.
+- **New unit tests:** `HybridRetrievalStrategyTest` — 7 pure-unit RRF tests (no Spring context). `RagEvaluationDatasetTest` updated to assert ≥ 34 cases and hybrid category presence.
+- **Backend test result:** 53 run, 0 failures, 0 errors, 4 skipped (API integration tests gated by env var). BUILD SUCCESS.
+- **Frontend quality pass:**
+  - `KnowledgeFocusPage`: dead "Start focus" button replaced with `<Link to="/library/{resourceId}">`.
+  - `KnowledgeInsightsPage`: added missing `completedResources` stat; improved loading/error states.
+  - `ResourceWorkspacePage`: two-step delete resource with confirmation guard; busy guard on "Save note"; aria-live on loading state; `role="tab"` on tabs.
+  - `KnowledgeLibraryPage`: added `useCallback` + `useRef` pattern for stable `load` reference; 4-second polling interval that auto-stops when all resources reach terminal state (`READY`/`FAILED`).
+  - `api/client.ts`: 401 interceptor redirects to `/login` on session expiry.
+  - `api/knowledge.ts`: `deleteResource` and `updateResourceFavorite` added.
+  - `knowledgeos-responsive.css`: `kos-button--danger` styles + `kos-insight-numbers` 4-column responsive grid.
+- **Frontend build:** TypeScript + Vite build PASS (1916 modules). Pre-existing chunk size warning (665 kB, non-breaking, previously documented).
+- **Frontend lint:** PASS — exit code 0, all warnings are pre-existing in non-KnowledgeOS pages.
+
+
 
 ## KnowledgeOS migration
 

@@ -13,3 +13,14 @@ export const apiClient = axios.create({
     Accept: 'application/json',
   },
 })
+
+// Redirect to /login on session expiry so the app never loops on 401 errors.
+apiClient.interceptors.response.use(
+  response => response,
+  error => {
+    if (error?.response?.status === 401 && window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+      window.location.replace('/login')
+    }
+    return Promise.reject(error)
+  }
+)

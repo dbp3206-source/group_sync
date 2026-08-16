@@ -1,5 +1,5 @@
 import { FileText, FolderPlus, Plus, Search, Tags, Upload, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { assignResourceToCollection, createCollection, createNote, getCollections, getResources, getTags, uploadResource, type KnowledgeCollection, type KnowledgeTag, type Resource } from '../api/knowledge'
 
@@ -11,7 +11,24 @@ export default function KnowledgeLibraryPage() {
   const [tagId, setTagId] = useState<number | undefined>(); const [collectionId, setCollectionId] = useState<number | undefined>()
   const [title, setTitle] = useState(''); const [content, setContent] = useState(''); const [open, setOpen] = useState(false)
   const [collectionOpen, setCollectionOpen] = useState(false); const [collectionName, setCollectionName] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
-  const load = (q = activeQuery, nextTag = tagId, nextCollection = collectionId) => getResources(q, nextTag, nextCollection).then(setResources).catch(() => setError('Your library could not be loaded.'))
+  // Refs keep polling callback stable without stale closures
+  const activeQueryRef = useRef(activeQuery); const tagIdRef = useRef(tagId); const collectionIdRef = useRef(collectionId)
+  activeQueryRef.current = activeQuery; tagIdRef.current = tagId; collectionIdRef.current = collectionId
+  const load = useCallback((q = activeQueryRef.current, nextTag = tagIdRef.current, nextCollection = collectionIdRef.current) =>
+    getResources(q, nextTag, nextCollection).then(setResources).catch(() => setError('Your library could not be loaded.')), [])
+  // Poll every 4 s while any resource is still processing; stop when all reach terminal state
+  useEffect(() => {
+    const PROCESSING = new Set(['UPLOADING','PARSING','CHUNKING','EMBEDDING'])
+    const interval = setInterval(() => {
+      setResources(current => {
+        const hasInFlight = current.some(r => PROCESSING.has(r.processingStatus))
+        if (hasInFlight) load()
+        else clearInterval(interval)
+        return current
+      })
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [load])
   useEffect(() => { load(); getCollections().then(setCollections).catch(() => setError('Collections could not be loaded.')); getTags().then(setTags).catch(() => setError('Tags could not be loaded.')) }, [])
   async function saveNote(e: React.FormEvent) { e.preventDefault(); setError(''); try { await createNote(title, content); setTitle(''); setContent(''); setOpen(false); load() } catch { setError('The note could not be saved.') } }
   async function importFile(file?: File) { if (!file) return; setBusy(true); setError(''); try { await uploadResource(file); await load() } catch { setError('The resource could not be imported.') } finally { setBusy(false) } }

@@ -1,0 +1,192 @@
+{
+  "status": "PUBLIC_BROWSER_SMOKE_PASS",
+  "publicUrl": "https://group-sync-khaki.vercel.app",
+  "desktopViewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "mobileViewport": {
+    "width": 390,
+    "height": 844
+  },
+  "keyboardFocus": "PASS",
+  "registrationAndProfileSetup": "PASS",
+  "logoutAndLogin": "PASS",
+  "routes": [
+    {
+      "label": "register-profile-ui",
+      "route": "/register -> /profile/setup -> /dashboard",
+      "url": "https://group-sync-khaki.vercel.app/dashboard",
+      "status": "PASS"
+    },
+    {
+      "label": "logout-login-ui",
+      "route": "/dashboard -> /login -> /dashboard",
+      "url": "https://group-sync-khaki.vercel.app/dashboard",
+      "status": "PASS"
+    },
+    {
+      "label": "dashboard",
+      "route": "/dashboard",
+      "url": "https://group-sync-khaki.vercel.app/dashboard",
+      "mainTextLength": 946,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "calendar",
+      "route": "/calendar",
+      "url": "https://group-sync-khaki.vercel.app/calendar",
+      "mainTextLength": 749,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "groups",
+      "route": "/groups",
+      "url": "https://group-sync-khaki.vercel.app/groups",
+      "mainTextLength": 366,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "study-group-detail",
+      "route": "/groups/9",
+      "url": "https://group-sync-khaki.vercel.app/groups/9",
+      "mainTextLength": 377,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "badminton-group-detail",
+      "route": "/groups/10",
+      "url": "https://group-sync-khaki.vercel.app/groups/10",
+      "mainTextLength": 517,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "availability",
+      "route": "/groups/10/availability",
+      "url": "https://group-sync-khaki.vercel.app/groups/10/availability",
+      "mainTextLength": 625,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "study",
+      "route": "/study?groupId=9",
+      "url": "https://group-sync-khaki.vercel.app/study?groupId=9",
+      "mainTextLength": 505,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "badminton",
+      "route": "/badminton?groupId=10",
+      "url": "https://group-sync-khaki.vercel.app/badminton?groupId=10",
+      "mainTextLength": 1366,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "badminton-session",
+      "route": "/badminton/sessions/6",
+      "url": "https://group-sync-khaki.vercel.app/badminton/sessions/6",
+      "mainTextLength": 356,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "badminton-profile",
+      "route": "/badminton/profile?groupId=10",
+      "url": "https://group-sync-khaki.vercel.app/badminton/profile?groupId=10",
+      "mainTextLength": 125,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "tournaments",
+      "route": "/tournaments?groupId=10",
+      "url": "https://group-sync-khaki.vercel.app/tournaments?groupId=10",
+      "mainTextLength": 662,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "notifications",
+      "route": "/notifications",
+      "url": "https://group-sync-khaki.vercel.app/notifications",
+      "mainTextLength": 222,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "profile",
+      "route": "/profile",
+      "url": "https://group-sync-khaki.vercel.app/profile",
+      "mainTextLength": 368,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "health",
+      "route": "/health",
+      "url": "https://group-sync-khaki.vercel.app/health",
+      "mainTextLength": 191,
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "dashboard-mobile",
+      "route": "/dashboard",
+      "url": "https://group-sync-khaki.vercel.app/dashboard",
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "calendar-mobile",
+      "route": "/calendar",
+      "url": "https://group-sync-khaki.vercel.app/calendar",
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "groups-mobile",
+      "route": "/groups",
+      "url": "https://group-sync-khaki.vercel.app/groups",
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "badminton-mobile",
+      "route": "/badminton?groupId=10",
+      "url": "https://group-sync-khaki.vercel.app/badminton?groupId=10",
+      "overflow": false,
+      "status": "PASS"
+    },
+    {
+      "label": "tournaments-mobile",
+      "route": "/tournaments?groupId=10",
+      "url": "https://group-sync-khaki.vercel.app/tournaments?groupId=10",
+      "overflow": false,
+      "status": "PASS"
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "failedResponses": [],
+  "screenshots": [
+    "badminton-desktop.png",
+    "badminton-mobile.png",
+    "calendar-desktop.png",
+    "calendar-mobile.png",
+    "dashboard-desktop.png",
+    "dashboard-mobile.png",
+    "groups-desktop.png",
+    "groups-mobile.png",
+    "login-desktop.png",
+    "tournaments-desktop.png",
+    "tournaments-mobile.png"
+  ]
+}

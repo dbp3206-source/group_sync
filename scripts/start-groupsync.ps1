@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $runDir = Join-Path $repoRoot '.run'
 $envFile = Join-Path $repoRoot '.env'
+$localEnvFile = Join-Path $repoRoot '.env.local'
 $javaPath = Join-Path $repoRoot '.jdk21-runtime\bin\java.exe'
 $backendJar = Join-Path $repoRoot 'backend\target\backend-0.0.1-SNAPSHOT.jar'
 $frontendDir = Join-Path $repoRoot 'frontend'
@@ -52,10 +53,11 @@ function Repair-DuplicatePathVariable {
 
 New-Item -ItemType Directory -Path $runDir -Force | Out-Null
 Import-LocalEnvironment $envFile
+Import-LocalEnvironment $localEnvFile
 Repair-DuplicatePathVariable
 
-if (-not $env:DB_PASSWORD) {
-    throw 'DB_PASSWORD is missing. Copy .env.example to .env, set the local PostgreSQL password, then run this script again.'
+if (-not $env:SPRING_DATASOURCE_PASSWORD -and -not $env:DB_PASSWORD) {
+    throw 'A datasource password is missing. Copy .env.local.example to .env.local and set the Neon development credentials, or use the existing .env local PostgreSQL credentials.'
 }
 if (-not (Test-Path -LiteralPath $javaPath)) { throw "Java 21 runtime not found: $javaPath" }
 if (-not (Test-Path -LiteralPath $backendJar)) { throw "Backend JAR not found. Run backend\mvnw.cmd test package first." }
@@ -65,8 +67,8 @@ $backendUrl = "http://127.0.0.1:$BackendPort"
 $frontendUrl = "http://127.0.0.1:$FrontendPort"
 
 $env:SERVER_PORT = "$BackendPort"
-$env:DB_URL = if ($env:DB_URL) { $env:DB_URL } else { 'jdbc:postgresql://127.0.0.1:54329/groupsync_dev' }
-$env:DB_USERNAME = if ($env:DB_USERNAME) { $env:DB_USERNAME } else { 'groupsync' }
+if (-not $env:SPRING_DATASOURCE_URL -and -not $env:DB_URL) { $env:DB_URL = 'jdbc:postgresql://127.0.0.1:54329/groupsync_dev' }
+if (-not $env:SPRING_DATASOURCE_USERNAME -and -not $env:DB_USERNAME) { $env:DB_USERNAME = 'groupsync' }
 $env:APP_CORS_ORIGINS = "$frontendUrl,http://localhost:$FrontendPort"
 
 $backendOut = Join-Path $runDir 'backend.out.log'
@@ -80,7 +82,7 @@ if (Test-Url "$backendUrl/api/health") {
     $backendStarted = $true
     $backend.Id | Set-Content -LiteralPath (Join-Path $runDir 'backend.pid')
 
-    if (-not (Wait-ForUrl "$backendUrl/api/health" 60 $backend)) {
+    if (-not (Wait-ForUrl "$backendUrl/api/health" 150 $backend)) {
         if (-not $backend.HasExited) { Stop-Process -Id $backend.Id -Force }
         $details = if (Test-Path -LiteralPath $backendOut) { (Get-Content -LiteralPath $backendOut -Tail 25) -join [Environment]::NewLine } else { 'No backend log was written.' }
         throw "Backend did not become healthy. Log:`n$details"

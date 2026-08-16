@@ -42,3 +42,6 @@ Thumbs.db
 .postgresql17-installer.exe
 .postgresql17-binaries/
 .postgresql18.zip
+
+# Local resource storage (LocalStorageService runtime blobs — never commit)
+knowledgeos-storage/

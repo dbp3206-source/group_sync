@@ -45,3 +45,5 @@ export async function getResourceActivity(id:number) { return (await apiClient.g
 export async function updateResourceProgress(id:number, progressPercent:number) { return (await apiClient.put<ResourceActivity>(`/resources/${id}/progress`, { progressPercent })).data }
 export async function getOrganizationSuggestions(id:number) { return (await apiClient.get<OrganizationSuggestions>(`/resources/${id}/organization/suggestions`)).data }
 export async function applyOrganization(id:number, payload:{tagNames:string[]; collectionIds:number[]; newCollectionNames:string[]; relatedResourceIds:number[]}) { await apiClient.post(`/resources/${id}/organization/apply`, payload) }
+export async function deleteResource(id:number) { await apiClient.delete(`/resources/${id}`) }
+export async function updateResourceFavorite(id:number, favorite:boolean) { return (await apiClient.patch<Resource>(`/resources/${id}`, { favorite })).data }

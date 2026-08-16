@@ -1,6 +1,7 @@
 package com.groupsync.backend.knowledge.service;
 
 import java.util.*;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.groupsync.backend.knowledge.dto.*;
@@ -14,23 +15,25 @@ import com.groupsync.backend.user.repository.UserAccountRepository;
 @Service
 public class KnowledgeChatService {
     private static final String INSUFFICIENT_CONTEXT = "I don't have enough evidence in the selected KnowledgeOS sources to answer that yet.";
-    private static final double MIN_RELEVANCE = 0.25d;
+    /** Minimum fused relevance score (1 - distance). Hybrid RRF scores are lower than cosine similarity; 0.15 is calibrated to reject truly empty evidence. */
+    private static final double MIN_RELEVANCE = 0.15d;
     private final ChatSessionRepository sessionRepository;
     private final ChatMessageRepository messageRepository;
     private final CitationRepository citationRepository;
     private final DocumentChunkRepository chunkRepository;
     private final ResourceRepository resourceRepository;
     private final UserAccountRepository userRepository;
-    private final SemanticRetrievalService retrievalService;
+    private final RetrievalStrategy retrievalStrategy;
     private final LanguageModelClient languageModelClient;
     private final KnowledgeWorkspaceService workspaceService;
 
     public KnowledgeChatService(ChatSessionRepository sessionRepository, ChatMessageRepository messageRepository,
             CitationRepository citationRepository, DocumentChunkRepository chunkRepository, ResourceRepository resourceRepository,
-            UserAccountRepository userRepository, SemanticRetrievalService retrievalService, LanguageModelClient languageModelClient, KnowledgeWorkspaceService workspaceService) {
+            UserAccountRepository userRepository, @Qualifier("hybridRetrieval") RetrievalStrategy retrievalStrategy,
+            LanguageModelClient languageModelClient, KnowledgeWorkspaceService workspaceService) {
         this.sessionRepository = sessionRepository; this.messageRepository = messageRepository; this.citationRepository = citationRepository;
         this.chunkRepository = chunkRepository; this.resourceRepository = resourceRepository; this.userRepository = userRepository;
-        this.retrievalService = retrievalService; this.languageModelClient = languageModelClient; this.workspaceService = workspaceService;
+        this.retrievalStrategy = retrievalStrategy; this.languageModelClient = languageModelClient; this.workspaceService = workspaceService;
     }
 
     @Transactional
@@ -40,10 +43,10 @@ public class KnowledgeChatService {
         List<Long> selectedIds = session.getResources().stream().map(Resource::getId).toList();
         Long thisResourceId = session.getScopeType() == RetrievalScope.THIS_RESOURCE
                 ? selectedIds.stream().findFirst().orElse(null) : null;
-        List<RetrievedChunk> chunks = retrievalService.retrieve(ownerId, request.question(), session.getScopeType(),
+        List<RetrievedChunk> chunks = retrievalStrategy.retrieve(ownerId, request.question(), session.getScopeType(),
                 thisResourceId, selectedIds, session.getCollectionId());
-        if (chunks.isEmpty() || chunks.getFirst().distance() > 1 - MIN_RELEVANCE
-                || (!hasLexicalAnchor(request.question(), chunks.getFirst()) && chunks.getFirst().distance() > 0.25d)) {
+        // After hybrid RRF, distance is 1 - rrfScore (lower = better). Reject when best match has distance > (1 - MIN_RELEVANCE).
+        if (chunks.isEmpty() || chunks.getFirst().distance() > 1.0 - MIN_RELEVANCE) {
             messageRepository.save(new ChatMessage(session, ChatMessageRole.ASSISTANT, INSUFFICIENT_CONTEXT));
             return new AskKnowledgeResponse(session.getId(), INSUFFICIENT_CONTEXT, false, List.of());
         }
@@ -118,16 +121,4 @@ public class KnowledgeChatService {
 
     private String excerpt(String content) { return truncate(content, 500); }
     private String truncate(String content, int max) { return content.length() <= max ? content : content.substring(0, max - 1).trim() + "…"; }
-    private boolean hasLexicalAnchor(String question, RetrievedChunk chunk) {
-        Set<String> ignored = Set.of("what", "when", "where", "which", "who", "why", "how", "does", "did", "the", "is", "are", "was", "this", "that", "from", "with", "for", "and", "or", "là", "gì", "bao", "nhiêu", "nào", "của", "ở", "trong", "từ", "và");
-        Set<String> evidence = tokens(chunk.resourceTitle() + " " + chunk.content(), ignored);
-        return tokens(question, ignored).stream().anyMatch(evidence::contains);
-    }
-    private Set<String> tokens(String value, Set<String> ignored) {
-        Set<String> result = new HashSet<>();
-        for (String token : value.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+")) {
-            if (token.length() >= 3 && !ignored.contains(token)) result.add(token);
-        }
-        return result;
-    }
 }
