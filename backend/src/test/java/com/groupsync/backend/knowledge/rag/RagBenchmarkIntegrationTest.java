@@ -13,7 +13,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import com.groupsync.backend.knowledge.model.Resource;
 import com.groupsync.backend.knowledge.model.ResourceType;
+import com.groupsync.backend.knowledge.dto.AskKnowledgeRequest;
+import com.groupsync.backend.knowledge.dto.AskKnowledgeResponse;
 import com.groupsync.backend.knowledge.repository.ResourceRepository;
+import com.groupsync.backend.knowledge.service.KnowledgeChatService;
 import com.groupsync.backend.knowledge.service.ResourceIngestionService;
 import com.groupsync.backend.knowledge.storage.StorageService;
 import com.groupsync.backend.user.model.UserAccount;
@@ -29,6 +32,7 @@ class RagBenchmarkIntegrationTest {
     @Autowired private StorageService storage;
     @Autowired private SemanticRetrievalService retrieval;
     @Autowired private LanguageModelClient languageModel;
+    @Autowired private KnowledgeChatService chat;
     private final List<Resource> created = new ArrayList<>();
     private UserAccount owner;
 
@@ -69,7 +73,13 @@ class RagBenchmarkIntegrationTest {
         double recall = recalled / (double) cases.size(); double reciprocalRank = reciprocalRankTotal / cases.size();
         double citationValidity = validCitations / (double) citationCount;
         double groundedRate = groundedAnswers / (double) cases.size();
-        System.out.printf(Locale.ROOT, "RAG_BENCHMARK total=%d recallAt5=%.3f mrr=%.3f citationValidity=%.3f groundedAnswerRate=%.3f scopeLeakage=0 unsupportedHallucinations=0 vietnamese=PASS promptInjection=PASS%n", cases.size(), recall, reciprocalRank, citationValidity, groundedRate);
+        AskKnowledgeResponse unsupported = chat.ask(owner.getId(), new AskKnowledgeRequest(null, "What is tomorrow's weather in Hanoi?", RetrievalScope.LIBRARY, null, List.of(), null, "Unsupported benchmark"));
+        int unsupportedHallucinations = unsupported.grounded() || !unsupported.citations().isEmpty() ? 1 : 0;
+        AskKnowledgeResponse leaked = chat.ask(owner.getId(), new AskKnowledgeRequest(null, "What is the Atlas accuracy?", RetrievalScope.THIS_RESOURCE, ids.get("Project Orion"), List.of(), null, "Scope benchmark"));
+        int scopeLeakage = leaked.grounded() || !leaked.citations().isEmpty() ? 1 : 0;
+        assertEquals(0, unsupportedHallucinations);
+        assertEquals(0, scopeLeakage);
+        System.out.printf(Locale.ROOT, "RAG_BENCHMARK total=%d recallAt5=%.3f mrr=%.3f citationValidity=%.3f groundedAnswerRate=%.3f scopeLeakage=%d unsupportedHallucinations=%d vietnamese=PASS promptInjection=PASS%n", cases.size() + 2, recall, reciprocalRank, citationValidity, groundedRate, scopeLeakage, unsupportedHallucinations);
         assertEquals(1.0d, citationValidity, 0.0001d);
     }
 

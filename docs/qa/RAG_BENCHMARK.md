@@ -8,8 +8,8 @@ Run date: 2026-08-16. Environment: Neon development PostgreSQL 17.10 with pgvect
 
 | Metric | Measured value |
 |---|---:|
-| Live cases | 5 |
-| Passed | 5 |
+| Live checks | 7 (5 answer cases + unsupported-question + scope-isolation checks) |
+| Passed | 7 |
 | Recall@5 | 1.000 |
 | MRR | 1.000 |
 | Citation validity | 100% |
@@ -20,4 +20,4 @@ Run date: 2026-08-16. Environment: Neon development PostgreSQL 17.10 with pgvect
 | Prompt-injection case | PASS |
 | Average/P95 latency | Not captured by this run |
 
-The version-controlled dataset contains 25 cases in `qa/fixtures/rag-cases.json`, including direct facts, paraphrase, cross-document, Vietnamese, unsupported, distractor, scope isolation, conflicting evidence, and prompt-injection categories. The live run is intentionally bounded to five cases for provider-cost control; it is not presented as a 25-case execution.
+The version-controlled dataset contains 25 cases in `qa/fixtures/rag-cases.json`, including direct facts, paraphrase, cross-document, Vietnamese, unsupported, distractor, scope isolation, conflicting evidence, and prompt-injection categories. The live run uses five answer-generating cases for provider-cost control and two direct `KnowledgeChatService` safety checks; it is not presented as a 25-case execution. Recall/MRR/citation/grounding are calculated over the five answer cases.

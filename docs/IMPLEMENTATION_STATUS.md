@@ -6,8 +6,8 @@
 - Search now supports title, Vietnamese title, tag, collection, combined AND filters, clear/reset, no-result state, and server-side owner isolation.
 - Smart Organization is a reviewed flow in Resource Workspace. It proposes normalized tags, existing/new collections, and semantic related resources; only confirmed selections are persisted.
 - RAG hardening separates trusted application rules from untrusted retrieved text, reports insufficient context for weak evidence, preserves scope filters, and asks Gemini to answer in the question language when practical.
-- Live benchmark: 5 controlled cases executed through parser, Gemini embeddings, pgvector retrieval, Gemini generation, and citation mapping. Recall@5 1.000, MRR 1.000, citation validity 1.000, grounded answer rate 1.000, scope leakage 0, unsupported hallucinations 0, Vietnamese PASS, prompt-injection PASS.
-- Controlled dataset: 25 version-controlled cases in `qa/fixtures/rag-cases.json`; the live benchmark is intentionally smaller to keep provider usage bounded while retaining direct-fact, Vietnamese, injection, and scope coverage.
+- Live benchmark: 7 checks executed through parser, Gemini embeddings, pgvector retrieval, Gemini generation, citation mapping, unsupported-question gating, and scope isolation. The five answer cases measured Recall@5 1.000, MRR 1.000, citation validity 1.000, and grounded answer rate 1.000; scope leakage 0, unsupported hallucinations 0, Vietnamese PASS, prompt-injection PASS.
+- Controlled dataset: 25 version-controlled cases in `qa/fixtures/rag-cases.json`; the live benchmark is intentionally smaller to keep provider usage bounded while retaining direct-fact, Vietnamese, injection, unsupported, and scope coverage.
 
 ## KnowledgeOS migration
 

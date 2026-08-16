@@ -1,3 +1,20 @@
+# KnowledgeOS continuation rules
+
+Read `docs/handoff/ANTIGRAVITY_HANDOFF.md` before making changes. This repository is the
+KnowledgeOS migration branch, not a request to restart GroupSync architecture.
+
+- Preserve the modular-monolith shape: React/TypeScript/Vite frontend, one Spring Boot backend, PostgreSQL + pgvector.
+- Keep Gemini as the only production RAG provider: `gemini-3.5-flash-lite` generation, `gemini-embedding-001` embeddings, 768 dimensions.
+- Never commit or print `.env.local`, `GEMINI_API_KEY`, database passwords, or connection secrets.
+- Never rewrite Flyway V1-V8. Add later migrations only when required and verify against development Neon.
+- Continue from the current branch/checkpoint; do not replace working code with a fresh architecture.
+- Do not merge `main`, rename the repository, or deploy production until a later explicit release phase.
+- Preserve the accepted KnowledgeOS visual direction and use `design-taste-frontend` for future visual work; avoid generic AI/SaaS layouts.
+- Run relevant backend tests/package and frontend build after changes; document root causes and known limitations.
+
+The older GroupSync/design-pipeline rules below remain valid where they do not conflict with this
+KnowledgeOS handoff.
+
 # GroupSync repository instructions
 
 ## Product

@@ -119,7 +119,7 @@ public class KnowledgeChatService {
     private String excerpt(String content) { return truncate(content, 500); }
     private String truncate(String content, int max) { return content.length() <= max ? content : content.substring(0, max - 1).trim() + "…"; }
     private boolean hasLexicalAnchor(String question, RetrievedChunk chunk) {
-        Set<String> ignored = Set.of("what", "when", "where", "which", "who", "why", "how", "does", "did", "the", "is", "are", "was", "this", "that", "from", "with", "for", "and", "or", "là", "gì", "bao", "nhiêu", "nào", "của", "ở", "trong", "từ", "và", "là");
+        Set<String> ignored = Set.of("what", "when", "where", "which", "who", "why", "how", "does", "did", "the", "is", "are", "was", "this", "that", "from", "with", "for", "and", "or", "là", "gì", "bao", "nhiêu", "nào", "của", "ở", "trong", "từ", "và");
         Set<String> evidence = tokens(chunk.resourceTitle() + " " + chunk.content(), ignored);
         return tokens(question, ignored).stream().anyMatch(evidence::contains);
     }
