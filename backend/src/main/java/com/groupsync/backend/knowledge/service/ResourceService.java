@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.groupsync.backend.knowledge.dto.*;
 import com.groupsync.backend.knowledge.model.*;
+import com.groupsync.backend.knowledge.repository.CitationRepository;
 import com.groupsync.backend.knowledge.repository.ResourceRepository;
 import com.groupsync.backend.knowledge.storage.StorageService;
 import com.groupsync.backend.knowledge.ingestion.ResourceProcessingRequestedEvent;
@@ -19,8 +20,20 @@ import com.groupsync.backend.user.repository.UserAccountRepository;
 @Service
 public class ResourceService {
     private static final long MAX_UPLOAD_BYTES = 25L * 1024 * 1024;
-    private final ResourceRepository resourceRepository; private final UserAccountRepository userRepository; private final StorageService storageService; private final ApplicationEventPublisher events;
-    public ResourceService(ResourceRepository resourceRepository, UserAccountRepository userRepository, StorageService storageService, ApplicationEventPublisher events) { this.resourceRepository = resourceRepository; this.userRepository = userRepository; this.storageService = storageService; this.events = events; }
+    private final ResourceRepository resourceRepository;
+    private final UserAccountRepository userRepository;
+    private final StorageService storageService;
+    private final ApplicationEventPublisher events;
+    private final CitationRepository citationRepository;
+
+    public ResourceService(ResourceRepository resourceRepository, UserAccountRepository userRepository,
+            StorageService storageService, ApplicationEventPublisher events, CitationRepository citationRepository) {
+        this.resourceRepository = resourceRepository;
+        this.userRepository = userRepository;
+        this.storageService = storageService;
+        this.events = events;
+        this.citationRepository = citationRepository;
+    }
     @Transactional
     public ResourceResponse upload(Long ownerId, MultipartFile file, String requestedTitle, String description) {
         if (file == null || file.isEmpty()) throw new BadRequestException("Choose a resource to import.");
@@ -49,7 +62,20 @@ public class ResourceService {
     @Transactional(readOnly = true) public List<ResourceResponse> list(Long ownerId, String query, Long tagId, Long collectionId) { List<Resource> resources = resourceRepository.search(ownerId, query == null || query.isBlank() ? null : query.trim(), tagId, collectionId); return resources.stream().map(ResourceResponse::from).toList(); }
     @Transactional(readOnly = true) public ResourceResponse get(Long ownerId, Long resourceId) { return ResourceResponse.from(find(ownerId, resourceId)); }
     @Transactional public ResourceResponse update(Long ownerId, Long resourceId, UpdateResourceRequest request) { Resource resource = find(ownerId, resourceId); resource.updateMetadata(request.title().trim(), normalize(request.description()), request.favorite(), request.priority()); return ResourceResponse.from(resource); }
-    @Transactional public void delete(Long ownerId, Long resourceId) { Resource resource = find(ownerId, resourceId); try { storageService.delete(resource.getStorageKey()); } catch (IOException exception) { throw new BadRequestException("The resource file could not be deleted."); } resourceRepository.delete(resource); }
+    @Transactional
+    public void delete(Long ownerId, Long resourceId) {
+        Resource resource = find(ownerId, resourceId);
+        // Citations reference document_chunks with ON DELETE RESTRICT.
+        // Delete citations first so that chunk (and then resource) deletion can proceed.
+        // Historical chat session and message records are preserved; only the chunk FK link is removed.
+        citationRepository.deleteByChunkResourceId(resourceId);
+        try {
+            storageService.delete(resource.getStorageKey());
+        } catch (IOException exception) {
+            throw new BadRequestException("The resource file could not be deleted.");
+        }
+        resourceRepository.delete(resource);
+    }
     @Transactional public ResourceResponse retry(Long ownerId, Long resourceId) { Resource resource = find(ownerId, resourceId); resource.retry(); events.publishEvent(new ResourceProcessingRequestedEvent(resource.getId())); return ResourceResponse.from(resource); }
     @Transactional(readOnly = true) public InputStream content(Long ownerId, Long resourceId) { Resource resource = find(ownerId, resourceId); try { return storageService.open(resource.getStorageKey()); } catch (IOException exception) { throw new NotFoundException("Stored resource content was not found."); } }
     @Transactional(readOnly = true) public Resource resourceForOwner(Long ownerId, Long resourceId) { return find(ownerId, resourceId); }

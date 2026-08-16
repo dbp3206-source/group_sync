@@ -22,7 +22,8 @@ This matrix records the current implementation evidence for the migration branch
 | Prompt injection | untrusted evidence delimiters and no secret/citation fabrication policy | PASS |
 | Vietnamese RAG | live controlled case | PASS |
 | RAG benchmark | 25 configured cases, 5 live cases | PASS |
-| Backend regression | 43 tests pass in full local suite; live Neon/Gemini smoke passes | PASS |
+| Resource deletion | Citations deleted before chunk/resource deletion, preventing ON DELETE RESTRICT FK violation | PASS |
+| Backend regression | 46 tests pass in full local suite (4 skipped for live keys); package passes | PASS |
 | Frontend build | TypeScript and Vite production build | PASS |
 | Responsive | 1440, 1024, 768, 390 widths previously verified without overflow | PASS |
 | Database safety | V1-V8 unchanged; V9-V11 validate on Neon | PASS |

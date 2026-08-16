@@ -8,6 +8,9 @@
 - RAG hardening separates trusted application rules from untrusted retrieved text, reports insufficient context for weak evidence, preserves scope filters, and asks Gemini to answer in the question language when practical.
 - Live benchmark: 7 checks executed through parser, Gemini embeddings, pgvector retrieval, Gemini generation, citation mapping, unsupported-question gating, and scope isolation. The five answer cases measured Recall@5 1.000, MRR 1.000, citation validity 1.000, and grounded answer rate 1.000; scope leakage 0, unsupported hallucinations 0, Vietnamese PASS, prompt-injection PASS.
 - Controlled dataset: 25 version-controlled cases in `qa/fixtures/rag-cases.json`; the live benchmark is intentionally smaller to keep provider usage bounded while retaining direct-fact, Vietnamese, injection, unsupported, and scope coverage.
+- Resource deletion with persisted citations: `ResourceService.delete()` now calls `citationRepository.deleteByChunkResourceId()` before deleting the resource, resolving the `ON DELETE RESTRICT` FK violation on `citations.document_chunk_id`. Historical chat sessions and messages are preserved; only citation rows referencing deleted chunks are removed. Verified by `ResourceDeleteWithCitationsTest` (2/2 PASS).
+- Final Local Acceptance: PASS (see `docs/qa/FINAL_LOCAL_ACCEPTANCE.md`). Backend 46 tests, 0 failures. Frontend build and lint PASS. All mandatory Prompt 3 gates pass. Production candidate: YES.
+
 
 ## KnowledgeOS migration
 
