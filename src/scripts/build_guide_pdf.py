@@ -135,11 +135,10 @@ def markdown_to_html(md_text):
 
 async def build_pdf_async():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    root_dir = os.path.dirname(script_dir)
-    md_path = os.path.join(root_dir, 'docs', 'KNOWLEDGEOS_GUIDE.md')
-    html_path = os.path.join(root_dir, 'docs', 'KNOWLEDGEOS_GUIDE.html')
-    pdf_path = os.path.join(root_dir, 'docs', 'KNOWLEDGEOS_GUIDE.pdf')
-    png_path = os.path.join(root_dir, 'docs', 'guide_preview.png')
+    root_dir = os.path.dirname(os.path.dirname(script_dir))
+    md_path = os.path.join(root_dir, 'docs', '01_guides', 'KNOWLEDGEOS_GUIDE.md')
+    html_path = os.path.join(root_dir, 'docs', '01_guides', 'KNOWLEDGEOS_GUIDE.html')
+    pdf_path = os.path.join(root_dir, 'docs', '01_guides', 'KNOWLEDGEOS_GUIDE.pdf')
 
     with open(md_path, 'r', encoding='utf-8') as f:
         md_content = f.read()
@@ -376,12 +375,6 @@ code {{
         print(f"Successfully generated PDF via Playwright: {pdf_path}")
         size = os.path.getsize(pdf_path)
         print(f"PDF Size: {size} bytes ({size / 1024:.2f} KB)")
-        
-        # Capture screenshot preview of page 2
-        await page.set_viewport_size({"width": 1000, "height": 1400})
-        await page.screenshot(path=png_path)
-        print(f"Updated preview screenshot to: {png_path}")
-        
         await browser.close()
 
 if __name__ == '__main__':

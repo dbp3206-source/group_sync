@@ -36,6 +36,20 @@ class RagBenchmarkIntegrationTest {
     private final List<Resource> created = new ArrayList<>();
     private UserAccount owner;
 
+    private static Path resolveFixturePath(String filename) {
+        Path[] candidates = new Path[] {
+            Path.of("..", "..", "refer", "qa_dataset", "fixtures", filename),
+            Path.of("..", "refer", "qa_dataset", "fixtures", filename),
+            Path.of("refer", "qa_dataset", "fixtures", filename),
+            Path.of("..", "qa", "fixtures", filename),
+            Path.of("qa", "fixtures", filename)
+        };
+        for (Path p : candidates) {
+            if (Files.exists(p)) return p;
+        }
+        return candidates[0];
+    }
+
     @Test
     void measuresLiveRetrievalCitationsGroundingAndSafety() throws Exception {
         owner = users.save(new UserAccount("rag-benchmark-" + UUID.randomUUID() + "@example.test", "not-a-login", "RAG Benchmark"));
@@ -47,7 +61,7 @@ class RagBenchmarkIntegrationTest {
                 "Imported notes", "prompt-injection.md");
         Map<String, Long> ids = new LinkedHashMap<>();
         for (Map.Entry<String, String> fixture : fixtures.entrySet()) {
-            String content = Files.readString(Path.of("..", "qa", "fixtures", fixture.getValue()), StandardCharsets.UTF_8);
+            String content = Files.readString(resolveFixturePath(fixture.getValue()), StandardCharsets.UTF_8);
             StorageService.StoredFile stored = storage.store(owner.getId(), fixture.getValue(), new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
             Resource resource = resources.saveAndFlush(new Resource(owner, fixture.getKey(), null, ResourceType.MARKDOWN, fixture.getValue(), "text/markdown", stored.sizeBytes(), stored.key(), stored.checksumSha256()));
             created.add(resource); ids.put(fixture.getKey(), resource.getId()); ingestion.process(resource.getId());

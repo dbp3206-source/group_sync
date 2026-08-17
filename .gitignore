@@ -1,12 +1,16 @@
 # Java / Maven
 backend/target/
+src/backend/target/
 *.class
 *.log
 
 # Node / Vite
 frontend/node_modules/
+src/frontend/node_modules/
 frontend/dist/
+src/frontend/dist/
 frontend/.vite/
+src/frontend/.vite/
 npm-debug.log*
 
 # Local databases and runtime data
@@ -21,7 +25,9 @@ postgresql-data/
 !.env.example
 !.env.local.example
 backend/.env
+src/backend/.env
 frontend/.env
+src/frontend/.env
 
 # IDE and OS files
 .idea/

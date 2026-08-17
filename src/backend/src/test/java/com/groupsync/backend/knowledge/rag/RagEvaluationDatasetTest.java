@@ -7,9 +7,24 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class RagEvaluationDatasetTest {
+    private static Path resolveFixturePath(String filename) {
+        Path[] candidates = new Path[] {
+            Path.of("..", "..", "refer", "qa_dataset", "fixtures", filename),
+            Path.of("..", "refer", "qa_dataset", "fixtures", filename),
+            Path.of("refer", "qa_dataset", "fixtures", filename),
+            Path.of("..", "qa", "fixtures", filename),
+            Path.of("qa", "fixtures", filename)
+        };
+        for (Path p : candidates) {
+            if (Files.exists(p)) return p;
+        }
+        return candidates[0];
+    }
+
     @Test
     void controlledDatasetContainsBroadGroundedAndSafetyCoverage() throws Exception {
-        String json = Files.readString(Path.of("..", "qa", "fixtures", "rag-cases.json"));
+        Path path = resolveFixturePath("rag-cases.json");
+        String json = Files.readString(path);
         long cases = Pattern.compile("\\\"testId\\\"").matcher(json).results().count();
         assertTrue(cases >= 34, "Expected at least 34 controlled cases (25 original + 9 hybrid-specific); found: " + cases);
         assertTrue(json.contains("VIETNAMESE"));

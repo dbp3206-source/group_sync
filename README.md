@@ -200,16 +200,18 @@ erDiagram
 
 ## 9. Comprehensive Documentation Suite
 
-| Document | Description | Format |
-|---|---|---|
-| 📖 [**Product Guide & User Manual**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/KNOWLEDGEOS_GUIDE.md) | System overview, architecture, and complete 39-step user manual | Markdown |
-| 📄 [**Product Guide (PDF)**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/KNOWLEDGEOS_GUIDE.pdf) | Formatted PDF with Times New Roman typography and Vietnamese support | PDF Export |
-| 🛠️ [**Detailed Technical Reference**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/TECHNICAL_REFERENCE.md) | Deep technical manual, physical project tree, full API catalog, and schema | Markdown |
-| 🗺️ [**Backend Roadmap Mapping**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/BACKEND_ROADMAP_MAPPING.md) | Educational bridge mapping KnowledgeOS to [roadmap.sh/backend](https://roadmap.sh/backend) | Markdown |
-| 🎓 [**Course Defense Guide**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/COURSE_DEFENSE_GUIDE.md) | 32 oral exam defense questions and concise 30–90 second spoken answers | Markdown |
-| 🧪 [**Manual QA Test Pack**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/demo-testcases/TEST_CASES.md) | 28 structured manual QA test cards across 8 functional areas | Markdown |
-| 📊 [**Test Coverage Matrix**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/demo-testcases/COVERAGE_MATRIX.md) | Comprehensive feature-to-testcase traceability matrix | Markdown |
-| ⏱️ [**Live Demo Script**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/demo-testcases/LIVE_DEMO_SCRIPT.md) | 12-minute step-by-step practical presentation script | Markdown |
+| Document Category | Key Document | Description | Format |
+|---|---|---|---|
+| **01 Guides** | 📖 [**Product Guide & User Manual**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/01_guides/KNOWLEDGEOS_GUIDE.md) | System overview, architecture, and complete 39-step user manual | Markdown |
+| | 📄 [**Product Guide (PDF)**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/01_guides/KNOWLEDGEOS_GUIDE.pdf) | Formatted PDF with Times New Roman typography and Vietnamese support | PDF Export |
+| **02 Technical Reference** | 🛠️ [**Detailed Technical Reference**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/02_technical_reference/TECHNICAL_REFERENCE.md) | Deep technical manual, physical project tree, full API catalog, and schema | Markdown |
+| **03 Curriculum Mapping** | 🗺️ [**Backend Roadmap Mapping**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/03_curriculum_mapping/BACKEND_ROADMAP_MAPPING.md) | Educational bridge mapping KnowledgeOS to [roadmap.sh/backend](https://roadmap.sh/backend) | Markdown |
+| **04 Course Defense** | 🎓 [**Course Defense Guide**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/04_course_defense/COURSE_DEFENSE_GUIDE.md) | 32 oral exam defense questions and concise 30–90 second spoken answers | Markdown |
+| **05 QA & Demo** | 🧪 [**Manual QA Test Pack**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/05_qa_and_demo/TEST_CASES.md) | 28 structured manual QA test cards across 8 functional areas | Markdown |
+| | 📊 [**Test Coverage Matrix**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/05_qa_and_demo/COVERAGE_MATRIX.md) | Comprehensive feature-to-testcase traceability matrix | Markdown |
+| | ⏱️ [**Live Demo Script**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/05_qa_and_demo/LIVE_DEMO_SCRIPT.md) | 12-minute step-by-step practical presentation script | Markdown |
+| | 📁 [**Demo Fixtures**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/05_qa_and_demo/fixtures) | 11 synthetic Markdown and text documents for live testing | Fixtures |
+| **Master Index** | 📑 [**Docs Master Index**](file:///C:/Users/Bao%20Phuc/Documents/GroupSync_Build/docs/README.md) | Central navigation table of contents for all project documentation | Markdown |
 
 ---
 
@@ -240,8 +242,8 @@ GEMINI_API_KEY=your_gemini_api_key
 
 ### Step 2: Start the Backend Service
 ```bash
-# Navigate to backend and run Spring Boot
-cd backend
+# Navigate to backend source and run Spring Boot
+cd src/backend
 ./mvnw spring-boot:run
 ```
 *The backend boots on `http://localhost:8080`. Flyway applies migrations V1–V13 automatically.*
@@ -249,7 +251,7 @@ cd backend
 ### Step 3: Start the Frontend SPA
 ```bash
 # In a separate terminal
-cd frontend
+cd src/frontend
 npm install
 npm run dev
 ```
@@ -276,7 +278,7 @@ KnowledgeOS maintains comprehensive test coverage across backend algorithms, dat
 
 ```bash
 # Run backend unit and service test suite (57 tests)
-cd backend
+cd src/backend
 ./mvnw test
 
 # Package backend JAR
@@ -289,8 +291,8 @@ npm run build
 ```
 
 - **Automated Tests**: 57 tests run, 0 failures, 0 errors.
-- **RAG Evaluation Dataset**: 34 version-controlled test cases validated in `RagEvaluationDatasetTest.java`.
-- **Manual QA Test Pack**: 28 structured test cards in `docs/demo-testcases/TEST_CASES.md`.
+- **RAG Evaluation Dataset**: 34 version-controlled test cases in `refer/qa_dataset/` validated by `RagEvaluationDatasetTest.java`.
+- **Manual QA Test Pack**: 28 structured test cards in `docs/05_qa_and_demo/TEST_CASES.md`.
 
 ---
 
@@ -310,31 +312,42 @@ We maintain complete engineering transparency regarding current v1 boundaries:
 
 ## 14. Project Source Tree
 
+The repository is structured into three clean, unambiguous top-level domains:
+
 ```text
 KnowledgeOS/
-├── backend/
-│   ├── src/main/java/com/groupsync/backend/
-│   │   ├── auth/                        # Security, sessions, BCrypt, AuthController
-│   │   ├── knowledge/
-│   │   │   ├── controller/              # Resource, Chat, Workspace, Dashboard controllers
-│   │   │   ├── dto/                     # Request and Response DTO contracts
-│   │   │   ├── model/                   # Rich JPA Entities: Resource, DocumentChunk, Citation
-│   │   │   ├── rag/                     # Hybrid, Semantic, Keyword retrieval & Prompt builder
-│   │   │   ├── repository/              # Spring Data JPA & native query repositories
-│   │   │   ├── service/                 # ResourceService, KnowledgeChatService, IngestionService
-│   │   │   └── storage/                 # StorageService & DatabaseStorageService (BYTEA)
-│   │   └── shared/                      # Global exception handlers & response wrappers
-│   └── src/main/resources/
-│       └── db/migration/                # Flyway migrations V1 through V13
-├── frontend/
-│   └── src/
-│       ├── api/                         # REST client modules (auth, knowledge, profile)
-│       ├── auth/                        # AuthContext & ProtectedRoute guards
-│       ├── pages/                       # KnowledgeHomePage, KnowledgeLibraryPage, KnowledgeAskPage
-│       └── styles/                      # Design tokens, redesign.css, Outfit typography
-├── docs/                                # Technical Reference, Guides, Roadmap Mapping, QA Pack
-├── render.yaml                          # Render backend deployment configuration
-└── README.md                            # Project documentation landing page
+├── src/                                         # RUNNABLE APPLICATION SOURCE
+│   ├── backend/                                 # Spring Boot 4 REST API Service (Java 21)
+│   │   ├── src/main/java/com/groupsync/backend/ # Controllers, Services, Repositories, Entities
+│   │   ├── src/main/resources/db/migration/     # Flyway migrations V1 through V13
+│   │   ├── src/test/java/                       # 57 automated unit, repository, and service tests
+│   │   ├── pom.xml                              # Maven build configuration
+│   │   └── Dockerfile                           # Production container definition
+│   ├── frontend/                                # React 19 + TypeScript SPA
+│   │   ├── src/                                 # Pages, Components, Client API, CSS Design Tokens
+│   │   ├── package.json                         # Node dependencies (React 19, Vite 8, Lucide)
+│   │   └── vite.config.ts                       # Vite bundler configuration
+│   └── scripts/                                 # Local development, PDF generation & test scripts
+│
+├── docs/                                        # READABLE PROJECT DOCUMENTATION
+│   ├── README.md                                # Documentation Master Index & Catalog
+│   ├── 01_guides/                               # Product Guide & Complete User Manual (MD + PDF)
+│   ├── 02_technical_reference/                  # Deep Technical Reference Manual & API Catalog
+│   ├── 03_curriculum_mapping/                   # Alignment against roadmap.sh/backend
+│   ├── 04_course_defense/                       # 32 oral exam defense questions & concise answers
+│   ├── 05_qa_and_demo/                          # 28 manual test cards, coverage matrix, live demo script
+│   └── 06_historical_reports/                   # Historical integration reports & migration audit logs
+│
+├── refer/                                       # SUPPORTING REFERENCES & ARTIFACTS
+│   ├── README.md                                # Reference catalog overview
+│   ├── qa_dataset/                              # RAG benchmark dataset (rag-cases.json) & raw test files
+│   ├── prompts/                                 # Historical planning and bootstrap prompt templates
+│   ├── design_work/                             # UI design briefs, content outlines, and screenshots
+│   └── reference_notes/                         # Reference notes (PESOC_REFERENCE_NOTES, DESIGN.md)
+│
+├── render.yaml                                  # Render production cloud deployment configuration
+├── .gitignore                                   # Ignore rules for build, binaries, and local secrets
+└── README.md                                    # Project landing page & quick start guide
 ```
 
 ---
