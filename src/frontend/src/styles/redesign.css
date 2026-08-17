@@ -1309,6 +1309,168 @@
   transform: translateY(-1px);
 }
 
+.kos-prompt-pills-bar {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  margin: .35rem 0 .5rem;
+}
+
+.kos-pills-title {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--kos-muted);
+}
+
+.kos-pills-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+}
+
+.kos-prompt-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  background: var(--kos-surface-1);
+  border: 1px solid var(--kos-line);
+  color: var(--kos-ink);
+  font-size: .78rem;
+  font-weight: 550;
+  padding: .3rem .65rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kos-prompt-pill:hover {
+  background: var(--kos-surface-2);
+  border-color: var(--kos-blue);
+  color: var(--kos-blue);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.kos-zen-toggle {
+  font-size: .8rem;
+  gap: .35rem;
+  border: 1px solid var(--kos-line);
+  padding: .4rem .75rem;
+  border-radius: 6px;
+}
+
+.kos-ask.kos-zen-mode .kos-ask-layout {
+  grid-template-columns: 1fr;
+}
+
+.kos-ask.kos-zen-mode .kos-ask-stage {
+  max-width: 960px;
+  margin-inline: auto;
+  width: 100%;
+}
+
+.kos-message-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .25rem;
+}
+
+.kos-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--kos-line) 80%, transparent);
+  color: var(--kos-muted);
+  font-size: .74rem;
+  font-weight: 600;
+  padding: .2rem .5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.kos-copy-btn:hover {
+  background: var(--kos-surface-2);
+  border-color: var(--kos-blue);
+  color: var(--kos-blue);
+}
+
+.kos-text-success {
+  color: #10b981;
+}
+
+.kos-citations-section {
+  margin-top: 1rem;
+  padding-top: .75rem;
+  border-top: 1px solid var(--kos-line);
+}
+
+.kos-citations-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--kos-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin: 0 0 .5rem;
+}
+
+.kos-citation-details {
+  padding: .5rem .65rem;
+  border: 1px solid var(--kos-line);
+  border-radius: 6px;
+  margin-bottom: .4rem;
+  background: var(--kos-surface-1);
+  transition: all 300ms ease;
+}
+
+.kos-citation-details summary {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: .83rem;
+  color: var(--kos-ink);
+  list-style: none;
+}
+
+.kos-citation-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.kos-cit-num {
+  font-weight: 700;
+  color: var(--kos-blue);
+}
+
+.kos-cit-title {
+  color: var(--kos-ink);
+}
+
+.kos-cit-excerpt {
+  color: var(--kos-muted);
+  line-height: 1.55;
+  font-size: .84rem;
+  margin: .4rem 0 0;
+  padding-top: .35rem;
+  border-top: 1px dashed color-mix(in srgb, var(--kos-line) 80%, transparent);
+}
+
+.kos-citation-details.kos-citation-glow {
+  border-color: var(--kos-blue);
+  background: color-mix(in srgb, var(--kos-blue) 8%, var(--kos-surface-1));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--kos-blue) 40%, transparent);
+  transform: scale(1.01);
+}
+
 .kos-answer > p:not(.kos-kicker) {
   color: #31444d;
   line-height: 1.7;
@@ -1548,7 +1710,283 @@
   border-bottom: 1px solid color-mix(in srgb, var(--kos-ink) 8%, transparent);
 }
 
-.kos-suggestion-list label small { color: var(--kos-muted); }
+/* =========================================================================
+   VIEW SWITCHER & KNOWLEDGE GRAPH VIEW
+   ========================================================================= */
+
+.kos-view-switcher {
+  display: inline-flex;
+  background: var(--kos-surface-1);
+  border: 1px solid var(--kos-line);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.kos-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--kos-muted);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.kos-view-btn:hover {
+  color: var(--kos-ink);
+}
+
+.kos-view-btn.is-active {
+  background: var(--kos-surface-2);
+  color: var(--kos-blue);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.kos-library-counter {
+  font-size: 0.78rem;
+  color: var(--kos-muted);
+  margin-left: auto;
+}
+
+.kos-graph-container {
+  display: flex;
+  flex-direction: column;
+  background: var(--kos-surface);
+  border: 1px solid var(--kos-line);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 1.5rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+}
+
+.kos-graph-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--kos-line);
+  background: var(--kos-surface-1);
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.kos-graph-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.kos-legend-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--kos-ink);
+  margin-right: 4px;
+}
+
+.kos-legend-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--kos-line);
+  background: var(--kos-surface);
+  color: var(--kos-muted);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.kos-legend-pill:hover,
+.kos-legend-pill.is-active {
+  border-color: var(--kos-blue);
+  color: var(--kos-blue);
+  background: var(--kos-surface-2);
+}
+
+.kos-legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.kos-graph-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-weight: 550;
+  color: var(--kos-muted);
+}
+
+.kos-graph-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 520px;
+  background: radial-gradient(circle at center, var(--kos-surface-1) 0%, var(--kos-surface) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.kos-graph-svg {
+  width: 100%;
+  height: 100%;
+  max-height: 540px;
+}
+
+.kos-graph-line {
+  stroke: color-mix(in srgb, var(--kos-ink) 12%, transparent);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+  transition: all 250ms ease;
+}
+
+.kos-graph-line.is-highlighted {
+  stroke: var(--kos-blue);
+  stroke-width: 2.2;
+  stroke-dasharray: none;
+}
+
+.kos-hub-circle {
+  fill: var(--kos-blue);
+  stroke: #ffffff;
+  stroke-width: 3;
+  filter: drop-shadow(0 4px 10px rgba(59, 130, 246, 0.35));
+}
+
+.kos-hub-title {
+  fill: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  font-family: var(--kos-font-display);
+}
+
+.kos-hub-sub {
+  fill: rgba(255, 255, 255, 0.85);
+  font-size: 7.5px;
+  font-weight: 600;
+  font-family: var(--kos-font-display);
+}
+
+.kos-col-circle {
+  fill: var(--kos-surface);
+  stroke: var(--kos-line);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.06));
+}
+
+.kos-col-icon-text {
+  font-size: 11px;
+}
+
+.kos-col-label {
+  fill: var(--kos-ink);
+  font-size: 9.5px;
+  font-weight: 650;
+  font-family: var(--kos-font-display);
+}
+
+.kos-node-circle {
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.08));
+}
+
+.kos-node-initial {
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  font-family: system-ui, sans-serif;
+  pointer-events: none;
+}
+
+.kos-node-label {
+  fill: var(--kos-ink);
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--kos-font-display);
+  pointer-events: none;
+}
+
+.kos-node-aura {
+  animation: kos-pulse-glow 1.5s infinite;
+}
+
+.kos-resource-node {
+  transition: opacity 250ms ease;
+}
+
+.kos-resource-node.is-dimmed {
+  opacity: 0.25;
+}
+
+.kos-graph-tooltip {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background: var(--kos-surface);
+  border: 1.5px solid var(--kos-blue);
+  border-radius: 8px;
+  padding: 0.85rem 1.1rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  max-width: 340px;
+  z-index: 10;
+  pointer-events: none;
+  animation: kos-fade-in 180ms ease;
+}
+
+.kos-tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 0.35rem;
+}
+
+.kos-tooltip-badge {
+  font-size: 0.72rem;
+  font-weight: 750;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.kos-tooltip-status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--kos-muted);
+}
+
+.kos-tooltip-title {
+  font: 700 0.92rem var(--kos-font-display);
+  color: var(--kos-ink);
+  margin: 0 0 0.3rem;
+  line-height: 1.35;
+}
+
+.kos-tooltip-hint {
+  font-size: 0.76rem;
+  color: var(--kos-blue);
+  font-weight: 600;
+  margin: 0;
+}
+
+@keyframes kos-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 /* =========================================================================
    RESPONSIVE — library and general page

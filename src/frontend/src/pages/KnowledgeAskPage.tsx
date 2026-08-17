@@ -1,10 +1,15 @@
 import {
   Activity,
   BrainCircuit,
+  Check,
   CheckCircle2,
+  Compass,
+  Copy,
   Loader2,
+  Maximize2,
   MessageSquare,
   MessageSquarePlus,
+  Minimize2,
   Send,
   Sparkles,
 } from 'lucide-react'
@@ -78,6 +83,39 @@ const DEFAULT_STEPS: ReasoningStep[] = [
   },
 ]
 
+const SMART_PROMPT_PILLS = [
+  {
+    id: 'roadmap',
+    icon: '🗺️',
+    label: 'Roadmap kiến thức',
+    prompt: 'Đưa cho tôi các đầu mục kiến thức chính của tài liệu này, đánh số thứ tự từ 1 đến hết như một lộ trình học tập (Roadmap).',
+  },
+  {
+    id: 'compare',
+    icon: '⚖️',
+    label: 'So sánh & Đối chiếu',
+    prompt: 'Phân tích sự khác biệt, ưu điểm và nhược điểm giữa các phương pháp hoặc khái niệm chính trong tài liệu.',
+  },
+  {
+    id: 'summary',
+    icon: '🧠',
+    label: 'Tóm tắt 3 ý cốt lõi',
+    prompt: 'Tóm tắt 3 luận điểm quan trọng nhất trong tài liệu này kèm các từ khóa chính và ý nghĩa thực tiễn.',
+  },
+  {
+    id: 'rules',
+    icon: '🎯',
+    label: 'Quy tắc & Công thức',
+    prompt: 'Trích xuất toàn bộ các định nghĩa, quy tắc suy diễn và công thức quan trọng được đề cập trong tài liệu.',
+  },
+  {
+    id: 'quiz',
+    icon: '❓',
+    label: '5 Câu hỏi ôn tập',
+    prompt: 'Dựa trên tài liệu, tạo 5 câu hỏi ôn tập quan trọng từ cơ bản đến nâng cao để kiểm tra mức độ hiểu bài.',
+  },
+]
+
 export default function KnowledgeAskPage() {
   const [params] = useSearchParams()
   const initial = Number(params.get('resource'))
@@ -93,6 +131,9 @@ export default function KnowledgeAskPage() {
   const [error, setError] = useState('')
   const [steps, setSteps] = useState<ReasoningStep[]>(DEFAULT_STEPS)
   const [elapsedSec, setElapsedSec] = useState<string>('0.0')
+  const [copiedId, setCopiedId] = useState<number | null>(null)
+  const [highlightedCitation, setHighlightedCitation] = useState<number | null>(null)
+  const [zenMode, setZenMode] = useState(false)
   const timerRef = useRef<number | null>(null)
   const animIntervalRef = useRef<number | null>(null)
 
@@ -235,146 +276,198 @@ export default function KnowledgeAskPage() {
     setElapsedSec('0.0')
   }
 
+  function handleSelectPromptPill(pillPrompt: string) {
+    setQuestion(pillPrompt)
+    const textarea = document.getElementById('ask-question') as HTMLTextAreaElement | null
+    if (textarea) {
+      textarea.focus()
+      textarea.selectionStart = textarea.value.length
+      textarea.selectionEnd = textarea.value.length
+    }
+  }
+
+  function copyMessage(id: number, content: string) {
+    navigator.clipboard.writeText(content)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  function handleCitationClick(citationNumber: number) {
+    setHighlightedCitation(citationNumber)
+    const el = document.getElementById(`citation-detail-${citationNumber}`)
+    if (el) {
+      ;(el as HTMLDetailsElement).open = true
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+    setTimeout(() => setHighlightedCitation(null), 2500)
+  }
+
   const completedCount = steps.filter(s => s.status === 'completed').length
 
   return (
-    <section className="kos-page kos-ask">
-      <p className="kos-kicker">ASK KNOWLEDGEOS</p>
-      <h1>Ask what your sources can answer.</h1>
+    <section className={`kos-page kos-ask ${zenMode ? 'kos-zen-mode' : ''}`}>
+      <div className="kos-page-header">
+        <div>
+          <p className="kos-kicker">ASK KNOWLEDGEOS</p>
+          <h1>Ask what your sources can answer.</h1>
+        </div>
+        <button
+          type="button"
+          className="kos-button kos-button--ghost kos-zen-toggle"
+          onClick={() => setZenMode(prev => !prev)}
+          title={zenMode ? 'Thoát chế độ tập trung' : 'Chuyển sang chế độ đọc toàn màn hình'}
+        >
+          {zenMode ? (
+            <>
+              <Minimize2 size={15} /> Giao diện chuẩn
+            </>
+          ) : (
+            <>
+              <Maximize2 size={15} /> Chế độ Zen Focus
+            </>
+          )}
+        </button>
+      </div>
 
       <div className="kos-ask-layout">
-        {/* Left Column: 3 Distinct Dedicated Boxes */}
-        <aside className="kos-ask-sidebar">
-          {/* BOX 1: New Conversation Action Card */}
-          <div className="kos-ask-box kos-new-chat-box">
-            <button className="kos-button kos-button--primary kos-button--block" onClick={newChat}>
-              <MessageSquarePlus size={16} /> New conversation
-            </button>
-          </div>
-
-          {/* BOX 2: Recent Conversations Card with Independent Scroll */}
-          <div className="kos-ask-box kos-recent-box">
-            <div className="kos-box-header">
-              <div className="kos-box-header-title">
-                <MessageSquare size={15} className="kos-box-icon" />
-                <h2>Recent conversations</h2>
-              </div>
-              <span className="kos-box-count">{sessions.length}</span>
-            </div>
-            <div className="kos-recent-scroll-content">
-              {sessions.length ? (
-                sessions.map(session => (
-                  <button
-                    key={session.id}
-                    className={`kos-session-item ${active?.id === session.id ? 'is-active' : ''}`}
-                    onClick={() => open(session.id)}
-                    title={session.title}
-                  >
-                    <span className="kos-chat-dot" />
-                    <span className="kos-chat-title">{session.title}</span>
-                  </button>
-                ))
-              ) : (
-                <p className="kos-empty-hint">No saved conversations yet.</p>
-              )}
-            </div>
-          </div>
-
-          {/* BOX 3: RAG Reasoning & Pipeline Brief Card with Independent Scroll */}
-          <div className="kos-ask-box kos-reasoning-box">
-            <div className="kos-box-header">
-              <div className="kos-box-header-title">
-                <Activity size={15} className={`kos-activity-icon ${loading ? 'is-pulsing' : ''}`} />
-                <h3>RAG Reasoning & Pipeline</h3>
-              </div>
-              <span
-                className={`kos-status-pill kos-status-pill--${
-                  loading ? 'running' : completedCount === steps.length ? 'success' : 'idle'
-                }`}
-              >
-                {loading ? `${elapsedSec}s` : completedCount === steps.length ? 'Done' : 'Ready'}
-              </span>
+        {/* Left Column: 3 Distinct Dedicated Boxes (hidden in Zen mode) */}
+        {!zenMode && (
+          <aside className="kos-ask-sidebar">
+            {/* BOX 1: New Conversation Action Card */}
+            <div className="kos-ask-box kos-new-chat-box">
+              <button className="kos-button kos-button--primary kos-button--block" onClick={newChat}>
+                <MessageSquarePlus size={16} /> New conversation
+              </button>
             </div>
 
-            <div className="kos-reasoning-scroll-content">
-              {steps.map((step, idx) => (
-                <div key={step.id} className={`kos-reasoning-step is-${step.status}`}>
-                  <div className="kos-step-indicator">
-                    {step.status === 'completed' ? (
-                      <CheckCircle2 size={14} className="kos-step-icon kos-step-icon--success" />
-                    ) : step.status === 'running' ? (
-                      <Loader2 size={14} className="kos-step-icon kos-step-icon--spin" />
-                    ) : (
-                      <span className="kos-step-num">{idx + 1}</span>
-                    )}
-                    {idx < steps.length - 1 && <span className="kos-step-line" />}
-                  </div>
-                  <div className="kos-step-body">
-                    <div className="kos-step-heading">
-                      <span className="kos-step-title">{step.title}</span>
-                      <span className="kos-step-badge">{step.badge}</span>
-                    </div>
-                    <p className="kos-step-detail">{step.detail}</p>
-                  </div>
+            {/* BOX 2: Recent Conversations Card with Dedicated Scrolling */}
+            <div className="kos-ask-box kos-recent-box">
+              <div className="kos-box-header">
+                <div className="kos-box-title">
+                  <MessageSquare size={16} className="kos-box-icon" />
+                  <span>Recent conversations</span>
                 </div>
-              ))}
+                {sessions.length > 0 && (
+                  <span className="kos-box-badge">{sessions.length}</span>
+                )}
+              </div>
+              <div className="kos-recent-scroll-content">
+                {sessions.length ? (
+                  sessions.map(session => (
+                    <button
+                      key={session.id}
+                      className={`kos-recent-item ${active?.id === session.id ? 'is-active' : ''}`}
+                      onClick={() => open(session.id)}
+                      title={session.title || 'Untitled conversation'}
+                    >
+                      <span className="kos-recent-bullet">•</span>
+                      <span className="kos-recent-text">
+                        {session.title || 'Untitled conversation'}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="kos-box-empty">Chưa có cuộc hội thoại nào.</p>
+                )}
+              </div>
             </div>
 
-            {active && (
-              <div className="kos-box-footer">
-                <Sparkles size={12} className="kos-sparkle-icon" />
-                <span>
-                  Scope: <strong>{scope}</strong> •{' '}
-                  {active.messages.reduce(
-                    (acc, m) => acc + (m.citations?.length || 0),
-                    0,
-                  )}{' '}
-                  trích dẫn
+            {/* BOX 3: Live RAG Reasoning & Pipeline Card with Dedicated Scrolling */}
+            <div className="kos-ask-box kos-reasoning-box">
+              <div className="kos-box-header">
+                <div className="kos-box-title">
+                  <Activity size={16} className="kos-box-icon kos-pulse-icon" />
+                  <span>RAG Reasoning & Pipeline</span>
+                </div>
+                <span className={`kos-status-pill ${loading ? 'is-running' : completedCount === steps.length ? 'is-done' : 'is-idle'}`}>
+                  {loading ? (
+                    <>
+                      <Loader2 size={11} className="kos-spin-fast" /> {elapsedSec}s
+                    </>
+                  ) : completedCount === steps.length ? (
+                    'Done'
+                  ) : (
+                    'Ready'
+                  )}
                 </span>
               </div>
-            )}
-          </div>
-        </aside>
 
-        {/* Right Main Panel: Question Stage & Answer Area */}
-        <div className="kos-ask-main-panel">
-          <form className="kos-ask-stage" onSubmit={submit}>
-            <BrainCircuit size={30} />
-            <label>
-              Scope
-              <select
-                id="ask-scope"
-                name="scope"
-                value={scope}
-                onChange={event => {
-                  setScope(event.target.value as Scope)
-                  setSelected([])
-                  setCollectionId(undefined)
-                  setActive(null)
-                }}
-              >
-                <option value="LIBRARY">Entire library</option>
-                <option value="THIS_RESOURCE">One resource</option>
-                <option value="SELECTED_RESOURCES">Selected resources</option>
-                <option value="COLLECTION">Collection</option>
-              </select>
-            </label>
+              <div className="kos-reasoning-scroll-content">
+                <div className="kos-reasoning-timeline">
+                  {steps.map((step, idx) => {
+                    const isDone = step.status === 'completed'
+                    const isRunning = step.status === 'running'
+                    return (
+                      <div
+                        key={step.id}
+                        className={`kos-reasoning-step ${isRunning ? 'is-running' : isDone ? 'is-done' : 'is-pending'}`}
+                      >
+                        <div className="kos-step-indicator">
+                          {isDone ? (
+                            <CheckCircle2 size={14} className="kos-step-icon is-done" />
+                          ) : isRunning ? (
+                            <Loader2 size={14} className="kos-step-icon is-running kos-spin-fast" />
+                          ) : (
+                            <span className="kos-step-dot">{idx + 1}</span>
+                          )}
+                          {idx < steps.length - 1 && <span className="kos-step-line" />}
+                        </div>
+                        <div className="kos-step-content">
+                          <div className="kos-step-header">
+                            <span className="kos-step-title">{step.title}</span>
+                            <span className="kos-step-badge">{step.badge}</span>
+                          </div>
+                          <p className="kos-step-desc">{step.detail}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="kos-box-footer">
+                <BrainCircuit size={13} />
+                <span>
+                  Scope: {scope === 'LIBRARY' ? 'Entire library' : scope === 'COLLECTION' ? 'Collection' : 'Selected resources'}
+                  {active?.messages?.length ? ` • ${active.messages[active.messages.length - 1]?.citations?.length || 0} citations` : ''}
+                </span>
+              </div>
+            </div>
+          </aside>
+        )}
+
+        {/* Right Column: Interaction & Answers Stage */}
+        <div className="kos-ask-stage">
+          <form className="kos-ask-form" onSubmit={submit}>
+            <div className="kos-ask-scope">
+              <label>
+                <Sparkles size={16} /> Scope
+                <select
+                  name="scope"
+                  value={scope}
+                  onChange={event => setScope(event.target.value as Scope)}
+                >
+                  <option value="LIBRARY">Entire library</option>
+                  <option value="COLLECTION">One collection</option>
+                  <option value="THIS_RESOURCE">One resource</option>
+                  <option value="SELECTED_RESOURCES">Selected resources</option>
+                </select>
+              </label>
+            </div>
 
             {scope === 'COLLECTION' && (
               <label>
                 Collection
                 <select
-                  id="ask-collection"
                   name="collectionId"
-                  value={collectionId ?? ''}
-                  onChange={event =>
-                    setCollectionId(Number(event.target.value) || undefined)
-                  }
+                  value={collectionId || ''}
+                  onChange={event => setCollectionId(Number(event.target.value))}
+                  required
                 >
-                  <option value="">Choose collection</option>
-                  {collections.map(collection => (
-                    <option key={collection.id} value={collection.id}>
-                      {collection.name}
+                  <option value="">Select a collection</option>
+                  {collections.map(col => (
+                    <option key={col.id} value={col.id}>
+                      {col.name}
                     </option>
                   ))}
                 </select>
@@ -408,10 +501,31 @@ export default function KnowledgeAskPage() {
                 name="question"
                 value={question}
                 onChange={event => setQuestion(event.target.value)}
-                placeholder="What would you like to understand?"
+                placeholder="Đặt câu hỏi hoặc chọn một mẫu gợi ý bên dưới để tra cứu nhanh..."
                 required
               />
             </label>
+
+            {/* Smart Prompt Pills Row */}
+            <div className="kos-prompt-pills-bar">
+              <span className="kos-pills-title">
+                <Compass size={13} /> Gợi ý câu hỏi nhanh:
+              </span>
+              <div className="kos-pills-container">
+                {SMART_PROMPT_PILLS.map(pill => (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    className="kos-prompt-pill"
+                    onClick={() => handleSelectPromptPill(pill.prompt)}
+                    title={pill.prompt}
+                  >
+                    <span>{pill.icon}</span>
+                    <span>{pill.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {error && <p className="kos-error">{error}</p>}
 
@@ -431,25 +545,63 @@ export default function KnowledgeAskPage() {
           <div className="kos-answer">
             {active?.messages.length ? (
               active.messages.map(message => (
-                <article key={message.id}>
-                  <p className="kos-kicker">
-                    {message.role === 'USER' ? 'YOU' : 'KNOWLEDGEOS'}
-                  </p>
-                  <div className="kos-message-body">
-                    <MarkdownView content={message.content} />
+                <article key={message.id} className={`kos-message-article kos-message--${message.role.toLowerCase()}`}>
+                  <div className="kos-message-header">
+                    <p className="kos-kicker">
+                      {message.role === 'USER' ? 'YOU' : 'KNOWLEDGEOS'}
+                    </p>
+                    {message.role === 'ASSISTANT' && (
+                      <button
+                        type="button"
+                        className="kos-copy-btn"
+                        onClick={() => copyMessage(message.id, message.content)}
+                        title="Sao chép nội dung câu trả lời"
+                      >
+                        {copiedId === message.id ? (
+                          <>
+                            <Check size={13} className="kos-text-success" />
+                            <span>Đã chép</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={13} />
+                            <span>Sao chép</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
-                  {message.citations.map(citation => (
-                    <details key={citation.chunkId}>
-                      <summary>
-                        [{citation.citationOrder}] {citation.resourceTitle}
-                      </summary>
-                      <p>{citation.evidenceExcerpt}</p>
-                    </details>
-                  ))}
+
+                  <div className="kos-message-body">
+                    <MarkdownView content={message.content} onCitationClick={handleCitationClick} />
+                  </div>
+
+                  {message.citations.length > 0 && (
+                    <div className="kos-citations-section">
+                      <p className="kos-citations-heading">
+                        <Sparkles size={13} /> Bằng chứng trích dẫn đối chứng:
+                      </p>
+                      {message.citations.map(citation => (
+                        <details
+                          id={`citation-detail-${citation.citationOrder}`}
+                          key={citation.chunkId}
+                          className={`kos-citation-details ${highlightedCitation === citation.citationOrder ? 'kos-citation-glow' : ''}`}
+                        >
+                          <summary>
+                            <span className="kos-cit-num">[{citation.citationOrder}]</span>
+                            <span className="kos-cit-title">{citation.resourceTitle}</span>
+                          </summary>
+                          <p className="kos-cit-excerpt">{citation.evidenceExcerpt}</p>
+                        </details>
+                      ))}
+                    </div>
+                  )}
                 </article>
               ))
             ) : (
-              <p>Start a grounded conversation with your library.</p>
+              <div className="kos-answer-empty">
+                <p>Bắt đầu cuộc trò chuyện grounded và tra cứu kiến thức từ thư viện của bạn.</p>
+              </div>
             )}
           </div>
         </div>
