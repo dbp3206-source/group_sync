@@ -50,20 +50,32 @@ public class KeywordRetrievalStrategy implements RetrievalStrategy {
             throw new IllegalArgumentException("A question is required.");
         }
         String queryText = question.trim();
-        // plainto_tsquery is forgiving: turns natural language into AND-query automatically.
-        // 'simple' config matches the stored tsvector configuration.
+        String orQuery = buildOrTsquery(queryText);
+        boolean hasOrQuery = !orQuery.isBlank();
+
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("ownerId", ownerId)
                 .addValue("query", queryText)
+                .addValue("orQuery", orQuery)
+                .addValue("hasOrQuery", hasOrQuery)
                 .addValue("limit", Math.min(Math.max(limit, 1), MAX_LIMIT));
 
         StringBuilder sql = new StringBuilder("""
                 SELECT dc.id, dc.resource_id, r.title, dc.chunk_index, dc.page_number, dc.section, dc.content,
-                       ts_rank_cd(dc.fts_content, plainto_tsquery('simple', :query), 1) AS fts_rank
+                       CASE 
+                           WHEN dc.fts_content @@ plainto_tsquery('simple', :query) THEN 
+                               ts_rank_cd(dc.fts_content, plainto_tsquery('simple', :query), 1) + 1.0
+                           WHEN :hasOrQuery = TRUE AND dc.fts_content @@ to_tsquery('simple', :orQuery) THEN 
+                               ts_rank_cd(dc.fts_content, to_tsquery('simple', :orQuery), 1)
+                           ELSE 0.0
+                       END AS fts_rank
                 FROM document_chunks dc
                 JOIN resources r ON r.id = dc.resource_id
                 WHERE r.owner_id = :ownerId
-                  AND dc.fts_content @@ plainto_tsquery('simple', :query)
+                  AND (
+                      dc.fts_content @@ plainto_tsquery('simple', :query)
+                      OR (:hasOrQuery = TRUE AND dc.fts_content @@ to_tsquery('simple', :orQuery))
+                  )
                 """);
 
         switch (scope) {
@@ -112,6 +124,21 @@ public class KeywordRetrievalStrategy implements RetrievalStrategy {
                     row.getString("content"),
                     distance);
         });
+    }
+
+    private static String buildOrTsquery(String text) {
+        if (text == null || text.isBlank()) return "";
+        // Extract alphanumeric words and hyphenated tokens (e.g. CVE-2026-8819, RFC-7519, KB-9902-REV4)
+        String[] rawTokens = text.replaceAll("[^a-zA-Z0-9\\u00C0-\\u1EF9\\-_]", " ").split("\\s+");
+        List<String> valid = new ArrayList<>();
+        for (String token : rawTokens) {
+            String clean = token.trim().replace("'", "").replace("&", "").replace("|", "").replace("!", "");
+            if (clean.length() >= 2 && !clean.equalsIgnoreCase("hoặc") && !clean.equalsIgnoreCase("and") && !clean.equalsIgnoreCase("or")) {
+                valid.add(clean + ":*");
+            }
+        }
+        if (valid.isEmpty()) return "";
+        return String.join(" | ", valid);
     }
 
     /**

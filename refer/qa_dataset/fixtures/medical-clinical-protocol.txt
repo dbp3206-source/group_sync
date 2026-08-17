@@ -1,0 +1,13 @@
+BÁO CÁO ĐỀ CƯƠNG THỬ NGHIỆM LÂM SÀNG GIAI ĐOẠN III (PHASE III CLINICAL PROTOCOL)
+
+1. Tên Hoạt Chất Nghiên Cứu: Cardiotrex-900 (Mã hợp chất thử nghiệm: CTX-900).
+2. Chỉ Định Điều Trị: Điều trị suy tim sung huyết mạn tính có phân suất tống máu giảm (HFrEF).
+3. Liều Lượng & Phác Đồ: 50mg/ngày, uống 1 lần duy nhất vào buổi sáng sau bữa ăn.
+4. Quy Mô Mẫu Thử Nghiệm: 1.500 bệnh nhân tại 42 trung tâm y khoa quốc tế.
+5. Hiệu Quả Lâm Sàng (Primary Efficacy Endpoint):
+   - Tỷ lệ giảm biến cố tim mạch nhập viện đạt 94.2% so với nhóm dùng giả dược (Placebo).
+   - Cải thiện chỉ số phân suất tống máu thất trái (LVEF) trung bình tăng thêm 8.5% sau 24 tuần.
+6. Tác Dụng Không Mong Muốn (Adverse Events):
+   - Tỷ lệ chóng mặt nhẹ: 1.8%
+   - Tỷ lệ hạ huyết áp tư thế: 0.9%
+   - Không ghi nhận trường hợp độc tính trên gan hay suy giảm chức năng thận cấp.

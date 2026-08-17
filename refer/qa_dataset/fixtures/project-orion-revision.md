@@ -1,3 +1,9 @@
-# Project Orion revision (controlled fixture)
+# Project Orion Revision Notes
 
-This later revision changes the launch date to 2 December 2026. The budget remains 480,000 USD.
+Addendum to the Project Orion deployment guideline.
+
+## Revision Details
+
+- **Admin Port Override**: In staging environments, the administrative daemon can alternatively listen on port `9443` if port `8443` is occupied.
+- **Protocol Amendment**: The `RFC-9421` requirement is enforced on all ingress endpoints starting from Version 2.4.
+- **Audit Logging**: All cryptographic operations must emit structured JSON logs to stdout.
