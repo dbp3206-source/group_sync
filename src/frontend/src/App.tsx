@@ -1,5 +1,5 @@
 import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { BrainCircuit, BookOpenText, ChartNoAxesCombined, Home, LogOut, Menu, Sparkles } from 'lucide-react'
+import { BrainCircuit, BookOpenText, ChartNoAxesCombined, Compass, Home, LogOut, Menu, Sparkles } from 'lucide-react'
 import '../tokens.css'
 import './App.css'
 import './styles/app-shell.css'
@@ -29,6 +29,7 @@ import KnowledgeLibraryPage from './pages/KnowledgeLibraryPage'
 import KnowledgeAskPage from './pages/KnowledgeAskPage'
 import KnowledgeFocusPage from './pages/KnowledgeFocusPage'
 import KnowledgeInsightsPage from './pages/KnowledgeInsightsPage'
+import KnowledgeGuidePage from './pages/KnowledgeGuidePage'
 import ResourceWorkspacePage from './pages/ResourceWorkspacePage'
 
 function App() {
@@ -52,6 +53,7 @@ function AppShell() {
     { to: '/ask', label: 'Ask', icon: BrainCircuit },
     { to: '/focus', label: 'Focus', icon: Sparkles },
     { to: '/insights', label: 'Insights', icon: ChartNoAxesCombined },
+    { to: '/guide', label: 'Guide', icon: Compass },
   ]
 
   return <div className={`app-shell${user ? ' app-shell--signed-in' : ' app-shell--guest'}`}>
@@ -80,11 +82,13 @@ function AppShell() {
           <Route path="/ask" element={<KnowledgeAskPage />} />
           <Route path="/focus" element={<KnowledgeFocusPage />} />
           <Route path="/insights" element={<KnowledgeInsightsPage />} />
+          <Route path="/guide" element={<KnowledgeGuidePage />} />
           <Route path="/knowledge/library" element={<KnowledgeLibraryPage />} />
           <Route path="/knowledge/library/:resourceId" element={<ResourceWorkspacePage />} />
           <Route path="/knowledge/ask" element={<KnowledgeAskPage />} />
           <Route path="/knowledge/focus" element={<KnowledgeFocusPage />} />
           <Route path="/knowledge/insights" element={<KnowledgeInsightsPage />} />
+          <Route path="/knowledge/guide" element={<KnowledgeGuidePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/study" element={<StudyPage />} />
