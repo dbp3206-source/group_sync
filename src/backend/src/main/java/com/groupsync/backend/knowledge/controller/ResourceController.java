@@ -101,6 +101,13 @@ public class ResourceController {
                 .body(new org.springframework.core.io.InputStreamResource(input));
     }
 
+    @GetMapping(value = "/{resourceId}/text", produces = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<String> extractedText(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long resourceId) {
+        return ResponseEntity.ok(resourceService.extractedText(user.getId(), resourceId));
+    }
+
     @PostMapping("/auto-organize-all")
     public ResponseEntity<java.util.Map<String, Object>> autoOrganizeAll(@AuthenticationPrincipal AuthenticatedUser user) {
         autoOrganizationService.autoOrganizeAll(user.getId());

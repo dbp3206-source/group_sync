@@ -25,14 +25,17 @@ public class ResourceService {
     private final StorageService storageService;
     private final ApplicationEventPublisher events;
     private final CitationRepository citationRepository;
+    private final com.groupsync.backend.knowledge.repository.DocumentChunkRepository chunkRepository;
 
     public ResourceService(ResourceRepository resourceRepository, UserAccountRepository userRepository,
-            StorageService storageService, ApplicationEventPublisher events, CitationRepository citationRepository) {
+            StorageService storageService, ApplicationEventPublisher events, CitationRepository citationRepository,
+            com.groupsync.backend.knowledge.repository.DocumentChunkRepository chunkRepository) {
         this.resourceRepository = resourceRepository;
         this.userRepository = userRepository;
         this.storageService = storageService;
         this.events = events;
         this.citationRepository = citationRepository;
+        this.chunkRepository = chunkRepository;
     }
     @Transactional
     public ResourceResponse upload(Long ownerId, MultipartFile file, String requestedTitle, String description) {
@@ -79,6 +82,28 @@ public class ResourceService {
     @Transactional public ResourceResponse retry(Long ownerId, Long resourceId) { Resource resource = find(ownerId, resourceId); resource.retry(); events.publishEvent(new ResourceProcessingRequestedEvent(resource.getId())); return ResourceResponse.from(resource); }
     @Transactional(readOnly = true) public InputStream content(Long ownerId, Long resourceId) { Resource resource = find(ownerId, resourceId); try { return storageService.open(resource.getStorageKey()); } catch (IOException exception) { throw new NotFoundException("Stored resource content was not found."); } }
     @Transactional(readOnly = true) public Resource resourceForOwner(Long ownerId, Long resourceId) { return find(ownerId, resourceId); }
+    @Transactional(readOnly = true)
+    public String extractedText(Long ownerId, Long resourceId) {
+        Resource resource = find(ownerId, resourceId);
+        List<DocumentChunk> chunks = chunkRepository.findByResourceIdOrderByChunkIndex(resourceId);
+        if (chunks != null && !chunks.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (DocumentChunk chunk : chunks) {
+                if (chunk.getContent() != null && !chunk.getContent().isBlank()) {
+                    if (sb.length() > 0) sb.append("\n\n");
+                    sb.append(chunk.getContent().trim());
+                }
+            }
+            if (sb.length() > 0) return sb.toString();
+        }
+        if (resource.getResourceType() == ResourceType.NOTE || resource.getResourceType() == ResourceType.TEXT || resource.getResourceType() == ResourceType.MARKDOWN) {
+            try (InputStream is = storageService.open(resource.getStorageKey())) {
+                return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            } catch (Exception ignored) {
+            }
+        }
+        return resource.getDescription() != null ? resource.getDescription() : "Nội dung văn bản đang được xử lý hoặc chưa sẵn sàng.";
+    }
     private Resource find(Long ownerId, Long resourceId) { return resourceRepository.findByIdAndOwnerId(resourceId, ownerId).orElseThrow(() -> new NotFoundException("Resource not found.")); }
     private UserAccount owner(Long ownerId) { return userRepository.findById(ownerId).orElseThrow(() -> new NotFoundException("User not found.")); }
     private ResourceType resolveType(String filename, String mimeType) { String value = filename == null ? "" : filename.toLowerCase(); if (value.endsWith(".pdf")) return ResourceType.PDF; if (value.endsWith(".docx")) return ResourceType.DOCX; if (value.endsWith(".md") || value.endsWith(".markdown")) return ResourceType.MARKDOWN; if (value.endsWith(".txt")) return ResourceType.TEXT; throw new BadRequestException("Supported files are PDF, DOCX, TXT, and Markdown."); }

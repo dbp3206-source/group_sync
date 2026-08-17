@@ -19,7 +19,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   assignResourceToCollection,
-  autoOrganizeAll,
   createCollection,
   createNote,
   createResourceNote,
@@ -72,8 +71,6 @@ export default function KnowledgeFocusPage() {
   // Initial Load
   const initLoad = async () => {
     try {
-      // Auto-organize all initially so everything is neatly clustered
-      await autoOrganizeAll().catch(() => {})
       const [cols, res, t] = await Promise.all([getCollections(), getResources(), getTags()])
       setCollections(cols)
       setAllResources(res)
@@ -96,17 +93,19 @@ export default function KnowledgeFocusPage() {
   useEffect(() => {
     if (selectedColId === null) return
     if (selectedColId === -1) {
-      // All resources view
       setTopicResources(allResources)
-      if (allResources.length > 0 && !activeResourceId) {
-        setActiveResourceId(allResources[0].id)
+      if (allResources.length > 0) {
+        setActiveResourceId(prev => (prev && allResources.some(r => r.id === prev) ? prev : allResources[0].id))
+      } else {
+        setActiveResourceId(null)
+        setActiveContent('')
       }
     } else {
       getCollectionResources(selectedColId)
         .then(resList => {
           setTopicResources(resList)
           if (resList.length > 0) {
-            setActiveResourceId(resList[0].id)
+            setActiveResourceId(prev => (prev && resList.some(r => r.id === prev) ? prev : resList[0].id))
           } else {
             setActiveResourceId(null)
             setActiveContent('')

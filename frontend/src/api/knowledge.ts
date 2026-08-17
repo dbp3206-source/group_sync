@@ -19,7 +19,7 @@ export type OrganizationSuggestions = { resourceId: number; suggestedTags: Organ
 
 export async function getResources(q?: string, tagId?: number, collectionId?: number) { return (await apiClient.get<Resource[]>('/resources', { params: { ...(q ? { q } : {}), ...(tagId ? { tagId } : {}), ...(collectionId ? { collectionId } : {}) } })).data }
 export async function getResource(id: number) { return (await apiClient.get<Resource>(`/resources/${id}`)).data }
-export async function getResourceContent(id: number) { return (await apiClient.get<string>(`/resources/${id}/content`, { responseType: 'text' })).data }
+export async function getResourceContent(id: number) { return (await apiClient.get<string>(`/resources/${id}/text`, { responseType: 'text' })).data }
 export async function getFocusNext() { return (await apiClient.get<FocusNext | null>('/focus/next')).data }
 export async function getInsights() { return (await apiClient.get<InsightOverview>('/insights/overview')).data }
 export async function createNote(title: string, content: string) { return (await apiClient.post<Resource>('/resources/notes', { title, content })).data }
