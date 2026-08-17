@@ -116,6 +116,6 @@ public class KnowledgeWorkspaceService {
     private void requireResource(Long ownerId, Long id) { if (jdbc.queryForObject("select count(*) from resources where id=:id and owner_id=:owner", Map.of("id",id,"owner",ownerId), Integer.class) == 0) throw new NotFoundException("Resource not found."); }
     public void requireTag(Long ownerId, Long id) { if (jdbc.queryForObject("select count(*) from tags where id=:id and owner_id=:owner", Map.of("id",id,"owner",ownerId), Integer.class) == 0) throw new NotFoundException("Tag not found."); }
     private String required(String value) { if (value == null || value.isBlank()) throw new IllegalArgumentException("A value is required."); return value.trim(); }
-    private String blankToNull(String value) { return value == null || value.isBlank() ? "" : value.trim(); }
+    private String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
     private String normalizeTag(String value) { return required(value).toLowerCase(java.util.Locale.ROOT).replaceAll("\\s+", "-"); }
 }
