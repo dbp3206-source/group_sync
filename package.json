@@ -1,0 +1,9 @@
+{
+  "name": "knowledgeos-monorepo",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix src/frontend run build",
+    "dev": "npm --prefix src/frontend run dev",
+    "preview": "npm --prefix src/frontend run preview"
+  }
+}
