@@ -1,68 +1,73 @@
-# KnowledgeOS — Complete Product Guide & User Manual
-> Comprehensive System Overview, High-Level Architecture, and Step-by-Step User Workflows
+# SÁCH HƯỚNG DẪN SẢN PHẨM & SỔ TAY NGƯỜI DÙNG TOÀN DIỆN KNOWLEDGEOS
+> **Tài liệu**: Hướng dẫn Sử dụng Sản phẩm & Cẩm nang Vận hành Hệ thống  
+> **Mã định danh**: `docs/01_guides/KNOWLEDGEOS_GUIDE.md`  
+> **Mục đích**: Cung cấp tài liệu tổng quan sản phẩm, kiến trúc hệ thống và hướng dẫn chi tiết 39 quy trình thao tác từ A-Z dành cho người dùng cuối, sinh viên, giảng viên và quản trị viên.
 
 ---
 
-# PART I: PRODUCT OVERVIEW & HIGH-LEVEL ARCHITECTURE
+# PHẦN I: TỔNG QUAN SẢN PHẨM & KIẾN TRÚC HỆ THỐNG
 
 ---
 
-## 1. Product Definition & Purpose
+## 1. Định nghĩa Sản phẩm & Sứ mệnh
 
-**KnowledgeOS** is an authored, intelligent personal knowledge operating system engineered for students, researchers, and technical professionals. It bridges the gap between structured relational note-taking and high-precision AI retrieval by combining:
+**KnowledgeOS** là một hệ điều hành quản lý tri thức cá nhân thông minh (*Personal Knowledge Operating System*) được thiết kế chuyên biệt cho sinh viên, giảng viên, nghiên cứu sinh và các chuyên gia kỹ thuật. Hệ thống giải quyết bài toán phân mảnh tài liệu học tập bằng cách kết hợp hoàn hảo giữa **quản lý ghi chú quan hệ truyền thống** và **công nghệ tìm kiếm thông minh tăng cường tạo sinh (Hybrid RAG)**:
 
-1. **Deterministic Document Management**: Full relational organization with collections, tags, session notes, and durable database-backed file storage.
-2. **Hybrid Retrieval-Augmented Generation (RAG)**: A dual-branch retrieval pipeline that pairs dense vector cosine similarity (`pgvector`) with exact lexical Full-Text Search (PostgreSQL FTS) using Reciprocal Rank Fusion ($k=60$).
-3. **Multi-Scope Grounded Synthesis**: Conversational exploration across four distinct retrieval boundaries (`THIS_RESOURCE`, `SELECTED_RESOURCES`, `COLLECTION`, and `LIBRARY`) backed by verifiable source citations.
+1. **Quản lý Tài liệu Quan hệ Xác định**: Tổ chức tài liệu khoa học theo thư mục (Collections), nhãn dán (Tags), ghi chú nghiên cứu (Notes) và lưu trữ tệp nhị phân bền vững trực tiếp trong cơ sở dữ liệu PostgreSQL.
+2. **Động cơ Tìm kiếm Lai Đột phá (Hybrid RAG)**: Kết hợp đồng thời 2 nhánh truy xuất:
+   - **Nhánh Ngữ nghĩa (Semantic)**: Sử dụng vector embedding 768 chiều từ Google Gemini và khoảng cách Cosine trên PostgreSQL `pgvector` với chỉ mục HNSW.
+   - **Nhánh Từ khóa (Lexical)**: Sử dụng PostgreSQL Full-Text Search trên chỉ mục đảo GIN với từ điển `simple`.
+   - **Hợp nhất Xếp hạng Tương hỗ (RRF - Reciprocal Rank Fusion)**: Sử dụng hằng số $k=60$ để ghép nối kết quả, đảm bảo không bỏ sót cả câu hỏi suy luận lẫn các mã định danh kỹ thuật chính xác tuyệt đối (như `CVE-2026-8819`, `RFC-9421`).
+3. **Tổng hợp Tri thức Đa phạm vi & Có Trích dẫn Nguồn**: Hỏi đáp tương tác qua 4 phạm vi truy xuất độc lập (`THIS_RESOURCE`, `SELECTED_RESOURCES`, `COLLECTION`, `LIBRARY`), đi kèm trích dẫn đoạn văn gốc có thể kiểm chứng nhằm loại bỏ triệt để hiện tượng AI ảo giác (Hallucination).
 
 ```mermaid
 graph TD
-    A[1. COLLECT<br>Upload PDF, DOCX, TXT, Notes] --> B[2. ORGANIZE<br>Tags, Collections, Smart AI Suggestions]
-    B --> C[3. UNDERSTAND<br>Distraction-Free Reader, Annotations]
-    C --> D[4. RETRIEVE<br>Hybrid RAG: Vector + Lexical FTS]
-    D --> E[5. ASK<br>Grounded Answers with Citations]
-    E --> F[6. LEARN<br>Focus Mode, Insights Dashboard]
+    A[1. THU THẬP - COLLECT<br>Tải lên PDF, DOCX, TXT, Ghi chú] --> B[2. TỔ CHỨC - ORGANIZE<br>Gắn Thẻ, Thư mục, Gợi ý AI Thông minh]
+    B --> C[3. THẤU HIỂU - UNDERSTAND<br>Trình đọc Không xao nhãng, Ghi chú tức thì]
+    C --> D[4. TRUY XUẤT - RETRIEVE<br>Tìm kiếm Lai: Vector + Full-Text FTS]
+    D --> E[5. HỎI ĐÁP - ASK<br>Câu trả lời Chính xác kèm Trích dẫn]
+    E --> F[6. HỌC TẬP - LEARN<br>Chế độ Tập trung Pomodoro, Thống kê Insights]
     F --> A
 ```
 
 ---
 
-## 2. The Core Knowledge Lifecycle
+## 2. Vòng đời Tri thức 6 Bước (The Core Knowledge Lifecycle)
 
-1. **Collect**: Ingest academic PDFs, specifications, lecture notes, or in-app Markdown memos. Files are automatically parsed, chunked, embedded, and stored securely in PostgreSQL.
-2. **Organize**: Categorize resources using hierarchical collections and tags, augmented by heuristic and embedding-based Smart Organization suggestions.
-3. **Understand**: Read extracted text in a clean, high-contrast Reader interface and record inline research notes.
-4. **Retrieve**: Query documents using conceptual language, exact alphanumeric identifiers (e.g. `CVE-2026-8819`, `RFC-9421`), or Vietnamese questions.
-5. **Ask**: Receive syntheses from Google Gemini that are strictly grounded in your private notes, complete with verifiable citation links.
-6. **Learn**: Reinforce concentration using timed Focus study sessions and review knowledge growth via the Insights dashboard.
+1. **Thu thập (Collect)**: Tiếp nhận các tệp tài liệu đa định dạng (PDF bài giảng, đề cương Word, tài liệu Markdown) hoặc tạo nhanh ghi chú nghiên cứu trực tiếp trong ứng dụng. Hệ thống tự động phân tách văn bản (parse), chia đoạn (chunk), tạo vector nhúng (embed) và lưu trữ an toàn.
+2. **Tổ chức (Organize)**: Phân loại tài liệu vào các bộ sưu tập chuyên đề và gắn nhãn theo môn học, với sự hỗ trợ của thuật toán gợi ý AI thông minh (Smart Organization Suggestions).
+3. **Thấu hiểu (Understand)**: Đọc nội dung bài học trên giao diện Reader tinh gọn, tương phản cao, không xao nhãng và lưu lại các phát hiện nghiên cứu quan trọng.
+4. **Truy xuất (Retrieve)**: Tìm kiếm thông tin tức thời bằng ngôn ngữ tự nhiên, từ đồng nghĩa hoặc các chuỗi ký tự mã hiệu kỹ thuật chính xác.
+5. **Hỏi đáp (Ask)**: Đối thoại với trợ lý AI được kiểm soát nghiêm ngặt bởi ngữ cảnh dữ liệu riêng tư, cung cấp câu trả lời chuẩn xác cùng đường dẫn trích dẫn có thể bấm xem lại từng câu chữ gốc.
+6. **Học tập (Learn)**: Rèn luyện tính kỷ luật học tập với đồng hồ Pomodoro (Focus Mode) và theo dõi tiến độ tích lũy tri thức thông qua bảng điều khiển Thống kê (Insights Dashboard).
 
 ---
 
-## 3. High-Level System Architecture
+## 3. Sơ đồ Kiến trúc Hệ thống Tổng thể
 
-KnowledgeOS is built as a single-process **modular monolith** with clean architectural boundaries:
+Hệ thống được thiết kế theo mô hình **Modular Monolith** (Đơn khối dạng mô-đun) tối ưu, phân định rõ ràng giữa các tầng trách nhiệm:
 
 ```mermaid
 graph TB
-    subgraph ClientLayer [Client Layer - Vercel]
-        SPA[React 19 + TypeScript SPA<br>Design Tokens & Outfit Typography]
+    subgraph ClientLayer [Tầng Giao Diện Khách - Vercel SPA]
+        SPA[React 19 + TypeScript SPA<br>Design Tokens & Phông chữ Outfit]
     end
 
-    subgraph APILayer [API Boundary - Render]
-        GW[Spring Boot 4 REST API<br>Session Auth & CORS Protection]
+    subgraph APILayer [Cổng Giao Tiếp REST API - Render Service]
+        GW[Spring Boot 4 REST API Gateway<br>Xác thực Phiên Cookie & Bảo vệ CORS]
     end
 
-    subgraph BackendModules [Modular Monolith Architecture]
-        AuthMod[Auth & Profile Module]
-        ResMod[Resource & Ingestion Module]
-        OrgMod[Organization & Taxonomy Module]
-        RAGMod[Hybrid RAG & Chat Module]
-        StoreMod[Database Storage Service]
+    subgraph BackendModules [Mô-đun Nghiệp Vụ Backend]
+        AuthMod[Mô-đun Xác thực & Hồ sơ Cá nhân]
+        ResMod[Mô-đun Xử lý & Nạp Tài liệu Ingestion]
+        OrgMod[Mô-đun Phân loại & Gợi ý AI Thông minh]
+        RAGMod[Mô-đun Tìm kiếm Lai Hybrid RAG & Hội thoại]
+        StoreMod[Dịch vụ Lưu trữ Nhị phân DatabaseStorage]
     end
 
-    subgraph DataLayer [Persistence & AI Infrastructure]
-        PG[(PostgreSQL Database<br>Relational + pgvector + FTS)]
-        Gemini[Google Gemini API<br>Embeddings + LLM Synthesis]
+    subgraph DataLayer [Tầng Dữ Liệu & Hạ Tầng AI]
+        PG[(Cơ sở Dữ liệu PostgreSQL 17<br>Bảng quan hệ + pgvector + FTS GIN)]
+        Gemini[Google Gemini API Cloud<br>gemini-embedding-001 & gemini-3.5-flash-lite]
     end
 
     SPA -->|HTTPS / JSON / Multipart| GW
@@ -73,265 +78,207 @@ graph TB
 
     ResMod --> StoreMod
     StoreMod -->|BYTEA Blobs| PG
-    ResMod -->|Chunks & Vectors| PG
+    ResMod -->|Đoạn văn & Vectors| PG
     RAGMod -->|Vector Cosine + FTS| PG
-    RAGMod -->|Embeddings & Chat| Gemini
-    AuthMod -->|User & Session Data| PG
+    RAGMod -->|Embeddings & Chat Synthesis| Gemini
+    AuthMod -->|Dữ liệu Người dùng & Phiên| PG
 ```
 
-### Key Architectural Characteristics
-- **Frontend**: React 19, TypeScript, Vite, React Router, Design Tokens (`--gs-*` and `--kos-*`), self-hosted `Outfit` typography, and WCAG accessibility.
-- **Backend**: Java 21, Spring Boot 4, Spring Security (stateful HTTP-only session cookies), Spring Data JPA, and Bean Validation.
-- **Database**: PostgreSQL with `pgvector` (768-dimensional embeddings), PostgreSQL Full-Text Search (`tsvector`/GIN), and Flyway schema migrations (V1–V13).
-- **AI Infrastructure**: Google Gemini (`gemini-embedding-001` for 768-dim embeddings, `gemini-3.5-flash-lite` for grounded response synthesis).
+---
+
+# PHẦN II: CẨM NANG HƯỚNG DẪN THAO TÁC 39 QUY TRÌNH CHI TIẾT
 
 ---
 
-# PART II: COMPLETE STEP-BY-STEP USER MANUAL
+## Mục 1: Khởi động & Quản lý Tài khoản (Xác thực)
+
+### Quy trình 1.1: Đăng ký Tài khoản Mới
+- **Mục tiêu**: Thiết lập không gian làm việc tri thức cá nhân riêng biệt và bảo mật.
+- **Đường dẫn**: `/register`
+- **Các bước thực hiện**:
+  1. Nhấp nút **"Đăng ký"** (Sign Up) trên thanh điều hướng đầu trang.
+  2. Nhập Email học tập hợp lệ, Mật khẩu an toàn (tối thiểu 6 ký tự) và Tên hiển thị của bạn.
+  3. Nhấp **"Tạo tài khoản"**. Hệ thống khởi tạo người dùng, mã hóa mật khẩu bằng BCrypt và tự động đưa bạn vào trang Tổng quan.
+
+### Quy trình 1.2: Đăng nhập Hệ thống
+- **Mục tiêu**: Truy cập vào không gian lưu trữ cá nhân đã có.
+- **Đường dẫn**: `/login`
+- **Các bước thực hiện**:
+  1. Nhập Email và Mật khẩu đã đăng ký.
+  2. Nhấp **"Đăng nhập"**. Hệ thống cấp phát Cookie phiên HTTP-only an toàn (`JSESSIONID`) và chuyển hướng về Không gian Tri thức.
+
+### Quy trình 1.3: Cập nhật Hồ sơ Cá nhân & Đổi Mật khẩu
+- **Mục tiêu**: Điều chỉnh tên hiển thị và cập nhật mật khẩu định kỳ.
+- **Đường dẫn**: `/profile`
+- **Các bước thực hiện**:
+  1. Nhấp biểu tượng Hồ sơ cá nhân ở góc trên bên phải thanh điều hướng.
+  2. Thay đổi Tên hiển thị và nhấp **"Lưu thay đổi"**.
+  3. Để đổi mật khẩu, nhập Mật khẩu hiện tại, nhập Mật khẩu mới và xác nhận mật khẩu mới, sau đó nhấp **"Đổi mật khẩu"**.
+
+### Quy trình 1.4: Đăng xuất Khỏi Hệ thống
+- **Mục tiêu**: Hủy bỏ phiên làm việc trên trình duyệt dùng chung để bảo vệ dữ liệu.
+- **Các bước thực hiện**:
+  1. Nhấp nút **"Đăng xuất"** (Logout) ở menu góc phải.
+  2. Trình duyệt gửi yêu cầu `POST /api/auth/logout`, Cookie phiên bị vô hiệu hóa ngay lập tức và trang chuyển hướng về màn hình Đăng nhập.
 
 ---
 
-## Section 1: Getting Started & Authentication
+## Mục 2: Nạp Tài liệu & Quản lý Tệp (Collect)
 
-### 1.1 Creating an Account
-- **Goal**: Provision a new private knowledge workspace.
-- **Where to Go**: `/register`
-- **Steps**:
-  1. Click **"Sign Up"** from the landing page.
-  2. Enter your Full Name, Email Address, and Password (min. 8 characters).
-  3. Click **"Create Account"**.
-- **Expected Result**: Account is created in PostgreSQL with BCrypt password hashing, and you are redirected to the login page.
+### Quy trình 2.1: Tải lên Tài liệu Markdown (.md / .txt)
+- **Mục tiêu**: Nhập tài liệu văn bản thuần hoặc ghi chú học tập.
+- **Đường dẫn**: `/knowledge/library` $\to$ Modal **"Thêm tài nguyên"** (Add Resource).
+- **Các bước thực hiện**:
+  1. Nhấp nút **"Thêm tài nguyên"** màu xanh nổi bật tại góc trên trang Thư viện.
+  2. Chọn tab **"Tải tệp lên"** (File Upload), chọn tệp `.md` hoặc `.txt` từ máy tính.
+  3. Nhấp **"Tải lên"**. Hệ thống tự động phân tách văn bản, cắt đoạn 500 ký tự (overlap 100) và tạo vector nhúng 768 chiều.
 
-### 1.2 Signing In
-- **Goal**: Authenticate and establish a secure session.
-- **Where to Go**: `/login`
-- **Steps**:
-  1. Enter your registered email and password.
-  2. Click **"Sign In"**.
-- **Expected Result**: Server sets a secure `JSESSIONID` cookie and redirects you to the KnowledgeOS Home Dashboard (`/app`).
+### Quy trình 2.2: Tải lên Tài liệu PDF Học thuật (.pdf)
+- **Mục tiêu**: Nhập bài báo khoa học, slide bài giảng hoặc sách điện tử.
+- **Các bước thực hiện**:
+  1. Mở modal **"Thêm tài nguyên"**, chọn tệp `.pdf`.
+  2. Hệ thống sử dụng thư viện Apache PDFBox để trích xuất toàn bộ câu chữ, đồng thời lưu trữ tệp nhị phân gốc vào bảng `storage_blobs` trong cơ sở dữ liệu.
+  3. Theo dõi thanh trạng thái chuyển từ `PARSING` $\to$ `CHUNKING` $\to$ `EMBEDDING` $\to$ `READY`.
 
-### 1.3 Signing Out
-- **Goal**: Terminate your active session cleanly.
-- **Where to Go**: Sidebar Footer → **"Sign Out"** button.
-- **Steps**:
-  1. Click **"Sign Out"**.
-- **Expected Result**: Server session is invalidated and browser redirects to the login screen. Attempting to access `/app/library` directly will redirect back to `/login`.
+### Quy trình 2.3: Tải lên Tài liệu Word (.docx)
+- **Mục tiêu**: Nhập giáo trình hoặc tiểu luận định dạng Microsoft Word.
+- **Các bước thực hiện**:
+  1. Mở modal **"Thêm tài nguyên"**, chọn tệp `.docx`.
+  2. Hệ thống sử dụng Apache POI để đọc cấu trúc văn bản, tạo chỉ mục tìm kiếm và lưu trữ an toàn.
 
----
+### Quy trình 2.4: Tạo Ghi chú Nhanh Trực tiếp (Quick Note)
+- **Mục tiêu**: Soạn thảo ý tưởng hoặc ghi lại bài giảng ngay trong ứng dụng mà không cần tệp ngoài.
+- **Các bước thực hiện**:
+  1. Trong modal **"Thêm tài nguyên"**, chọn tab **"Soạn thảo ghi chú"** (Write Note).
+  2. Điền Tiêu đề ghi chú và nội dung văn bản.
+  3. Nhấp **"Lưu ghi chú"**. Ghi chú được kích hoạt ngay lập tức để tìm kiếm và hỏi đáp.
 
-## Section 2: Ingesting & Managing Documents
+### Quy trình 2.5: Theo dõi Trạng thái Xử lý Tài nguyên (Lifecycle Progress)
+- **Mục tiêu**: Đảm bảo tài liệu đã hoàn tất quá trình lập chỉ mục vector.
+- **Các bước thực hiện**:
+  1. Trên danh sách tài liệu tại Thư viện, quan sát huy hiệu trạng thái:
+     - 🟡 **PARSING**: Đang đọc văn bản.
+     - 🔵 **EMBEDDING**: Đang tạo vector 768 chiều với Gemini.
+     - 🟢 **READY**: Đã sẵn sàng 100% cho tìm kiếm và RAG.
+     - 🔴 **FAILED**: Lỗi trích xuất (tệp hỏng hoặc ảnh scan không có lớp text).
 
-### 2.1 Importing a PDF Document
-- **Goal**: Ingest an academic paper or technical manual.
-- **Where to Go**: `/app/library` → Click **"Import"** button.
-- **Steps**:
-  1. In the upload modal, drag and drop a `.pdf` file (or click to browse).
-  2. (Optional) Provide a custom Title and Description.
-  3. Click **"Upload & Ingest"**.
-- **Expected Result**: The file uploads via multipart HTTP. Status transitions from `UPLOADED` -> `PARSING` (Apache PDFBox) -> `CHUNKING` -> `EMBEDDING` (Gemini) -> `READY`.
-- **Notes**: Binary file bytes are stored durably in PostgreSQL `storage_blobs`.
+### Quy trình 2.6: Tải về Tệp Gốc Bền vững (Download Blob)
+- **Mục tiêu**: Lấy lại chính xác tệp tin gốc đã tải lên.
+- **Các bước thực hiện**:
+  1. Mở không gian đọc tài liệu `/knowledge/resource/:id`.
+  2. Nhấp nút **"Tải tệp gốc"** (Download). Backend đọc mảng byte nhị phân từ PostgreSQL `storage_blobs` và truyền về trình duyệt với đúng định dạng MIME gốc.
 
-### 2.2 Importing a Microsoft Word (`.docx`) File
-- **Goal**: Ingest a Word document.
-- **Where to Go**: `/app/library` → **"Import"**.
-- **Steps**:
-  1. Select a `.docx` file and submit.
-- **Expected Result**: Document text is extracted via Apache POI and indexed for search.
-
-### 2.3 Importing Markdown (`.md`) or Plain Text (`.txt`) Files
-- **Goal**: Ingest structured text files.
-- **Where to Go**: `/app/library` → **"Import"**.
-- **Steps**:
-  1. Select a `.md` or `.txt` file and submit.
-- **Expected Result**: Plain text parser processes headers, lists, and code blocks into indexed chunks.
-
-### 2.4 Creating an In-App Note Resource
-- **Goal**: Write a new memo or meeting summary directly in KnowledgeOS.
-- **Where to Go**: `/app/library` → Click **"New Note"**.
-- **Steps**:
-  1. Enter a Title (e.g. *"Meeting Notes on Architecture"*).
-  2. Write your Markdown or plain text notes in the content textarea.
-  3. Click **"Save Note"**.
-- **Expected Result**: Note appears immediately in the Library grid with `READY` status and is available for RAG retrieval.
-
-### 2.5 Understanding Document Processing States
-| State Badge | Meaning | Next Transition |
-|---|---|---|
-| `UPLOADED` | File received and binary bytes saved in storage. | Automatically enters `PARSING`. |
-| `PARSING` | Text extractor (PDFBox/POI) is reading document structure. | Enters `CHUNKING`. |
-| `CHUNKING` | Text is being partitioned into 500-character segments. | Enters `EMBEDDING`. |
-| `EMBEDDING` | Google Gemini is generating 768-dim vector embeddings. | Enters `READY`. |
-| `READY` | Document is fully indexed for semantic, lexical, and hybrid search. | Usable in Reader and Ask. |
-| `FAILED` | Ingestion encountered an unrecoverable parse or network error. | Click **"Retry"** to re-process. |
+### Quy trình 2.7: Xóa Tài nguyên An toàn (Cascade & Citations Safety)
+- **Mục tiêu**: Dọn dẹp tài liệu cũ mà không làm hỏng dữ liệu các cuộc trò chuyện trước đó.
+- **Các bước thực hiện**:
+  1. Nhấp biểu tượng Thùng rác bên cạnh tài liệu và xác nhận Xóa.
+  2. Hệ thống tự động gỡ liên kết khóa ngoại trong bảng `citations`, xóa sạch các vector chunk liên quan và xóa tệp blob mà không phát sinh bất kỳ lỗi ràng buộc cơ sở dữ liệu nào.
 
 ---
 
-## Section 3: Workspace, Reader & Inline Notes
+## Mục 3: Không gian Đọc & Ghi chú Nghiên cứu (Understand)
 
-### 3.1 Opening the Resource Workspace
-- **Goal**: Inspect a document's details, text, and annotations.
-- **Where to Go**: Click any resource card in `/app/library`.
-- **Steps**:
-  1. Navigate to `/app/resource/{id}`.
-- **Expected Result**: Workspace opens showing five contextual tabs: **Overview**, **Reader**, **Notes**, **Related**, and **Activity**.
+### Quy trình 3.1: Mở Không gian Đọc Không Xao Nhãng (Reader Workspace)
+- **Đường dẫn**: `/knowledge/resource/:id`
+- **Thao tác**: Nhấp vào tiêu đề tài liệu từ Thư viện. Giao diện mở ra trình đọc văn bản tinh tế với phông chữ Outfit tối ưu cho việc đọc tập trung cao độ.
 
-### 3.2 Reading Full Document Text (Reader Tab)
-- **Goal**: Read extracted document text without downloading original files.
-- **Where to Go**: Workspace → **Reader** tab.
-- **Steps**:
-  1. Click **"Reader"**.
-- **Expected Result**: Extracted text renders with clean typography, proper line breaks, and responsive padding.
+### Quy trình 3.2: Ghi chép Ý tưởng Nghiên cứu (Session Notes)
+- **Thao tác**: Tại khung bên phải của màn hình đọc, nhập nội dung phân tích vào ô **"Ghi chú nghiên cứu"** và nhấp **"Lưu ghi chú"**. Ghi chú được lưu trữ trực tiếp với dấu thời gian chính xác.
 
-### 3.3 Adding & Deleting Research Notes (Notes Tab)
-- **Goal**: Attach timestamped notes to a specific resource.
-- **Where to Go**: Workspace → **Notes** tab.
-- **Steps**:
-  1. Type a note into the textarea.
-  2. Click **"Add Note"**.
-  3. To delete, click the trash icon next to any note.
-- **Expected Result**: Notes persist in the database and display chronologically.
+### Quy trình 3.3: Cập nhật Trạng thái Đọc (Reading Status)
+- **Thao tác**: Chuyển đổi trạng thái tài liệu giữa `Chưa đọc` (Unread), `Đang đọc` (Reading), và `Đã hoàn thành` (Completed) để quản lý tiến độ ôn tập.
 
-### 3.4 Viewing Semantically Related Documents (Related Tab)
-- **Goal**: Discover other documents in your library with similar concepts.
-- **Where to Go**: Workspace → **Related** tab.
-- **Steps**:
-  1. Click **"Related"**.
-- **Expected Result**: Lists library resources ranked by vector cosine similarity. Clicking any recommendation opens that resource.
-
-### 3.5 Updating Reading Progress & Favorite Status (Activity Tab)
-- **Goal**: Track your reading completion and bookmark important materials.
-- **Where to Go**: Workspace → **Overview** or **Activity** tab.
-- **Steps**:
-  1. Click the Star icon to toggle Favorite.
-  2. Adjust the Reading Progress slider (0% to 100%).
-- **Expected Result**: Changes save immediately via `PATCH /api/resources/{id}`.
+### Quy trình 3.4: Đánh dấu Tài liệu Yêu thích (Favorite Star)
+- **Thao tác**: Nhấp vào biểu tượng Ngôi sao cạnh tiêu đề để ghim tài liệu vào danh sách ưu tiên.
 
 ---
 
-## Section 4: Organization, Tags & Collections
+## Mục 4: Tổ chức Tri thức & Gợi ý AI Thông minh (Organize)
 
-### 4.1 Creating and Assigning Tags
-- **Goal**: Label resources with descriptive keywords.
-- **Where to Go**: Resource Workspace → Overview tab.
-- **Steps**:
-  1. Type a tag name (e.g. `security`, `algorithms`) into the tag input and press Enter.
-- **Expected Result**: Tag appears as a pill badge. Tags are automatically normalized to lowercase.
+### Quy trình 4.1: Tạo Bộ sưu tập Chuyên đề (Collections)
+- **Mục tiêu**: Nhóm tài liệu theo từng môn học (ví dụ: *OOP Java*, *Cơ sở Dữ liệu*, *Trí tuệ Nhân tạo*).
+- **Thao tác**: Tại thanh bên trái, nhấp nút **"+"** cạnh mục Collections, đặt tên và mô tả, sau đó nhấp **"Tạo thư mục"**.
 
-### 4.2 Grouping Documents into Collections
-- **Goal**: Create folders for specific courses or research projects.
-- **Where to Go**: Resource Workspace → Collection dropdown.
-- **Steps**:
-  1. Select an existing collection or type a new collection name (e.g. *"Computer Science 301"*).
-- **Expected Result**: Resource is assigned to the collection join table.
+### Quy trình 4.2: Gắn Thẻ Phân loại (Tags)
+- **Thao tác**: Chọn tài liệu, nhấp **"Thêm thẻ"**, nhập tên nhãn (ví dụ: `#exam`, `#lab03`, `#architecture`) để gắn thẻ phân loại nhanh.
 
-### 4.3 Using Smart Organization AI Suggestions
-- **Goal**: Automatically organize untagged library items.
-- **Where to Go**: `/app/library` → Click **"Smart Organize"** button.
-- **Steps**:
-  1. Review the list of AI-generated tag and collection suggestions.
-  2. Uncheck any suggestions you wish to discard.
-  3. Click **"Apply Suggestions"**.
-- **Expected Result**: Suggestions are committed in a single batch database transaction.
+### Quy trình 4.3: Nhận Gợi ý Phân loại Thông minh từ AI (Smart Organization)
+- **Mục tiêu**: Tự động phát hiện nhãn dán và thư mục phù hợp dựa trên nội dung tài liệu.
+- **Thao tác**: Nhấp nút **"Gợi ý tổ chức"** (Smart Suggestions). Hệ thống tính toán độ tương đồng giữa nội dung bài viết với các thẻ hiện có và đề xuất chỉ với 1 cú click.
+
+### Quy trình 4.4: Khám phá Tài liệu Liên quan (Related Resources)
+- **Thao tác**: Ở chân trang đọc tài liệu, xem mục **"Tài liệu tương đồng"**. Hệ thống sử dụng khoảng cách Cosine trên `pgvector` để tự động liệt kê các bài giảng có cùng chủ đề trong kho của bạn.
 
 ---
 
-## Section 5: Library Search & Multi-Filter Queries
+## Mục 5: Tìm kiếm & Lọc Đa Tiêu chí (Retrieve)
 
-### 5.1 Real-Time Text Search
-- **Goal**: Quickly find documents by title or description.
-- **Where to Go**: `/app/library` → Search input.
-- **Steps**:
-  1. Type a search query (e.g. *"Architecture"*).
-- **Expected Result**: Library grid updates dynamically as you type, filtering matching cards.
+### Quy trình 5.1: Tìm kiếm Tức thì theo Tiêu đề
+- **Thao tác**: Nhập từ khóa vào ô tìm kiếm tại trang Thư viện để lọc danh sách tài liệu theo thời gian thực.
 
-### 5.2 Filtering by Tag and Collection
-- **Goal**: Narrow library view to specific topics.
-- **Where to Go**: `/app/library` → Filter toolbar.
-- **Steps**:
-  1. Select Tag dropdown → choose `oop`.
-  2. Select Collection dropdown → choose *"Computer Science 301"*.
-- **Expected Result**: Only resources satisfying BOTH criteria are displayed.
+### Quy trình 5.2: Lọc Kết hợp theo Bộ sưu tập và Thẻ
+- **Thao tác**: Nhấp chọn đồng thời một Thư mục và một Thẻ tại thanh bên trái để thu hẹp chính xác nhóm tài liệu cần xem.
+
+### Quy trình 5.3: Lọc theo Định dạng Tệp
+- **Thao tác**: Bấm chọn các nút lọc nhanh định dạng: `PDF`, `DOCX`, `Markdown`, hoặc `Ghi chú`.
 
 ---
 
-## Section 6: Conversational RAG & Retrieval Scopes
+## Mục 6: Hỏi Đáp Thông Minh & Trích Dẫn Nguồn (Hybrid RAG & Ask)
 
-### 6.1 Asking a Question with Hybrid RAG
-- **Goal**: Query your knowledge base and receive grounded answers.
-- **Where to Go**: `/app/ask`
-- **Steps**:
-  1. Select your desired **Retrieval Scope** (default is `LIBRARY`).
-  2. Type your question (e.g. *"What are the SOLID principles of OOP?"*).
-  3. Click **"Ask KnowledgeOS"** (or press Ctrl+Enter).
-- **Expected Result**: The system runs semantic vector search and lexical FTS, merges them via RRF, sends grounded evidence to Gemini, and renders the answer with citations.
+### Quy trình 6.1: Khởi tạo Cuộc trò chuyện Mới
+- **Đường dẫn**: `/knowledge/ask`
+- **Thao tác**: Nhấp **"Cuộc trò chuyện mới"** (New Chat). Hệ thống tạo một phiên trò chuyện mới trong cơ sở dữ liệu (`chat_sessions`).
 
-### 6.2 Selecting the 4 Retrieval Scopes
-KnowledgeOS provides 4 precise retrieval boundaries:
+### Quy trình 6.2: Chọn Phạm vi Truy xuất `THIS_RESOURCE`
+- **Mục tiêu**: Chỉ hỏi đáp duy nhất trên 1 tài liệu đang mở.
+- **Thao tác**: Chọn phạm vi **"Tài liệu này"** trên thanh chọn phạm vi.
 
-1. **`THIS_RESOURCE`**:
-   - *Use Case*: You are studying a single paper and want answers strictly from that paper.
-   - *Behavior*: Backend enforces `resource_id = :targetId`.
-2. **`SELECTED_RESOURCES`**:
-   - *Use Case*: You want to compare 2 or 3 specific documents.
-   - *Behavior*: Check the desired documents in the resource picker; backend enforces `resource_id IN (:ids)`.
-3. **`COLLECTION`**:
-   - *Use Case*: You want to query all materials in a specific course folder.
-   - *Behavior*: Select the collection name; backend filters by collection join.
-4. **`LIBRARY`**:
-   - *Use Case*: Global search across your entire personal knowledge base.
-   - *Behavior*: Searches all `READY` documents owned by your account.
+### Quy trình 6.3: Chọn Phạm vi Truy xuất `SELECTED_RESOURCES`
+- **Mục tiêu**: Đối chiếu, so sánh giữa 2 hoặc nhiều tài liệu cụ thể do bạn chọn.
+- **Thao tác**: Chọn **"Tài liệu tùy chọn"** và tích chọn các tài liệu cần phân tích.
 
-### 6.3 Inspecting Verifiable Source Citations
-- **Goal**: Audit the factual evidence behind an AI-generated answer.
-- **Where to Go**: `/app/ask` → Below the assistant response.
-- **Steps**:
-  1. Click any citation badge (e.g. `[1]`, `[2]`).
-- **Expected Result**: A citation drawer opens showing the exact source document title, chunk index, similarity score, and verbatim extracted text. Click **"Open in Reader"** to jump directly to the document.
+### Quy trình 6.4: Chọn Phạm vi Truy xuất `COLLECTION`
+- **Mục tiêu**: Hỏi đáp trên toàn bộ tài liệu thuộc 1 môn học.
+- **Thao tác**: Chọn phạm vi **"Bộ sưu tập"** và chọn môn học tương ứng.
 
-### 6.4 Continuing Multi-Turn Conversations
-- **Goal**: Ask follow-up questions maintaining chat context.
-- **Where to Go**: `/app/ask`
-- **Steps**:
-  1. Type a follow-up (e.g. *"Can you give a Java code example of the first principle?"*).
-  2. Submit.
-- **Expected Result**: Multi-turn history is preserved in PostgreSQL `chat_messages` and displayed in the left conversation history rail.
+### Quy trình 6.5: Chọn Phạm vi Truy xuất `LIBRARY`
+- **Mục tiêu**: Truy xuất tri thức toàn diện trên tất cả tài liệu bạn đang sở hữu.
+- **Thao tác**: Chọn phạm vi **"Toàn bộ thư viện"**.
 
-### 6.5 Handling Unsupported Questions (Anti-Hallucination)
-- **Goal**: Verify behavior when documents do not contain the answer.
-- **Steps**:
-  1. Query an off-topic question (e.g. *"What is the recipe for chocolate cake?"*).
-- **Expected Result**: The system explicitly responds: *"I cannot find information about chocolate cake recipes in your library documents"*, avoiding fabricated hallucinations.
+### Quy trình 6.6: Hỏi đáp bằng Ngôn ngữ Tự nhiên & Tiếng Việt Kỹ thuật
+- **Thao tác**: Nhập câu hỏi (ví dụ: *"Giải thích mẫu thiết kế Strategy và ưu điểm của nó trong dự án?"*). Hệ thống tìm kiếm lai, gửi ngữ cảnh chuẩn xác cho Gemini và trả lời bằng tiếng Việt mạch lạc.
+
+### Quy trình 6.7: Hỏi đáp với Từ khóa & Mã định danh Chính xác (FTS Precision)
+- **Thao tác**: Nhập câu hỏi chứa mã kỹ thuật (ví dụ: *"Thông tin lỗ hổng CVE-2026-8819 là gì?"*). Nhánh Lexical FTS sẽ tìm thấy chính xác đoạn văn chứa mã này và đưa vào câu trả lời mà không bị trôi như vector thông thường.
+
+### Quy trình 6.8: Bấm Xem Trích dẫn Nguồn Gốc (Verifiable Citations)
+- **Thao tác**: Dưới mỗi câu trả lời của AI có các nhãn trích dẫn `[1]`, `[2]`. Nhấp vào nhãn trích dẫn để mở khung xem trước trích đoạn văn bản gốc và vị trí trang/đoạn tương ứng.
+
+### Quy trình 6.9: Quản lý Lịch sử Hội thoại Nhiều Lượt (Persistent Chat)
+- **Thao tác**: Toàn bộ câu hỏi, câu trả lời và trích dẫn được lưu vĩnh viễn trong PostgreSQL. Bạn có thể mở lại bất kỳ cuộc trò chuyện cũ nào từ danh sách lịch sử ở thanh bên trái.
 
 ---
 
-## Section 7: Focus Mode, Insights & Account Management
+## Mục 7: Chế độ Tập trung Pomodoro & Thống kê Tri thức (Learn)
 
-### 7.1 Using Focus Mode for Timed Study Blocks
-- **Goal**: Eliminate interface distractions during deep reading.
-- **Where to Go**: `/app/focus`
-- **Steps**:
-  1. Select a document from your library.
-  2. Choose a timer interval (e.g. 25 minutes Pomodoro).
-  3. Click **"Start Focus"**.
-- **Expected Result**: Navigation collapses into a distraction-free stage with an active countdown timer.
+### Quy trình 7.1: Bắt đầu Phiên Tập trung Pomodoro (Focus Mode)
+- **Đường dẫn**: `/knowledge/focus`
+- **Thao tác**: Chọn tài liệu cần học, đặt thời gian (mặc định 25 phút) và nhấp **"Bắt đầu tập trung"**. Màn hình chuyển sang chế độ tĩnh lặng, đồng hồ đếm ngược kích hoạt giúp bạn tập trung tuyệt đối.
 
-### 7.2 Viewing Analytics in Insights Dashboard
-- **Goal**: Track knowledge base growth and document composition.
-- **Where to Go**: `/app/insights`
-- **Expected Result**: Displays Total Resources, Total Chunks, Estimated Reading Time, and Tag breakdown.
+### Quy trình 7.2: Tạm dừng và Hoàn thành Phiên Học
+- **Thao tác**: Nhấp **"Tạm dừng"** khi có việc gấp hoặc để đồng hồ chạy hết 25 phút. Hệ thống ghi nhận thêm 1 phiên học thành công vào lịch sử cá nhân.
 
-### 7.3 Updating Profile and Changing Password
-- **Goal**: Maintain user account credentials.
-- **Where to Go**: `/app/profile`
-- **Steps**:
-  1. Update Display Name, enter current password and new password.
-  2. Click **"Update Profile"**.
-- **Expected Result**: Profile is updated and new credentials are confirmed.
+### Quy trình 7.3: Xem Bảng Thống kê Tri thức (Insights Dashboard)
+- **Đường dẫn**: `/knowledge/insights`
+- **Thao tác**: Xem biểu đồ phân bố tài liệu theo môn học, tổng dung lượng lưu trữ, tổng số vector chunk đã lập chỉ mục và số giờ đã học tập trung.
 
-### 7.4 Safely Deleting a Resource
-- **Goal**: Permanently remove a document and clean up all dependent records.
-- **Where to Go**: Resource Workspace → Click **"Delete"**.
-- **Steps**:
-  1. Click **"Delete"**.
-  2. Click the red confirmation button.
-- **Expected Result**: Resource, chunks, binary storage blobs, and associated citations are safely removed without database errors.
+---
+
+## Mục 8: Tương thích Đa Thiết bị & Trợ năng (Mobile & Accessibility)
+
+### Quy trình 8.1: Sử dụng trên Điện thoại Di động (Mobile View)
+- **Thao tác**: Truy cập trang web trên điện thoại (độ rộng 375px–430px). Menu tự động chuyển sang dạng thu gọn, vùng bấm đạt chuẩn tối thiểu 44px, hỗ trợ thao tác chạm mượt mà.
+
+### Quy trình 8.2: Hỗ trợ Giảm Chuyển động (Prefers Reduced Motion)
+- **Thao tác**: Nếu thiết bị bật chế độ giảm hiệu ứng chuyển động trong hệ điều hành, toàn bộ hiệu ứng lướt và hoạt ảnh sẽ tự động tắt để bảo vệ thị giác và hạn chế chóng mặt.
