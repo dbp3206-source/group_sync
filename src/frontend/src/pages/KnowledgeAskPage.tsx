@@ -21,6 +21,7 @@ import {
   type KnowledgeCollection,
   type Resource,
 } from '../api/knowledge'
+import MarkdownView from '../components/MarkdownView'
 
 type Scope = 'THIS_RESOURCE' | 'SELECTED_RESOURCES' | 'COLLECTION' | 'LIBRARY'
 
@@ -434,7 +435,9 @@ export default function KnowledgeAskPage() {
                   <p className="kos-kicker">
                     {message.role === 'USER' ? 'YOU' : 'KNOWLEDGEOS'}
                   </p>
-                  <p>{message.content}</p>
+                  <div className="kos-message-body">
+                    <MarkdownView content={message.content} />
+                  </div>
                   {message.citations.map(citation => (
                     <details key={citation.chunkId}>
                       <summary>

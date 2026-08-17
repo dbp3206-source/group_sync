@@ -1141,7 +1141,7 @@
 }
 
 /* =========================================================================
-   ANSWER PANEL
+   ANSWER PANEL & RICH MARKDOWN BODY
    ========================================================================= */
 
 .kos-answer {
@@ -1157,6 +1157,156 @@
   margin-top: 1.25rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--kos-line);
+}
+
+.kos-message-body {
+  margin-top: .4rem;
+}
+
+.kos-markdown-body {
+  color: var(--kos-ink);
+  font-size: .95rem;
+  line-height: 1.7;
+}
+
+.kos-markdown-body .kos-md-p {
+  margin: 0 0 .85rem;
+}
+
+.kos-markdown-body .kos-md-p:last-child {
+  margin-bottom: 0;
+}
+
+.kos-markdown-body .kos-md-h2 {
+  font: 700 1.25rem var(--kos-font-display);
+  color: var(--kos-ink);
+  margin: 1.35rem 0 .65rem;
+  letter-spacing: -0.015em;
+  padding-bottom: .3rem;
+  border-bottom: 1px solid var(--kos-line);
+}
+
+.kos-markdown-body .kos-md-h3 {
+  font: 600 1.12rem var(--kos-font-display);
+  color: var(--kos-ink);
+  margin: 1.15rem 0 .5rem;
+  letter-spacing: -0.01em;
+}
+
+.kos-markdown-body .kos-md-h4 {
+  font: 600 1.02rem var(--kos-font-display);
+  color: var(--kos-ink);
+  margin: .95rem 0 .4rem;
+}
+
+.kos-markdown-body .kos-md-list {
+  margin: 0 0 1rem;
+  padding-left: 1.4rem;
+}
+
+.kos-markdown-body .kos-md-list--ul {
+  list-style-type: disc;
+}
+
+.kos-markdown-body .kos-md-list--ol {
+  list-style-type: decimal;
+}
+
+.kos-markdown-body .kos-md-list-item {
+  margin-bottom: .45rem;
+  line-height: 1.6;
+}
+
+.kos-markdown-body .kos-md-list-item:last-child {
+  margin-bottom: 0;
+}
+
+.kos-markdown-body .kos-md-quote {
+  margin: .85rem 0;
+  padding: .65rem 1rem;
+  border-left: 3.5px solid var(--kos-blue);
+  background: var(--kos-surface-2);
+  color: var(--kos-muted);
+  border-radius: 0 4px 4px 0;
+  font-style: italic;
+}
+
+.kos-markdown-body .kos-md-code-block {
+  margin: .85rem 0;
+  padding: .85rem 1.1rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: .84rem;
+  line-height: 1.5;
+}
+
+.kos-md-code-inline {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: .86em;
+  background: var(--kos-surface-2);
+  color: #c026d3;
+  padding: .15em .4em;
+  border-radius: 3px;
+  border: 1px solid var(--kos-line);
+}
+
+.kos-md-strong {
+  font-weight: 650;
+  color: var(--kos-ink);
+}
+
+.kos-md-em {
+  font-style: italic;
+  color: var(--kos-ink);
+}
+
+.kos-md-arrow {
+  color: var(--kos-blue);
+  font-weight: 700;
+  padding: 0 .15rem;
+  font-family: system-ui, sans-serif;
+}
+
+.kos-md-math {
+  font-family: "Cambria Math", "Times New Roman", serif;
+  font-style: italic;
+  background: color-mix(in srgb, var(--kos-blue) 6%, transparent);
+  color: var(--kos-ink);
+  padding: .1em .35em;
+  border-radius: 3px;
+  font-size: .95em;
+}
+
+.kos-md-citation-group {
+  display: inline-flex;
+  gap: .2rem;
+  margin: 0 .2rem;
+  vertical-align: baseline;
+}
+
+.kos-md-citation-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--kos-blue) 30%, transparent);
+  background: color-mix(in srgb, var(--kos-blue) 10%, transparent);
+  color: var(--kos-blue);
+  font-size: .75rem;
+  font-weight: 700;
+  padding: .05rem .35rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  line-height: 1.2;
+}
+
+.kos-md-citation-badge:hover {
+  background: var(--kos-blue);
+  color: #fff;
+  transform: translateY(-1px);
 }
 
 .kos-answer > p:not(.kos-kicker) {
