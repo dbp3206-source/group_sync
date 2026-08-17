@@ -1,0 +1,1466 @@
+/* =========================================================================
+   KnowledgeOS Design System  —  redesign.css
+   =========================================================================
+   Token aliases: bridge --kos-* to the canonical --gs-* token system so
+   KnowledgeOS pages and the rest of the app share one source of truth.
+   ========================================================================= */
+
+:root {
+  /* Colour tokens */
+  --kos-blue:        var(--gs-indigo);          /* primary interactive blue/indigo */
+  --kos-blue-soft:   var(--gs-indigo-soft);     /* soft tint for backgrounds */
+  --kos-ink:         var(--gs-ink);             /* primary text */
+  --kos-muted:       var(--gs-muted);           /* secondary / supporting text */
+  --kos-line:        var(--gs-rule);            /* dividers, borders */
+  --kos-surface:     var(--gs-surface);         /* card / panel background */
+  --kos-surface-2:   var(--gs-surface-2);       /* recessed background */
+
+  /* Display font: Outfit (self-hosted via fontsource) */
+  --kos-font-display: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* =========================================================================
+   APP SHELL
+   ========================================================================= */
+
+.app-shell {
+  display: grid;
+  min-height: 100dvh;
+}
+
+.app-shell--signed-in {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.app-sidebar {
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  padding: 24px 16px;
+  background: #1a2630;
+  overflow: auto;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  font-family: var(--kos-font-display);
+  font-size: .93rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  text-decoration: none;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--kos-blue);
+  color: white;
+  font-family: var(--kos-font-display);
+  font-size: .97rem;
+  font-weight: 800;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 32px;
+  flex: 1;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: rgba(201, 212, 215, 0.85);
+  font-size: .83rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.sidebar-link:hover {
+  background: rgba(255,255,255,.07);
+  color: #e8f0f2;
+}
+
+.sidebar-link.is-active {
+  background: rgba(255,255,255,.12);
+  color: white;
+}
+
+.sidebar-foot {
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding-top: 16px;
+}
+
+.account-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: rgba(201, 212, 215, 0.85);
+  text-decoration: none;
+  transition: background 150ms ease;
+}
+
+.account-link:hover { background: rgba(255,255,255,.07); }
+
+.account-link strong {
+  display: block;
+  font-size: .82rem;
+  font-weight: 700;
+  color: #d8e4e8;
+}
+
+.account-link small {
+  display: block;
+  font-size: .7rem;
+  color: var(--kos-muted);
+}
+
+.sign-out-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(201, 212, 215, 0.7);
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.sign-out-button:hover {
+  background: rgba(255,255,255,.07);
+  color: #e8f0f2;
+}
+
+.guest-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 1480px;
+  min-height: 68px;
+  padding: 0 3.5rem;
+  margin: 0 auto;
+}
+
+.guest-nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-left: auto;
+}
+
+.mobile-app-header { display: none; }
+
+.app-main {
+  max-width: 1480px;
+  padding: 2.25rem 3.5rem 5rem;
+}
+
+/* =========================================================================
+   KICKER (eyebrow label)
+   ========================================================================= */
+
+.kos-kicker {
+  margin: 0;
+  color: var(--kos-blue);
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+/* =========================================================================
+   HOME PAGE
+   ========================================================================= */
+
+.kos-home {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(340px, .95fr);
+  gap: 2.25rem;
+  align-items: center;
+  min-height: calc(100dvh - 4.5rem);
+}
+
+.kos-home-copy { padding: 1.5rem 0; }
+
+.kos-home h1,
+.kos-page h1 {
+  color: var(--kos-ink);
+  font-family: var(--kos-font-display);
+  font-size: clamp(3rem, 6vw, 6.1rem);
+  font-weight: 800;
+  line-height: .93;
+  letter-spacing: -.045em;
+}
+
+.kos-home h1 em {
+  color: var(--kos-blue);
+  font-weight: 800;
+  font-style: normal;
+}
+
+.kos-lead {
+  max-width: 34rem;
+  color: #46565e;
+  font-size: 1.04rem;
+  line-height: 1.7;
+}
+
+.kos-hero-actions {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+  margin-top: 2rem;
+}
+
+.kos-text-link {
+  color: var(--kos-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.kos-text-link:hover { text-decoration: underline; }
+
+.kos-greeting {
+  margin-top: 5rem;
+  color: var(--kos-muted);
+  font-size: .8rem;
+}
+
+.kos-hero-art {
+  position: relative;
+  min-height: 560px;
+  overflow: hidden;
+  border-radius: 4px;
+  box-shadow: 22px 28px 0 color-mix(in srgb, var(--kos-blue) 12%, transparent);
+}
+
+.kos-hero-art img {
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+  object-fit: cover;
+}
+
+.kos-art-caption {
+  position: absolute;
+  left: 1.2rem;
+  bottom: 1.2rem;
+  color: white;
+  font: 600 1.1rem var(--kos-font-display);
+}
+
+.kos-focus-card {
+  grid-column: 1;
+  align-self: end;
+  margin-top: -9rem;
+  position: relative;
+  z-index: 1;
+  width: min(370px, 100%);
+  padding: 1.35rem;
+  background: var(--kos-surface);
+  border-left: 3px solid var(--kos-blue);
+  box-shadow: var(--gs-shadow);
+}
+
+.kos-focus-card span,
+.kos-resource p {
+  color: var(--kos-blue);
+  font-size: .67rem;
+  font-weight: 700;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.kos-focus-card h2 {
+  color: var(--kos-ink);
+  margin: .55rem 0;
+  font-family: var(--kos-font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.kos-focus-card p {
+  color: var(--kos-muted);
+  line-height: 1.5;
+  font-size: .86rem;
+}
+
+.kos-focus-card a {
+  display: inline-flex;
+  gap: .35rem;
+  align-items: center;
+  color: var(--kos-ink);
+  font-weight: 700;
+  font-size: .82rem;
+}
+
+.kos-home-band {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--kos-line);
+  padding-top: 1rem;
+}
+
+.kos-home-band a {
+  display: flex;
+  gap: .7rem;
+  color: var(--kos-ink);
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+.kos-home-band a:hover { color: var(--kos-blue); }
+
+.kos-home-band b,
+.kos-home-band small { display: block; }
+
+.kos-home-band small {
+  color: var(--kos-muted);
+  margin-top: .2rem;
+}
+
+/* =========================================================================
+   PAGE SHELL + PAGE ENTRY ANIMATION
+   ========================================================================= */
+
+.kos-page { max-width: 1180px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .kos-page,
+  .kos-home {
+    animation: kos-page-enter 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes kos-page-enter {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+  }
+}
+
+.kos-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 2.8rem;
+}
+
+.kos-page h1 {
+  margin: .7rem 0 0;
+  font-size: clamp(2.6rem, 5vw, 5rem);
+}
+
+/* =========================================================================
+   BUTTONS — KnowledgeOS Control Language
+   ========================================================================= */
+
+.kos-button {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: .72rem 1.1rem;
+  font: 600 .84rem var(--kos-font-display), sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+  background: var(--kos-surface-2);
+  color: var(--kos-ink);
+  transition: background 160ms ease, color 160ms ease, transform 100ms ease, box-shadow 160ms ease;
+  user-select: none;
+}
+
+.kos-button:hover {
+  background: color-mix(in srgb, var(--kos-ink) 8%, var(--kos-surface-2));
+}
+
+.kos-button:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.kos-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--kos-blue) 50%, transparent);
+  outline-offset: 2px;
+}
+
+.kos-button--primary {
+  background: var(--kos-blue);
+  color: white;
+  border-color: transparent;
+}
+
+.kos-button--primary:hover {
+  background: color-mix(in srgb, var(--kos-blue) 88%, #000);
+}
+
+.kos-button--danger {
+  background: #fff0f0;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+
+.kos-button--danger:hover { background: #fee2e2; }
+
+.kos-button--danger.is-confirming {
+  background: #b91c1c;
+  color: white;
+  border-color: #b91c1c;
+}
+
+.kos-button:disabled,
+.kos-button[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.kos-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--kos-muted);
+  font: 600 .83rem var(--kos-font-display), sans-serif;
+  cursor: pointer;
+  padding: 8px 4px;
+  transition: color 150ms ease;
+}
+
+.kos-text-button:hover { color: var(--kos-ink); }
+
+/* =========================================================================
+   FORM CONTROLS — KnowledgeOS Control Language
+   Labels above, consistent focus ring, no outline flash.
+   ========================================================================= */
+
+/* Shared base for all KOS form controls */
+.kos-ask-stage input,
+.kos-ask-stage select,
+.kos-ask-stage textarea,
+.kos-modal input,
+.kos-modal textarea,
+.kos-modal select,
+.kos-notes textarea,
+.kos-library-toolbar input,
+.kos-library-toolbar select,
+.kos-filter select,
+.kos-collection-select select {
+  border: 1px solid var(--kos-line);
+  border-radius: 6px;
+  padding: .65rem .85rem;
+  font: inherit;
+  background: var(--kos-surface);
+  color: var(--kos-ink);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  outline: none;
+}
+
+.kos-ask-stage input:focus-visible,
+.kos-ask-stage select:focus-visible,
+.kos-ask-stage textarea:focus-visible,
+.kos-modal input:focus-visible,
+.kos-modal textarea:focus-visible,
+.kos-modal select:focus-visible,
+.kos-notes textarea:focus-visible,
+.kos-library-toolbar input:focus-visible,
+.kos-library-toolbar select:focus-visible,
+.kos-filter select:focus-visible,
+.kos-collection-select select:focus-visible {
+  border-color: var(--kos-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--kos-blue) 18%, transparent);
+}
+
+/* Range input */
+.kos-activity input[type="range"] {
+  width: 100%;
+  min-height: 44px;
+  accent-color: var(--kos-blue);
+}
+
+/* =========================================================================
+   LIBRARY PAGE
+   ========================================================================= */
+
+.kos-library-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid var(--kos-line);
+  border-bottom: 1px solid var(--kos-line);
+  padding: .85rem 0;
+}
+
+.kos-library-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  min-width: min(420px, 100%);
+}
+
+.kos-library-toolbar input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  outline: 0;
+}
+
+.kos-library-toolbar input:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.kos-library-toolbar span {
+  color: var(--kos-muted);
+  font-size: .8rem;
+}
+
+.kos-resource-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.kos-resource {
+  min-height: 250px;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--kos-line);
+  transition: box-shadow 180ms ease;
+}
+
+.kos-resource:hover {
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--kos-blue) 12%, transparent);
+}
+
+.kos-resource > a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.kos-resource-cover {
+  height: 150px;
+  display: flex;
+  align-items: flex-end;
+  padding: 1rem;
+  color: white;
+  background: #263e4b;
+  border-radius: 3px 3px 0 0;
+}
+
+.kos-resource-cover--1 { background: var(--kos-blue); }
+.kos-resource-cover--2 { background: #637865; }
+.kos-resource-cover--3 { background: #bd825f; }
+
+.kos-resource h2 {
+  color: var(--kos-ink);
+  margin: .35rem 0;
+  font-family: var(--kos-font-display);
+  font-size: 1.18rem;
+  font-weight: 700;
+}
+
+.kos-resource small { color: var(--kos-muted); }
+
+/* =========================================================================
+   COLLECTION SELECT (inside resource cards)
+   ========================================================================= */
+
+.kos-collection-select {
+  display: grid;
+  gap: .35rem;
+  margin-top: .8rem;
+  color: var(--kos-muted);
+  font-size: .72rem;
+}
+
+.kos-collection-select select { min-height: 40px; }
+
+/* =========================================================================
+   FILTER controls (tag / collection dropdowns in library toolbar)
+   ========================================================================= */
+
+.kos-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kos-filter select { min-width: 150px; }
+
+/* =========================================================================
+   LIBRARY ACTIONS
+   ========================================================================= */
+
+.kos-library-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+}
+
+/* =========================================================================
+   EMPTY STATE
+   ========================================================================= */
+
+.kos-empty {
+  margin-top: 3rem;
+  padding: 3rem;
+  border: 1px dashed var(--kos-line);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.kos-empty h2 {
+  color: var(--kos-ink);
+  margin: .7rem;
+  font-family: var(--kos-font-display);
+  font-weight: 700;
+}
+
+.kos-empty p { color: var(--kos-muted); }
+
+/* =========================================================================
+   STATUS TEXT
+   ========================================================================= */
+
+.kos-error  { color: #a03636; }
+.kos-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #166534;
+}
+
+/* =========================================================================
+   MODAL
+   ========================================================================= */
+
+.kos-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(16, 32, 44, .65);
+  backdrop-filter: blur(4px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .kos-modal {
+    animation: kos-modal-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes kos-modal-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .kos-modal form {
+    animation: kos-modal-form-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes kos-modal-form-in {
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+  }
+}
+
+.kos-modal form {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  width: min(560px, 100%);
+  padding: 2rem;
+  background: var(--kos-surface);
+  border-radius: 4px;
+  box-shadow: 0 24px 60px rgba(16, 32, 44, .25);
+}
+
+.kos-modal label {
+  display: grid;
+  gap: .4rem;
+  font-weight: 600;
+  font-size: .85rem;
+}
+
+.kos-modal textarea { min-height: 170px; resize: vertical; }
+
+.kos-modal-close {
+  justify-self: end;
+  border: 0;
+  background: none;
+  color: var(--kos-muted);
+  cursor: pointer;
+  padding: 4px;
+  transition: color 150ms ease;
+}
+
+.kos-modal-close:hover { color: var(--kos-ink); }
+
+/* =========================================================================
+   FOCUS STAGE + ASK STAGE  (editorial panels)
+   ========================================================================= */
+
+.kos-focus-stage,
+.kos-ask-stage {
+  display: grid;
+  gap: 1rem;
+  max-width: 760px;
+  margin-top: 2.5rem;
+  padding: clamp(1.5rem, 5vw, 4rem);
+  background: var(--kos-surface-2);
+  border-left: 4px solid var(--kos-blue);
+  border-radius: 0 4px 4px 0;
+}
+
+.kos-focus-stage h2,
+.kos-ask-stage h2 {
+  color: var(--kos-ink);
+  font: 700 clamp(2rem, 4vw, 3.7rem)/.98 var(--kos-font-display);
+}
+
+.kos-focus-stage p,
+.kos-ask-stage > p:not(.kos-kicker):not(.kos-error) {
+  max-width: 38rem;
+  color: #43545d;
+  line-height: 1.65;
+}
+
+.kos-focus-stage span,
+.kos-ask-stage small { color: var(--kos-muted); }
+
+.kos-ask-stage label {
+  display: grid;
+  gap: .45rem;
+  font-size: .84rem;
+  font-weight: 600;
+}
+
+.kos-ask-stage select,
+.kos-ask-stage textarea { width: 100%; }
+
+.kos-ask-stage textarea { min-height: 130px; resize: vertical; }
+
+/* =========================================================================
+   ASK PAGE LAYOUT
+   ========================================================================= */
+
+.kos-ask-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.5rem;
+}
+
+/* =========================================================================
+   3 DISTINCT ASK SIDEBAR BOXES WITH INDEPENDENT SCROLLBARS
+   ========================================================================= */
+
+.kos-ask-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+  position: sticky;
+  top: 1.5rem;
+  max-height: calc(100vh - 140px);
+  min-width: 0;
+}
+
+.kos-ask-box {
+  background: var(--kos-surface-1);
+  border: 1px solid var(--kos-line);
+  border-radius: var(--kos-radius);
+  padding: .9rem 1rem;
+  box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kos-new-chat-box {
+  flex: 0 0 auto;
+  padding: .75rem .9rem;
+}
+
+.kos-new-chat-box .kos-button--block {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  font-weight: 600;
+}
+
+.kos-recent-box {
+  flex: 1 1 190px;
+  min-height: 140px;
+  max-height: 220px;
+}
+
+.kos-reasoning-box {
+  flex: 1.3 1 260px;
+  min-height: 200px;
+  max-height: 310px;
+}
+
+.kos-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin-bottom: .65rem;
+  flex-shrink: 0;
+}
+
+.kos-box-header-title {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+
+.kos-box-header-title h2,
+.kos-box-header-title h3 {
+  margin: 0;
+  font: 600 .96rem var(--kos-font-display);
+  color: var(--kos-ink);
+  letter-spacing: -0.01em;
+}
+
+.kos-box-icon {
+  color: var(--kos-muted);
+}
+
+.kos-box-count {
+  font-size: .72rem;
+  font-weight: 600;
+  padding: .15rem .45rem;
+  border-radius: 999px;
+  background: var(--kos-surface-2);
+  color: var(--kos-muted);
+}
+
+.kos-recent-scroll-content {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  overflow-y: auto;
+  padding-right: .3rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--kos-line) transparent;
+}
+
+.kos-recent-scroll-content::-webkit-scrollbar,
+.kos-reasoning-scroll-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.kos-recent-scroll-content::-webkit-scrollbar-thumb,
+.kos-reasoning-scroll-content::-webkit-scrollbar-thumb {
+  background: var(--kos-line);
+  border-radius: 4px;
+}
+
+.kos-session-item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  border: 0;
+  border-left: 2.5px solid transparent;
+  background: transparent;
+  padding: .45rem .6rem;
+  color: var(--kos-muted);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0 4px 4px 0;
+  font-size: .86rem;
+  transition: background 150ms ease, color 150ms ease, border-left-color 150ms ease;
+  min-width: 0;
+  width: 100%;
+}
+
+.kos-session-item:hover {
+  background: var(--kos-surface-2);
+  color: var(--kos-ink);
+}
+
+.kos-session-item.is-active {
+  border-left-color: var(--kos-blue);
+  color: var(--kos-blue);
+  background: color-mix(in srgb, var(--kos-blue) 8%, transparent);
+  font-weight: 500;
+}
+
+.kos-chat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--kos-line);
+  flex-shrink: 0;
+}
+
+.kos-session-item.is-active .kos-chat-dot {
+  background: var(--kos-blue);
+}
+
+.kos-chat-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kos-empty-hint {
+  font-size: .82rem;
+  color: var(--kos-muted);
+  margin: .5rem 0;
+  font-style: italic;
+}
+
+/* =========================================================================
+   LIVE RAG REASONING & PIPELINE TRACE
+   ========================================================================= */
+
+.kos-activity-icon {
+  color: var(--kos-blue);
+}
+
+.kos-activity-icon.is-pulsing {
+  animation: kos-pulse-glow 1.5s infinite ease-in-out;
+}
+
+.kos-status-pill {
+  font-size: .72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  background: var(--kos-surface-2);
+  color: var(--kos-muted);
+}
+
+.kos-status-pill--running {
+  background: color-mix(in srgb, var(--kos-blue) 15%, transparent);
+  color: var(--kos-blue);
+  animation: kos-pulse-badge 1.2s infinite alternate;
+}
+
+.kos-status-pill--success {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+}
+
+.kos-reasoning-scroll-content {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  overflow-y: auto;
+  padding-right: .3rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--kos-line) transparent;
+}
+
+.kos-reasoning-step {
+  display: flex;
+  gap: .65rem;
+  position: relative;
+  transition: opacity 200ms ease;
+}
+
+.kos-reasoning-step.is-pending {
+  opacity: .45;
+}
+
+.kos-reasoning-step.is-running {
+  opacity: 1;
+}
+
+.kos-reasoning-step.is-completed {
+  opacity: .92;
+}
+
+.kos-step-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 18px;
+}
+
+.kos-step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--kos-surface-2);
+  color: var(--kos-muted);
+  font-size: .68rem;
+  font-weight: 600;
+}
+
+.kos-step-icon--success {
+  color: #16a34a;
+}
+
+.kos-step-icon--spin {
+  color: var(--kos-blue);
+  animation: kos-spin 1s linear infinite;
+}
+
+.kos-btn-spin {
+  animation: kos-spin 1s linear infinite;
+}
+
+.kos-step-line {
+  flex: 1;
+  width: 1.5px;
+  background: var(--kos-line);
+  margin-top: 4px;
+  min-height: 12px;
+}
+
+.kos-step-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.kos-step-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .4rem;
+}
+
+.kos-step-title {
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--kos-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kos-step-badge {
+  font-size: .65rem;
+  font-family: monospace;
+  background: var(--kos-surface-2);
+  color: var(--kos-muted);
+  padding: .1rem .35rem;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.kos-reasoning-step.is-running .kos-step-badge {
+  background: color-mix(in srgb, var(--kos-blue) 12%, transparent);
+  color: var(--kos-blue);
+}
+
+.kos-step-detail {
+  margin: .15rem 0 0;
+  font-size: .75rem;
+  line-height: 1.35;
+  color: var(--kos-muted);
+}
+
+.kos-box-footer {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .4rem .55rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--kos-blue) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--kos-blue) 15%, transparent);
+  font-size: .73rem;
+  color: var(--kos-ink);
+  margin-top: .6rem;
+  flex-shrink: 0;
+}
+
+.kos-sparkle-icon {
+  color: var(--kos-blue);
+  flex-shrink: 0;
+}
+
+@keyframes kos-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes kos-pulse-glow {
+  0%, 100% { opacity: 0.5; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes kos-pulse-badge {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+
+.kos-resource-picker {
+  display: grid;
+  gap: .4rem;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.kos-resource-picker label {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-weight: 500;
+}
+
+/* =========================================================================
+   ANSWER PANEL
+   ========================================================================= */
+
+.kos-answer {
+  align-self: start;
+  margin-top: 2.5rem;
+  padding: 2rem;
+  background: var(--kos-surface);
+  border: 1px solid var(--kos-line);
+  border-radius: 4px;
+}
+
+.kos-answer article + article {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--kos-line);
+}
+
+.kos-answer > p:not(.kos-kicker) {
+  color: #31444d;
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
+.kos-answer h2 {
+  color: var(--kos-ink);
+  margin-top: 1.5rem;
+  font-family: var(--kos-font-display);
+  font-weight: 700;
+}
+
+.kos-answer details {
+  padding: .75rem 0;
+  border-top: 1px solid var(--kos-line);
+}
+
+.kos-answer summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: .83rem;
+  color: var(--kos-ink);
+}
+
+.kos-answer details p {
+  color: var(--kos-muted);
+  line-height: 1.55;
+  font-size: .84rem;
+}
+
+/* =========================================================================
+   INSIGHTS PAGE
+   ========================================================================= */
+
+.kos-insight-numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.kos-insight-numbers div {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  padding: 1.2rem 0;
+  border-top: 1px solid var(--kos-line);
+}
+
+.kos-insight-numbers b {
+  display: block;
+  font: 800 2.5rem/1 var(--kos-font-display);
+  color: var(--kos-blue);
+}
+
+.kos-insight-numbers span {
+  font-size: .78rem;
+  color: var(--kos-muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.kos-composition { max-width: 560px; }
+
+.kos-composition h2 {
+  margin-bottom: 1rem;
+  color: var(--kos-ink);
+  font-family: var(--kos-font-display);
+  font-weight: 700;
+}
+
+.kos-composition div {
+  display: flex;
+  justify-content: space-between;
+  padding: .85rem 0;
+  border-bottom: 1px solid var(--kos-line);
+}
+
+/* =========================================================================
+   WORKSPACE PAGE
+   ========================================================================= */
+
+.kos-workspace header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1.5rem;
+}
+
+.kos-back {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  margin-bottom: 1.5rem;
+  color: var(--kos-muted);
+  text-decoration: none;
+  font-size: .83rem;
+  transition: color 150ms ease;
+}
+
+.kos-back:hover { color: var(--kos-ink); }
+
+.kos-tabs {
+  display: flex;
+  gap: .25rem;
+  margin: 2rem 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--kos-line);
+}
+
+.kos-tabs button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: .7rem 1rem;
+  font: 600 .83rem var(--kos-font-display);
+  color: var(--kos-muted);
+  cursor: pointer;
+  transition: color 150ms ease, border-bottom-color 150ms ease;
+}
+
+.kos-tabs button:hover { color: var(--kos-ink); }
+
+.kos-tabs button.is-active {
+  border-bottom-color: var(--kos-blue);
+  color: var(--kos-blue);
+}
+
+.kos-workspace-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.kos-workspace-overview,
+.kos-reader,
+.kos-notes,
+.kos-related,
+.kos-activity {
+  max-width: 850px;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  background: var(--kos-surface);
+  border: 1px solid var(--kos-line);
+  border-radius: 4px;
+}
+
+.kos-reader {
+  max-height: 65vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.75;
+}
+
+.kos-notes { display: grid; gap: 1rem; }
+
+.kos-notes label { display: grid; gap: .45rem; }
+
+.kos-notes textarea {
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+}
+
+.kos-notes article {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: .75rem;
+  align-items: start;
+}
+
+.kos-notes article button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--kos-muted);
+  transition: color 150ms ease;
+}
+
+.kos-notes article button:hover { color: #b91c1c; }
+
+.kos-related {
+  display: grid;
+  gap: 1rem;
+}
+
+.kos-related > a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid var(--kos-line);
+  padding-bottom: 1rem;
+  display: block;
+  transition: color 150ms ease;
+}
+
+.kos-related > a:hover h2 { color: var(--kos-blue); }
+
+/* =========================================================================
+   ORGANIZE PANEL
+   ========================================================================= */
+
+.kos-organize {
+  display: grid;
+  gap: 24px;
+  max-width: 860px;
+}
+
+.kos-suggestion-list { display: grid; gap: 18px; }
+
+.kos-suggestion-list fieldset {
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--kos-ink) 16%, transparent);
+  padding: 18px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.kos-suggestion-list legend {
+  font-weight: 700;
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.kos-suggestion-list label {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) minmax(140px, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--kos-ink) 8%, transparent);
+}
+
+.kos-suggestion-list label small { color: var(--kos-muted); }
+
+/* =========================================================================
+   RESPONSIVE — library and general page
+   ========================================================================= */
+
+@media (max-width: 1024px) {
+  .app-main { padding-inline: 32px; }
+  .kos-home { grid-template-columns: 1fr 1fr; }
+  .kos-hero-art,
+  .kos-hero-art img { min-height: 470px; }
+  .kos-resource-grid { grid-template-columns: repeat(3, 1fr); }
+  .kos-ask-layout { grid-template-columns: minmax(190px, .38fr) minmax(0, 1fr); }
+  .kos-workspace header { align-items: flex-start; }
+}
+
+@media (max-width: 768px) {
+  .app-main { padding: 1.25rem 1rem 6rem; }
+  .kos-home { display: flex; flex-direction: column; align-items: stretch; min-height: auto; gap: 1.25rem; }
+  .kos-home-copy { padding: 1.4rem 0 0; }
+  .kos-home h1 { font-size: clamp(3rem, 15vw, 4.7rem); }
+  .kos-greeting { margin-top: 2.5rem; }
+  .kos-hero-art,
+  .kos-hero-art img { min-height: 420px; }
+  .kos-focus-card { width: 100%; margin-top: 0; }
+  .kos-home-band { grid-template-columns: 1fr; gap: 1rem; }
+  .kos-page-header { align-items: flex-start; flex-direction: column; }
+  .kos-library-toolbar { align-items: flex-start; flex-direction: column; }
+  .kos-library-toolbar label { min-width: 100%; }
+  .kos-library-toolbar > label,
+  .kos-library-toolbar > label select { width: 100%; }
+  .kos-filter { justify-content: flex-start; }
+  .kos-resource-grid { grid-template-columns: repeat(2, 1fr); }
+  .kos-resource-cover { height: 130px; }
+  .kos-library-actions { width: 100%; }
+  .kos-library-actions .kos-button { flex: 1 1 auto; justify-content: center; min-height: 44px; }
+  .kos-ask-layout { grid-template-columns: 1fr; }
+  .kos-ask-sidebar { position: static; max-height: none; }
+  .kos-recent-box { max-height: 180px; }
+  .kos-reasoning-box { max-height: 260px; }
+  .kos-ask-stage,
+  .kos-answer { margin-top: 1rem; }
+  .kos-workspace header { flex-direction: column; align-items: flex-start; }
+  .kos-workspace-actions { justify-content: flex-start; }
+  .kos-tabs { margin-inline: -1rem; padding-inline: 1rem; }
+  .kos-insight-numbers { grid-template-columns: 1fr; }
+  .kos-modal { align-items: flex-end; }
+  .kos-modal form { max-height: 90vh; overflow: auto; }
+  .kos-suggestion-list label { grid-template-columns: 20px minmax(0, 1fr); }
+  .kos-suggestion-list label small { grid-column: 2; }
+}
+
+@media (max-width: 480px) {
+  .kos-resource-grid { grid-template-columns: 1fr; }
+  .kos-resource-cover { height: 155px; }
+  .kos-page h1 { font-size: clamp(2.4rem, 13vw, 3.5rem); }
+  .kos-empty { padding: 2rem 1rem; }
+  .kos-ask-stage,
+  .kos-answer,
+  .kos-workspace-overview,
+  .kos-reader,
+  .kos-notes,
+  .kos-related,
+  .kos-activity { padding: 1.1rem; }
+  .kos-home h1 { font-size: clamp(2.8rem, 15vw, 4rem); }
+}
