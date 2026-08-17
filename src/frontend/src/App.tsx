@@ -73,7 +73,28 @@ function AppShell() {
     <main className="app-main">
       <Routes>
         <Route path="/health" element={<HealthPage />} />
-        <Route element={<ProtectedRoute />}><Route path="/dashboard" element={<KnowledgeHomePage />} /><Route path="/library" element={<KnowledgeLibraryPage />} /><Route path="/library/:resourceId" element={<ResourceWorkspacePage />} /><Route path="/ask" element={<KnowledgeAskPage />} /><Route path="/focus" element={<KnowledgeFocusPage />} /><Route path="/insights" element={<KnowledgeInsightsPage />} /><Route path="/notifications" element={<NotificationsPage />} /><Route path="/calendar" element={<CalendarPage />} /><Route path="/study" element={<StudyPage />} /><Route path="/badminton" element={<BadmintonPage />} /><Route path="/groups/:groupId/availability" element={<AvailabilityPage />} /><Route path="/badminton/sessions/:sessionId" element={<BadmintonSessionDetailPage />} /><Route path="/badminton/profile" element={<BadmintonProfilePage />} /><Route path="/profile/setup" element={<ProfileSetupPage />} /><Route path="/profile" element={<ProfilePage />} /></Route>
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<KnowledgeHomePage />} />
+          <Route path="/library" element={<KnowledgeLibraryPage />} />
+          <Route path="/library/:resourceId" element={<ResourceWorkspacePage />} />
+          <Route path="/ask" element={<KnowledgeAskPage />} />
+          <Route path="/focus" element={<KnowledgeFocusPage />} />
+          <Route path="/insights" element={<KnowledgeInsightsPage />} />
+          <Route path="/knowledge/library" element={<KnowledgeLibraryPage />} />
+          <Route path="/knowledge/library/:resourceId" element={<ResourceWorkspacePage />} />
+          <Route path="/knowledge/ask" element={<KnowledgeAskPage />} />
+          <Route path="/knowledge/focus" element={<KnowledgeFocusPage />} />
+          <Route path="/knowledge/insights" element={<KnowledgeInsightsPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/study" element={<StudyPage />} />
+          <Route path="/badminton" element={<BadmintonPage />} />
+          <Route path="/groups/:groupId/availability" element={<AvailabilityPage />} />
+          <Route path="/badminton/sessions/:sessionId" element={<BadmintonSessionDetailPage />} />
+          <Route path="/badminton/profile" element={<BadmintonProfilePage />} />
+          <Route path="/profile/setup" element={<ProfileSetupPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+        </Route>
         <Route path="/check-in" element={user ? <CheckinPage /> : <Navigate to="/login" replace />} />
         <Route element={<ProtectedRoute />}><Route path="/tournaments" element={<TournamentPage />} /></Route>
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} />

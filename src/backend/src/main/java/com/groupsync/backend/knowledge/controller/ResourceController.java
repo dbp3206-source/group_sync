@@ -17,9 +17,12 @@ import com.groupsync.backend.knowledge.service.ResourceService;
 public class ResourceController {
 
     private final ResourceService resourceService;
+    private final com.groupsync.backend.knowledge.service.AutoOrganizationService autoOrganizationService;
 
-    public ResourceController(ResourceService resourceService) {
+    public ResourceController(ResourceService resourceService,
+            com.groupsync.backend.knowledge.service.AutoOrganizationService autoOrganizationService) {
         this.resourceService = resourceService;
+        this.autoOrganizationService = autoOrganizationService;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -96,5 +99,19 @@ public class ResourceController {
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         ContentDisposition.inline().filename(filename).build().toString())
                 .body(new org.springframework.core.io.InputStreamResource(input));
+    }
+
+    @PostMapping("/auto-organize-all")
+    public ResponseEntity<java.util.Map<String, Object>> autoOrganizeAll(@AuthenticationPrincipal AuthenticatedUser user) {
+        autoOrganizationService.autoOrganizeAll(user.getId());
+        return ResponseEntity.ok(java.util.Map.of("message", "All resources organized into relevant collections and tags."));
+    }
+
+    @PostMapping("/{resourceId}/auto-organize")
+    public ResponseEntity<java.util.Map<String, Object>> autoOrganize(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long resourceId) {
+        autoOrganizationService.autoOrganize(user.getId(), resourceId);
+        return ResponseEntity.ok(java.util.Map.of("message", "Resource organized into relevant collections and tags."));
     }
 }

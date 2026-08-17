@@ -30,10 +30,12 @@ public class ResourceIngestionService {
     private final StorageService storageService;
     private final EmbeddingProvider embeddingProvider;
     private final GeminiProperties geminiProperties;
+    private final AutoOrganizationService autoOrganizationService;
 
     public ResourceIngestionService(ResourceRepository resourceRepository, DocumentChunkRepository chunkRepository,
             ResourceParserRegistry parserRegistry, RecursiveChunkingStrategy chunkingStrategy,
-            StorageService storageService, EmbeddingProvider embeddingProvider, GeminiProperties geminiProperties) {
+            StorageService storageService, EmbeddingProvider embeddingProvider, GeminiProperties geminiProperties,
+            AutoOrganizationService autoOrganizationService) {
         this.resourceRepository = resourceRepository;
         this.chunkRepository = chunkRepository;
         this.parserRegistry = parserRegistry;
@@ -41,6 +43,7 @@ public class ResourceIngestionService {
         this.storageService = storageService;
         this.embeddingProvider = embeddingProvider;
         this.geminiProperties = geminiProperties;
+        this.autoOrganizationService = autoOrganizationService;
     }
 
     @Async
@@ -76,6 +79,11 @@ public class ResourceIngestionService {
                 chunk.embed(embeddingProvider.embedDocument(chunk.getContent()), geminiProperties.embeddingModel());
             }
             resource.markReady();
+            try {
+                autoOrganizationService.autoOrganize(resource.getOwner().getId(), resource.getId());
+            } catch (Exception ignored) {
+                // Keep ready state intact even if auto-classification encounters constraint collision
+            }
         } catch (Exception exception) {
             resource.markFailed(safeMessage(exception));
         }

@@ -5,6 +5,7 @@ import {
   Network,
   Plus,
   Search,
+  Sparkles,
   Tags,
   Upload,
   X,
@@ -13,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   assignResourceToCollection,
+  autoOrganizeAll,
   createCollection,
   createNote,
   getCollections,
@@ -217,8 +219,25 @@ export default function KnowledgeLibraryPage() {
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          className="kos-button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            try {
+              await autoOrganizeAll()
+              await Promise.all([load(), getCollections().then(setCollections), getTags().then(setTags)])
+            } finally {
+              setBusy(false)
+            }
+          }}
+          title="Tự động phân loại toàn bộ tài liệu vào các Topic & Collection phù hợp"
+        >
+          <Sparkles size={15} /> Auto-Organize
+        </button>
         {hasFilters && (
-          <button className="kos-text-button" onClick={clearFilters}>
+          <button type="button" className="kos-button kos-button--ghost" onClick={clearFilters}>
             <X size={15} /> Clear
           </button>
         )}

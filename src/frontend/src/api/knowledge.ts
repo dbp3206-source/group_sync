@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 
-export type Resource = { id: number; title: string; description: string | null; resourceType: string; processingStatus: string; favorite: boolean; priority: number; createdAt: string }
+export type Resource = { id: number; title: string; description: string | null; resourceType: string; processingStatus: string; favorite: boolean; priority: number; originalFilename?: string | null; sizeBytes?: number | null; createdAt: string }
 export type FocusNext = { resourceId: number; title: string; resourceType: string; priority: number; favorite: boolean; progressPercent: number; reason: string }
 export type InsightOverview = { totalResources: number; readyResources: number; inProgressResources: number; completedResources: number; composition: { resourceType: string; count: number }[] }
 export type Citation = { chunkId: number; resourceId: number; resourceTitle: string; pageNumber: number | null; section: string | null; citationOrder: number; relevanceScore: number; evidenceExcerpt: string }
@@ -47,3 +47,5 @@ export async function getOrganizationSuggestions(id:number) { return (await apiC
 export async function applyOrganization(id:number, payload:{tagNames:string[]; collectionIds:number[]; newCollectionNames:string[]; relatedResourceIds:number[]}) { await apiClient.post(`/resources/${id}/organization/apply`, payload) }
 export async function deleteResource(id:number) { await apiClient.delete(`/resources/${id}`) }
 export async function updateResourceFavorite(id:number, favorite:boolean) { return (await apiClient.patch<Resource>(`/resources/${id}`, { favorite })).data }
+export async function autoOrganizeAll() { return (await apiClient.post<{ message: string }>('/resources/auto-organize-all')).data }
+export async function autoOrganizeResource(id: number) { return (await apiClient.post<{ message: string }>(`/resources/${id}/auto-organize`)).data }
