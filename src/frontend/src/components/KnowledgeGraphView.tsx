@@ -88,18 +88,12 @@ export default function KnowledgeGraphView({ resources, collections, tags = [] }
 
   // Links from collections or center to resources
   resourceNodes.forEach(res => {
-    const targetCol = collectionNodes.length > 0
-      ? collectionNodes[res.id % collectionNodes.length]
-      : null
-
-    const startX = targetCol ? targetCol.x : centerX
-    const startY = targetCol ? targetCol.y : centerY
-
+    // Connect directly to KnowledgeOS core hub
     const isConnected = hoveredNode === res.id
 
     links.push({
-      x1: startX,
-      y1: startY,
+      x1: centerX,
+      y1: centerY,
       x2: res.x,
       y2: res.y,
       key: `link-${res.id}`,

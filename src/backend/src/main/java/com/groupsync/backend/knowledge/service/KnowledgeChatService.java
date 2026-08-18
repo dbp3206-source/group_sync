@@ -1,6 +1,8 @@
 package com.groupsync.backend.knowledge.service;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,8 @@ public class KnowledgeChatService {
     private static final String INSUFFICIENT_CONTEXT = "I don't have enough evidence in the selected KnowledgeOS sources to answer that yet.";
     /** Minimum fused relevance score (1 - distance). Hybrid RRF scores are lower than cosine similarity; 0.15 is calibrated to reject truly empty evidence. */
     private static final double MIN_RELEVANCE = 0.15d;
+    private static final Pattern CITATION_PATTERN = Pattern.compile("\\[(\\d+)\\]");
+
     private final ChatSessionRepository sessionRepository;
     private final ChatMessageRepository messageRepository;
     private final CitationRepository citationRepository;
@@ -39,33 +43,104 @@ public class KnowledgeChatService {
     @Transactional
     public AskKnowledgeResponse ask(Long ownerId, AskKnowledgeRequest request) {
         ChatSession session = resolveSession(ownerId, request);
+
+        // Fetch previous session message history for multi-turn conversational context
+        List<ChatMessage> previousMessages = messageRepository.findBySessionIdOrderByCreatedAtAsc(session.getId());
+        List<GroundedPromptBuilder.ConversationTurn> historyTurns = new ArrayList<>();
+        int startIdx = Math.max(0, previousMessages.size() - 4);
+        for (int i = startIdx; i < previousMessages.size(); i++) {
+            ChatMessage msg = previousMessages.get(i);
+            historyTurns.add(new GroundedPromptBuilder.ConversationTurn(msg.getRole().name(), msg.getContent()));
+        }
+
+        // Save current user message
         messageRepository.save(new ChatMessage(session, ChatMessageRole.USER, request.question().trim()));
+
+        // Formulate search query: enrich with recent topic context if this is a follow-up turn
+        String searchQuery = contextualizeSearchQuery(request.question().trim(), previousMessages);
+
         List<Long> selectedIds = session.getResources().stream().map(Resource::getId).toList();
         Long thisResourceId = session.getScopeType() == RetrievalScope.THIS_RESOURCE
                 ? selectedIds.stream().findFirst().orElse(null) : null;
-        List<RetrievedChunk> chunks = retrievalStrategy.retrieve(ownerId, request.question(), session.getScopeType(),
+        List<RetrievedChunk> chunks = retrievalStrategy.retrieve(ownerId, searchQuery, session.getScopeType(),
                 thisResourceId, selectedIds, session.getCollectionId());
+
         // After hybrid RRF, distance is 1 - rrfScore (lower = better). Reject when best match has distance > (1 - MIN_RELEVANCE).
         if (chunks.isEmpty() || chunks.getFirst().distance() > 1.0 - MIN_RELEVANCE) {
             messageRepository.save(new ChatMessage(session, ChatMessageRole.ASSISTANT, INSUFFICIENT_CONTEXT));
             return new AskKnowledgeResponse(session.getId(), INSUFFICIENT_CONTEXT, false, List.of());
         }
 
-        String answer = languageModelClient.answer(GroundedPromptBuilder.build(request.question(), chunks));
+        // Build prompt with untrusted knowledge and recent conversation history
+        String groundedPrompt = GroundedPromptBuilder.build(request.question().trim(), chunks, historyTurns);
+        String answer = languageModelClient.answer(groundedPrompt);
         ChatMessage assistantMessage = messageRepository.save(new ChatMessage(session, ChatMessageRole.ASSISTANT, answer));
+
+        // P0.4: Parse citation markers from generated answer output and validate indices
+        Set<Integer> referencedIndices = extractCitationIndices(answer, chunks.size());
+        if (referencedIndices.isEmpty() && !chunks.isEmpty() && !answer.contains(INSUFFICIENT_CONTEXT)) {
+            // Fallback: If no explicit [X] notation used but evidence was grounded, cite top match
+            referencedIndices.add(1);
+        }
+
         Map<Long, DocumentChunk> persistedChunks = new HashMap<>();
         chunkRepository.findAllById(chunks.stream().map(RetrievedChunk::chunkId).toList())
                 .forEach(chunk -> persistedChunks.put(chunk.getId(), chunk));
+
         List<CitationResponse> citations = new ArrayList<>();
-        for (int index = 0; index < chunks.size(); index++) {
-            RetrievedChunk chunk = chunks.get(index);
+        int citationOrder = 1;
+        for (Integer index : referencedIndices) {
+            RetrievedChunk chunk = chunks.get(index - 1);
             DocumentChunk persisted = persistedChunks.get(chunk.chunkId());
             if (persisted == null) continue;
-            citationRepository.save(new Citation(assistantMessage, persisted, index + 1, 1 - chunk.distance(), excerpt(chunk.content())));
+            citationRepository.save(new Citation(assistantMessage, persisted, citationOrder, 1 - chunk.distance(), excerpt(chunk.content())));
             citations.add(new CitationResponse(chunk.chunkId(), chunk.resourceId(), chunk.resourceTitle(), chunk.pageNumber(),
-                    chunk.section(), index + 1, 1 - chunk.distance(), excerpt(chunk.content())));
+                    chunk.section(), index, 1 - chunk.distance(), excerpt(chunk.content())));
+            citationOrder++;
         }
+
         return new AskKnowledgeResponse(session.getId(), answer, true, citations);
+    }
+
+    private Set<Integer> extractCitationIndices(String answer, int totalChunks) {
+        Set<Integer> indices = new LinkedHashSet<>();
+        if (answer == null || totalChunks <= 0) return indices;
+        Matcher matcher = CITATION_PATTERN.matcher(answer);
+        while (matcher.find()) {
+            try {
+                int idx = Integer.parseInt(matcher.group(1));
+                if (idx >= 1 && idx <= totalChunks) {
+                    indices.add(idx);
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+        return indices;
+    }
+
+    private String contextualizeSearchQuery(String currentQuestion, List<ChatMessage> history) {
+        if (history == null || history.isEmpty()) {
+            return currentQuestion;
+        }
+        // Extract recent user query terms or keywords from previous turn to provide context for relative queries
+        ChatMessage lastUserMsg = null;
+        for (int i = history.size() - 1; i >= 0; i--) {
+            if (history.get(i).getRole() == ChatMessageRole.USER) {
+                lastUserMsg = history.get(i);
+                break;
+            }
+        }
+        if (lastUserMsg == null) return currentQuestion;
+
+        String prevText = lastUserMsg.getContent().trim();
+        String lowerQ = currentQuestion.toLowerCase(Locale.ROOT);
+        boolean isRelative = lowerQ.contains("it") || lowerQ.contains("this") || lowerQ.contains("that")
+                || lowerQ.contains("they") || lowerQ.contains("previous") || lowerQ.contains("above")
+                || lowerQ.contains("này") || lowerQ.contains("đó") || lowerQ.contains("trên") || lowerQ.contains("trước");
+
+        if (isRelative && !prevText.isBlank()) {
+            return prevText + " " + currentQuestion;
+        }
+        return currentQuestion;
     }
 
     @Transactional(readOnly = true)
@@ -74,6 +149,7 @@ public class KnowledgeChatService {
                 "id", session.getId(), "title", session.getTitle(), "scope", session.getScopeType().name(),
                 "collectionId", session.getCollectionId() == null ? 0L : session.getCollectionId(), "updatedAt", session.getUpdatedAt())).toList();
     }
+
     @Transactional(readOnly = true)
     public Map<String, Object> session(Long ownerId, Long sessionId) {
         ChatSession session = sessionRepository.findByIdAndOwnerId(sessionId, ownerId).orElseThrow(() -> new NotFoundException("Chat session not found."));

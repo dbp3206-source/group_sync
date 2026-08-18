@@ -2,12 +2,15 @@ package com.groupsync.backend.knowledge.service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
-import org.springframework.context.event.EventListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionalEventListener;
 import com.groupsync.backend.knowledge.chunking.RecursiveChunkingStrategy;
 import com.groupsync.backend.knowledge.ingestion.ParsedResourceContent;
@@ -15,6 +18,7 @@ import com.groupsync.backend.knowledge.ingestion.ResourceParserRegistry;
 import com.groupsync.backend.knowledge.ingestion.ResourceProcessingRequestedEvent;
 import com.groupsync.backend.knowledge.model.DocumentChunk;
 import com.groupsync.backend.knowledge.model.Resource;
+import com.groupsync.backend.knowledge.model.ResourceProcessingStatus;
 import com.groupsync.backend.knowledge.repository.DocumentChunkRepository;
 import com.groupsync.backend.knowledge.repository.ResourceRepository;
 import com.groupsync.backend.knowledge.rag.EmbeddingProvider;
@@ -23,6 +27,8 @@ import com.groupsync.backend.knowledge.storage.StorageService;
 
 @Service
 public class ResourceIngestionService {
+    private static final Logger log = LoggerFactory.getLogger(ResourceIngestionService.class);
+
     private final ResourceRepository resourceRepository;
     private final DocumentChunkRepository chunkRepository;
     private final ResourceParserRegistry parserRegistry;
@@ -48,59 +54,105 @@ public class ResourceIngestionService {
 
     @Async
     @TransactionalEventListener
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processAfterUpload(ResourceProcessingRequestedEvent event) {
         process(event.resourceId());
     }
 
-    @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 10000)
+    @Scheduled(fixedDelay = 10000)
     public void sweepPendingUploads() {
-        List<Resource> pending = resourceRepository.findByProcessingStatus(com.groupsync.backend.knowledge.model.ResourceProcessingStatus.UPLOADED);
+        List<Resource> pending = resourceRepository.findByProcessingStatus(ResourceProcessingStatus.UPLOADED);
         for (Resource res : pending) {
             try {
                 process(res.getId());
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.warn("Sweeper failed to process resource {}: {}", res.getId(), e.getMessage());
+            }
         }
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean claimResourceForProcessing(Long resourceId) {
+        int updated = resourceRepository.updateStatusIfMatches(resourceId, ResourceProcessingStatus.UPLOADED, ResourceProcessingStatus.PARSING);
+        return updated > 0;
+    }
+
     public void process(Long resourceId) {
-        Resource resource = null;
-        for (int i = 0; i < 5; i++) {
-            resource = resourceRepository.findById(resourceId).orElse(null);
-            if (resource != null) break;
-            try { Thread.sleep(80); } catch (InterruptedException ignored) {}
-        }
-        if (resource == null || resource.getProcessingStatus().isTerminal()) {
+        if (resourceId == null) return;
+
+        // Step 1: Atomic claim UPLOADED -> PARSING
+        boolean claimed = claimResourceForProcessing(resourceId);
+        if (!claimed) {
             return;
         }
+
+        Resource resource = resourceRepository.findById(resourceId).orElse(null);
+        if (resource == null) {
+            return;
+        }
+
         try {
-            resource.beginParsing();
+            // Step 2: Parse file (in memory / stream)
             ParsedResourceContent parsed = parse(resource);
+
+            // Step 3: Chunk content (in memory)
             List<String> pieces = chunkingStrategy.chunk(parsed.content());
             if (pieces.isEmpty()) {
                 throw new IllegalArgumentException("No readable text was found in this resource.");
             }
-            resource.beginChunking();
-            chunkRepository.deleteByResourceId(resource.getId());
-            List<DocumentChunk> chunks = new java.util.ArrayList<>();
-            for (int index = 0; index < pieces.size(); index++) {
-                chunks.add(new DocumentChunk(resource, index, parsed.pageNumber(), parsed.section(), pieces.get(index)));
-            }
-            chunkRepository.saveAll(chunks);
 
-            resource.beginEmbedding();
-            for (DocumentChunk chunk : chunks) {
-                chunk.embed(embeddingProvider.embedDocument(chunk.getContent()), geminiProperties.embeddingModel());
+            // Step 4: External Gemini Embeddings (OUTSIDE database transaction)
+            List<float[]> embeddings = new ArrayList<>(pieces.size());
+            for (String piece : pieces) {
+                embeddings.add(embeddingProvider.embedDocument(piece));
             }
-            resource.markReady();
-            try {
-                autoOrganizationService.autoOrganize(resource.getOwner().getId(), resource.getId());
-            } catch (Exception ignored) {
-                // Keep ready state intact even if auto-classification encounters constraint collision
-            }
+
+            // Step 5: Short dedicated database transaction to save chunks and mark READY
+            saveChunksAndMarkReady(resourceId, pieces, embeddings, parsed);
+
         } catch (Exception exception) {
-            resource.markFailed(safeMessage(exception));
+            log.error("Resource processing failed for id {}: {}", resourceId, exception.getMessage(), exception);
+            markResourceFailed(resourceId, safeMessage(exception));
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveChunksAndMarkReady(Long resourceId, List<String> pieces, List<float[]> embeddings, ParsedResourceContent parsed) {
+        Resource resource = resourceRepository.findById(resourceId)
+                .orElseThrow(() -> new IllegalStateException("Resource not found during final save: " + resourceId));
+
+        resource.beginChunking();
+        chunkRepository.deleteByResourceId(resource.getId());
+
+        List<DocumentChunk> chunks = new ArrayList<>();
+        for (int index = 0; index < pieces.size(); index++) {
+            DocumentChunk chunk = new DocumentChunk(resource, index, parsed.pageNumber(), parsed.section(), pieces.get(index));
+            if (index < embeddings.size() && embeddings.get(index) != null) {
+                chunk.embed(embeddings.get(index), geminiProperties.embeddingModel());
+            }
+            chunks.add(chunk);
+        }
+        chunkRepository.saveAll(chunks);
+
+        resource.markReady();
+        resourceRepository.save(resource);
+
+        try {
+            autoOrganizationService.autoOrganize(resource.getOwner().getId(), resource.getId());
+        } catch (Exception e) {
+            log.warn("Auto-organization skipped for resource {}: {}", resourceId, e.getMessage());
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markResourceFailed(Long resourceId, String errorMessage) {
+        try {
+            Resource resource = resourceRepository.findById(resourceId).orElse(null);
+            if (resource != null) {
+                resource.markFailed(errorMessage);
+                resourceRepository.save(resource);
+            }
+        } catch (Exception e) {
+            log.error("Failed to mark resource {} as FAILED: {}", resourceId, e.getMessage());
         }
     }
 

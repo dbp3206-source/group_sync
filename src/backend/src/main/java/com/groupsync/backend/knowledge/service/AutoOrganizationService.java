@@ -119,11 +119,11 @@ public class AutoOrganizationService {
         // Assign tags
         for (String tagName : matchedTags) {
             try {
-                Map<String, Object> tag = workspaceService.createTag(ownerId, tagName);
+                Map<String, Object> tag = workspaceService.findOrCreateTag(ownerId, tagName);
                 Long tagId = ((Number) tag.get("id")).longValue();
                 workspaceService.assignTag(ownerId, resourceId, tagId);
-            } catch (Exception ignored) {
-                // Ignore any duplicate constraint race condition
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(AutoOrganizationService.class).warn("Failed to assign tag {}: {}", tagName, e.getMessage(), e);
             }
         }
 
@@ -132,11 +132,11 @@ public class AutoOrganizationService {
             try {
                 TopicRule rule = TOPIC_RULES.stream().filter(r -> r.collectionName().equalsIgnoreCase(colName)).findFirst().orElse(null);
                 String colDesc = rule != null ? rule.collectionDesc() : "Curated topic collection.";
-                Map<String, Object> collection = workspaceService.createCollection(ownerId, colName, colDesc);
+                Map<String, Object> collection = workspaceService.findOrCreateCollection(ownerId, colName, colDesc);
                 Long colId = ((Number) collection.get("id")).longValue();
                 workspaceService.assignResource(ownerId, colId, resourceId);
-            } catch (Exception ignored) {
-                // Ignore any duplicate constraint race condition
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(AutoOrganizationService.class).warn("Failed to assign collection {}: {}", colName, e.getMessage(), e);
             }
         }
     }

@@ -12,7 +12,13 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
     Optional<Resource> findByOwnerIdAndChecksumSha256(Long ownerId, String checksumSha256);
     List<Resource> findByOwnerIdAndTitleContainingIgnoreCaseOrderByUpdatedAtDesc(Long ownerId, String query);
     List<Resource> findByOwnerIdOrderByUpdatedAtDesc(Long ownerId);
-    List<Resource> findByProcessingStatus(com.groupsync.backend.knowledge.model.ResourceProcessingStatus processingStatus);
+    List<com.groupsync.backend.knowledge.model.Resource> findByProcessingStatus(com.groupsync.backend.knowledge.model.ResourceProcessingStatus processingStatus);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Resource r SET r.processingStatus = :newStatus WHERE r.id = :id AND r.processingStatus = :expectedStatus")
+    int updateStatusIfMatches(@Param("id") Long id,
+            @Param("expectedStatus") com.groupsync.backend.knowledge.model.ResourceProcessingStatus expectedStatus,
+            @Param("newStatus") com.groupsync.backend.knowledge.model.ResourceProcessingStatus newStatus);
 
     @Query(value = """
             select distinct r.* from resources r

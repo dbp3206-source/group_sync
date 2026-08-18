@@ -33,7 +33,13 @@ public class Resource {
     public void beginParsing() { transition(ResourceProcessingStatus.UPLOADED, ResourceProcessingStatus.PARSING); }
     public void beginChunking() { transition(ResourceProcessingStatus.PARSING, ResourceProcessingStatus.CHUNKING); }
     public void beginEmbedding() { transition(ResourceProcessingStatus.CHUNKING, ResourceProcessingStatus.EMBEDDING); }
-    public void markReady() { transition(ResourceProcessingStatus.EMBEDDING, ResourceProcessingStatus.READY); processingError = null; }
+    public void markReady() {
+        if (processingStatus != ResourceProcessingStatus.EMBEDDING && processingStatus != ResourceProcessingStatus.PARSING && processingStatus != ResourceProcessingStatus.CHUNKING) {
+            throw new IllegalStateException("Resource is not ready for ready.");
+        }
+        processingStatus = ResourceProcessingStatus.READY;
+        processingError = null;
+    }
     public void markFailed(String message) { processingStatus = ResourceProcessingStatus.FAILED; processingError = message == null ? "Processing could not be completed." : message.substring(0, Math.min(500, message.length())); }
     public void retry() { if (processingStatus != ResourceProcessingStatus.FAILED) throw new IllegalStateException("Only failed resources can be retried."); processingStatus = ResourceProcessingStatus.UPLOADED; processingError = null; }
     private void transition(ResourceProcessingStatus expected, ResourceProcessingStatus next) { if (processingStatus != expected) throw new IllegalStateException("Resource is not ready for " + next.name().toLowerCase() + "."); processingStatus = next; }

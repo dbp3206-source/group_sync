@@ -2,15 +2,11 @@ import {
   ArrowLeft,
   BookOpen,
   BrainCircuit,
-  Check,
-  CheckCircle2,
+  Compass,
   FileText,
-  HelpCircle,
   Network,
-  RotateCcw,
   Sparkles,
   Trash2,
-  XCircle,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -27,7 +23,6 @@ import {
   getResourceNotes,
   getResources,
   getTags,
-  updateResourceNote,
   updateResourceProgress,
   type KnowledgeCollection,
   type KnowledgeTag,
@@ -38,14 +33,6 @@ import {
 import KnowledgeGraphView from '../components/KnowledgeGraphView'
 
 type Tab = 'Overview' | 'Reader' | 'Notes' | 'Related' | 'Activity'
-
-interface QuizQuestion {
-  id: number
-  question: string
-  options: string[]
-  correctIndex: number
-  explanation: string
-}
 
 export default function ResourceWorkspacePage() {
   const resourceId = Number(useParams().resourceId)
@@ -67,11 +54,6 @@ export default function ResourceWorkspacePage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  // Quiz state in Activity tab
-  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([])
-  const [userAnswers, setUserAnswers] = useState<Record<number, number>>({})
-  const [quizSubmitted, setQuizSubmitted] = useState(false)
-
   const load = () =>
     Promise.all([
       getResource(resourceId),
@@ -92,88 +74,12 @@ export default function ResourceWorkspacePage() {
         setAllResources(allR)
         setCollections(cols)
         setTags(t)
-        generateQuiz(text)
       })
       .catch(() => setError('This resource could not be loaded.'))
 
   useEffect(() => {
     load()
   }, [resourceId])
-
-  function generateQuiz(text: string) {
-    setUserAnswers({})
-    setQuizSubmitted(false)
-
-    if (!text || text.length < 50) {
-      setQuizQuestions([])
-      return
-    }
-
-    const lines = text.split('\n').filter(l => l.trim().length > 20)
-    const questions: QuizQuestion[] = []
-
-    if (text.toLowerCase().includes('armstrong') || text.toLowerCase().includes('phụ thuộc hàm')) {
-      questions.push(
-        {
-          id: 1,
-          question: 'Hệ tiên đề Armstrong gồm 3 luật cơ bản nào đóng vai trò đúng đắn và đầy đủ?',
-          options: [
-            'Luật phản xạ (Reflexivity), Luật tăng trưởng (Augmentation), Luật bắc cầu (Transitivity)',
-            'Luật chiếu (Decomposition), Luật cộng (Union), Luật giả bắc cầu (Pseudo-transitivity)',
-            'Luật giao hoán, Luật kết hợp, Luật phân phối',
-            'Luật bảo toàn thông tin, Luật bảo toàn phụ thuộc hàm',
-          ],
-          correctIndex: 0,
-          explanation: '3 luật cơ bản của hệ tiên đề Armstrong là Phản xạ, Tăng trưởng và Bắc cầu.',
-        },
-        {
-          id: 2,
-          question: 'Một phụ thuộc hàm X → Y được gọi là hiển nhiên (Trivial) khi nào?',
-          options: [
-            'Khi Y ⊆ X (Vế phải là tập con của vế trái)',
-            'Khi X ⊆ Y (Vế trái là tập con của vế phải)',
-            'Khi X ∩ Y = ∅ (X và Y rời nhau)',
-            'Khi X là siêu khóa của lược đồ quan hệ',
-          ],
-          correctIndex: 0,
-          explanation: 'Phụ thuộc hàm X → Y là hiển nhiên khi và chỉ khi Y là tập con của X (Y ⊆ X).',
-        },
-      )
-    } else if (text.toLowerCase().includes('cve') || text.toLowerCase().includes('security') || text.toLowerCase().includes('injection')) {
-      questions.push(
-        {
-          id: 1,
-          question: 'Đâu là giải pháp cốt lõi để phòng thủ tấn công Prompt Injection trong hệ thống RAG?',
-          options: [
-            'Đóng gói chứng cứ vào thẻ XML <evidence> và chỉ thị AI xử lý chứng cứ dưới dạng dữ liệu thụ động',
-            'Tăng nhiệt độ (temperature) của mô hình ngôn ngữ lớn',
-            'Chỉ sử dụng mô hình AI có số lượng tham số lớn hơn 70B',
-            'Xóa bỏ toàn bộ trích dẫn nguồn đối chứng',
-          ],
-          correctIndex: 0,
-          explanation: 'Phân lập rõ ràng giữa chỉ thị hệ thống và dữ liệu tri thức không tin cậy bằng thẻ XML và prompt grounding.',
-        },
-      )
-    } else {
-      const sampleTopic = lines[0] ? lines[0].slice(0, 60) : 'nội dung tài liệu'
-      questions.push(
-        {
-          id: 1,
-          question: `Chủ đề trọng tâm được đề cập trong phần đầu của tài liệu là gì?`,
-          options: [
-            sampleTopic,
-            'Cấu trúc mạng máy tính diện rộng',
-            'Phương pháp quản trị kinh doanh hiện đại',
-            'Lý thuyết đồ thị rời rạc nâng cao',
-          ],
-          correctIndex: 0,
-          explanation: `Nội dung phần mở đầu tài liệu tập trung trực tiếp vào: "${sampleTopic}".`,
-        },
-      )
-    }
-
-    setQuizQuestions(questions)
-  }
 
   async function handleAutoOrganize() {
     setOrganizing(true)
@@ -184,54 +90,44 @@ export default function ResourceWorkspacePage() {
       setTimeout(() => setAutoOrganizeMsg(''), 4000)
       await load()
     } catch {
-      setError('Could not auto-organize resource.')
+      setAutoOrganizeMsg('Không thể tự động phân loại.')
     } finally {
       setOrganizing(false)
     }
   }
 
-  async function addNote() {
-    if (!draft.trim() || noteBusy) return
+  async function addNote(e: React.FormEvent) {
+    e.preventDefault()
+    if (!draft.trim()) return
     setNoteBusy(true)
     try {
-      await createResourceNote(resourceId, draft)
+      const created = await createResourceNote(resourceId, draft.trim())
+      setNotes(prev => [created, ...prev])
       setDraft('')
-      const [nextNotes, nextActivity] = await Promise.all([
-        getResourceNotes(resourceId),
-        getResourceActivity(resourceId),
-      ])
-      setNotes(nextNotes)
-      setActivity(nextActivity)
+      setActivity(prev => (prev ? { ...prev, note_count: prev.note_count + 1 } : prev))
     } catch {
-      setError('The note could not be saved.')
+      setError('Could not save note.')
     } finally {
       setNoteBusy(false)
     }
   }
 
-  async function removeNote(id: number) {
+  async function removeNote(noteId: number) {
     try {
-      await deleteResourceNote(resourceId, id)
-      setNotes(await getResourceNotes(resourceId))
+      await deleteResourceNote(resourceId, noteId)
+      setNotes(prev => prev.filter(n => n.id !== noteId))
+      setActivity(prev => (prev ? { ...prev, note_count: Math.max(0, prev.note_count - 1) } : prev))
     } catch {
-      setError('The note could not be deleted.')
+      setError('Could not delete note.')
     }
   }
 
-  async function saveNote(id: number, value: string) {
+  async function saveProgress(percent: number) {
     try {
-      await updateResourceNote(resourceId, id, value)
-      setNotes(await getResourceNotes(resourceId))
+      const updated = await updateResourceProgress(resourceId, percent)
+      setActivity(updated)
     } catch {
-      setError('The note could not be updated.')
-    }
-  }
-
-  async function progress(value: number) {
-    try {
-      setActivity(await updateResourceProgress(resourceId, value))
-    } catch {
-      setError('Progress could not be saved.')
+      setError('Could not update progress.')
     }
   }
 
@@ -252,13 +148,6 @@ export default function ResourceWorkspacePage() {
     }
   }
 
-  function selectAnswer(questionId: number, optionIdx: number) {
-    if (quizSubmitted) return
-    setUserAnswers(prev => ({ ...prev, [questionId]: optionIdx }))
-  }
-
-  const correctCount = quizQuestions.filter(q => userAnswers[q.id] === q.correctIndex).length
-
   if (error && !resource)
     return (
       <section className="kos-page">
@@ -278,175 +167,218 @@ export default function ResourceWorkspacePage() {
       </section>
     )
 
+  const metaItems = [
+    { label: 'Type', value: resource.resourceType },
+    { label: 'Status', value: resource.processingStatus },
+    { label: 'Priority', value: resource.priority },
+    { label: 'Favorite', value: resource.favorite ? 'Yes' : 'No' },
+    { label: 'Filename', value: resource.originalFilename || '—' },
+    {
+      label: 'Size',
+      value: resource.sizeBytes
+        ? `${(resource.sizeBytes / 1024).toFixed(1)} KB`
+        : '—',
+    },
+    { label: 'Created', value: new Date(resource.createdAt).toLocaleString() },
+  ]
+
   return (
     <section className="kos-page kos-workspace">
-      <Link className="kos-back" to="/library">
-        <ArrowLeft size={16} aria-hidden="true" /> Library
-      </Link>
-      <header>
-        <div>
-          <p className="kos-kicker">{resource.resourceType}</p>
-          <h1>{resource.title}</h1>
-          <p>{resource.description || 'A resource in your KnowledgeOS library.'}</p>
-          {autoOrganizeMsg && (
-            <p className="kos-success" style={{ marginTop: '.4rem' }}>
-              <Check size={14} /> {autoOrganizeMsg}
-            </p>
-          )}
-        </div>
+      {/* Top action bar */}
+      <div className="kos-workspace-nav">
+        <button
+          type="button"
+          className="kos-icon-btn"
+          onClick={() => navigate('/library')}
+          aria-label="Back to Library"
+        >
+          <ArrowLeft size={16} />
+        </button>
+        <span className="kos-workspace-type-badge">{resource.resourceType}</span>
+        <h1 className="kos-workspace-title">{resource.title}</h1>
         <div className="kos-workspace-actions">
+          <Link
+            to={`/knowledge/ask?resources=${resource.id}`}
+            className="kos-button kos-button--primary"
+          >
+            <BrainCircuit size={16} /> Ask with this source
+          </Link>
           <button
-            className={`kos-button kos-button--danger${deleteConfirm ? ' is-confirming' : ''}`}
+            type="button"
+            className="kos-button kos-button--danger"
             onClick={handleDelete}
             disabled={deleting}
-            aria-label={deleteConfirm ? 'Confirm deletion' : 'Delete this resource'}
           >
-            <Trash2 size={17} aria-hidden="true" />
-            {deleting ? 'Deleting…' : deleteConfirm ? 'Confirm delete' : 'Delete'}
+            <Trash2 size={16} />
+            {deleting ? 'Deleting…' : deleteConfirm ? 'Confirm Delete?' : 'Delete'}
           </button>
-          {deleteConfirm && !deleting && (
-            <button className="kos-text-button" onClick={() => setDeleteConfirm(false)}>
-              Cancel
-            </button>
-          )}
-          <button
-            className="kos-button"
-            onClick={handleAutoOrganize}
-            disabled={organizing}
-            title="Tự động bóc tách từ khóa và gán vào Collection & Tags"
-          >
-            <Sparkles size={17} aria-hidden="true" /> {organizing ? 'Organizing…' : 'Auto-Organize'}
-          </button>
-          <Link className="kos-button kos-button--primary" to={`/knowledge/ask?resource=${resource.id}`}>
-            <BrainCircuit size={17} aria-hidden="true" /> Ask
-          </Link>
         </div>
-      </header>
+      </div>
 
-      <nav className="kos-tabs" role="tablist">
+      {/* Tabs */}
+      <nav className="kos-workspace-tabs" aria-label="Resource sections">
         {(['Overview', 'Reader', 'Notes', 'Related', 'Activity'] as Tab[]).map(item => (
           <button
             key={item}
             type="button"
-            role="tab"
-            aria-selected={tab === item}
-            className={`kos-tab${tab === item ? ' is-active' : ''}`}
+            className={`kos-workspace-tab ${tab === item ? 'is-active' : ''}`}
             onClick={() => setTab(item)}
           >
-            {item === 'Activity' ? '⚡ Activity & Quiz' : item}
+            {item === 'Overview' ? '📋 Tổng quan' : item === 'Reader' ? '📖 Đọc tài liệu' : item === 'Notes' ? '📝 Ghi chú' : item === 'Related' ? '🔗 Liên quan' : '⚡ Hoạt động & Recall'}
           </button>
         ))}
       </nav>
 
+      {/* Tab: Overview */}
       {tab === 'Overview' && (
-        <div className="kos-workspace-overview">
-          <dl>
-            <dt>Status</dt>
-            <dd>{resource.processingStatus}</dd>
-            <dt>Original file</dt>
-            <dd>{resource.originalFilename || 'Direct note'}</dd>
-            <dt>Size</dt>
-            <dd>{resource.sizeBytes ? `${Math.round(resource.sizeBytes / 1024)} KB` : 'Embedded text'}</dd>
-            <dt>Created</dt>
-            <dd>{new Date(resource.createdAt).toLocaleDateString()}</dd>
-          </dl>
-          <div>
-            <h2>Start studying</h2>
-            <p>Read the extracted text, record private notes, or test your knowledge with Smart Quiz.</p>
-            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginTop: '.75rem' }}>
-              <button className="kos-button kos-button--primary" onClick={() => setTab('Reader')}>
-                <BookOpen size={16} /> Open reader
-              </button>
-              <button className="kos-button" onClick={() => setTab('Activity')}>
-                <HelpCircle size={16} /> Open Quiz & Activity
-              </button>
+        <div className="kos-workspace-panel">
+          <div className="kos-workspace-overview-grid">
+            <div className="kos-overview-card">
+              <h3>Description</h3>
+              <p>{resource.description || 'No description provided.'}</p>
+
+              <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--kos-line)' }}>
+                <button
+                  type="button"
+                  className="kos-button kos-button--sm"
+                  onClick={handleAutoOrganize}
+                  disabled={organizing}
+                >
+                  <Sparkles size={14} className={organizing ? 'kos-spin' : ''} />
+                  {organizing ? 'Đang phân loại...' : 'Tự động phân loại vào Collection/Tag'}
+                </button>
+                {autoOrganizeMsg && (
+                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: 'var(--kos-green)' }}>
+                    {autoOrganizeMsg}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="kos-overview-card">
+              <h3>Metadata</h3>
+              <dl className="kos-metadata-list">
+                {metaItems.map(m => (
+                  <div key={m.label} className="kos-metadata-row">
+                    <dt>{m.label}</dt>
+                    <dd>{m.value}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           </div>
         </div>
       )}
 
+      {/* Tab: Reader */}
       {tab === 'Reader' && (
-        <div className="kos-reader">
-          <pre>{content || 'No readable text content is available for this resource.'}</pre>
+        <div className="kos-workspace-panel kos-workspace-reader">
+          <div className="kos-reader-toolbar">
+            <span>{content ? `${content.length} characters extracted` : 'No text available'}</span>
+            <Link
+              to={`/knowledge/ask?resources=${resource.id}`}
+              className="kos-button kos-button--sm"
+            >
+              <BrainCircuit size={14} /> Ground with RAG
+            </Link>
+          </div>
+          {content ? (
+            <pre className="kos-reader-content">{content}</pre>
+          ) : (
+            <div className="kos-box-empty">
+              <BookOpen size={24} />
+              <p>No text has been extracted for this resource yet.</p>
+            </div>
+          )}
         </div>
       )}
 
+      {/* Tab: Notes */}
       {tab === 'Notes' && (
-        <div className="kos-notes">
-          <div className="kos-notes-form">
+        <div className="kos-workspace-panel">
+          <form className="kos-note-form" onSubmit={addNote}>
             <textarea
-              aria-label="Add a private note"
-              placeholder="Record a thought, insight, or follow-up question for this resource…"
               value={draft}
-              onChange={event => setDraft(event.target.value)}
+              onChange={e => setDraft(e.target.value)}
+              placeholder="Write a private note about this resource…"
               rows={3}
+              required
             />
-            <button className="kos-button kos-button--primary" disabled={noteBusy || !draft.trim()} onClick={addNote}>
-              Save note
+            <button
+              type="submit"
+              className="kos-button kos-button--primary"
+              disabled={noteBusy || !draft.trim()}
+            >
+              {noteBusy ? 'Saving…' : 'Save Note'}
             </button>
-          </div>
+          </form>
+
           <div className="kos-notes-list">
-            {notes.length ? (
-              notes.map(item => (
-                <article key={item.id} className="kos-note-card">
-                  <textarea
-                    defaultValue={item.content}
-                    onBlur={event => saveNote(item.id, event.target.value)}
-                    rows={2}
-                  />
-                  <footer>
-                    <small>{new Date(item.created_at).toLocaleString()}</small>
-                    <button className="kos-text-button" onClick={() => removeNote(item.id)}>
-                      Delete
+            {notes.length > 0 ? (
+              notes.map(n => (
+                <div key={n.id} className="kos-note-card">
+                  <p className="kos-note-body">{n.content}</p>
+                  <div className="kos-note-footer">
+                    <small>{new Date(n.created_at).toLocaleString()}</small>
+                    <button
+                      type="button"
+                      className="kos-icon-btn kos-icon-btn--danger"
+                      onClick={() => removeNote(n.id)}
+                      aria-label="Delete note"
+                    >
+                      <Trash2 size={14} />
                     </button>
-                  </footer>
-                </article>
+                  </div>
+                </div>
               ))
             ) : (
-              <p className="kos-empty">No notes recorded for this resource yet.</p>
+              <p className="kos-box-empty">No notes yet. Add your first note above.</p>
             )}
           </div>
         </div>
       )}
 
+      {/* Tab: Related */}
       {tab === 'Related' && (
-        <div className="kos-related">
-          {related.length ? (
-            <div className="kos-resource-grid">
-              {related.map(item => (
-                <article key={item.id} className="kos-resource-card">
-                  <p className="kos-kicker">{item.resourceType}</p>
-                  <h3>
-                    <Link to={`/library/${item.id}`}>{item.title}</Link>
-                  </h3>
-                  <p>{item.description || 'Related reading from your library.'}</p>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="kos-empty">
-              <h2>No related resources found yet.</h2>
-              <p>KnowledgeOS automatically discovers related material using hybrid vector search.</p>
-            </div>
-          )}
+        <div className="kos-workspace-panel">
+          <div className="kos-related-list">
+            {related.length > 0 ? (
+              related.map(r => (
+                <div key={r.id} className="kos-related-card">
+                  <span className="kos-workspace-type-badge">{r.resourceType}</span>
+                  <div className="kos-related-info">
+                    <h4>{r.title}</h4>
+                    <p>{r.description || 'No description'}</p>
+                  </div>
+                  <Link to={`/library/${r.id}`} className="kos-button kos-button--sm">
+                    Open
+                  </Link>
+                </div>
+              ))
+            ) : (
+              <p className="kos-box-empty">
+                No related resources found. Organize collections or tags to connect knowledge.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
+      {/* Tab: Activity */}
       {tab === 'Activity' && (
-        <div className="kos-activity" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Progress & Status Card */}
-          <div style={{ background: 'var(--kos-surface-1)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--kos-line)' }}>
-            <h2>Learning progress</h2>
+        <div className="kos-workspace-panel">
+          <div className="kos-activity-summary-card">
+            <h3>Reading Progress</h3>
             <p>
-              {activity?.progress_percent ?? 0}% complete · {activity?.note_count ?? 0} notes
+              Current progress: <strong>{activity?.progress_percent ?? 0}%</strong> · Notes:{' '}
+              <strong>{activity?.note_count ?? 0}</strong>
             </p>
             <input
-              aria-label="Reading progress"
               type="range"
-              min="0"
-              max="100"
+              min={0}
+              max={100}
               value={activity?.progress_percent ?? 0}
-              onChange={event => progress(Number(event.target.value))}
+              onChange={e => saveProgress(Number(e.target.value))}
               className="kos-range-slider"
               style={{ maxWidth: '100%', width: '100%', margin: '.6rem 0' }}
             />
@@ -456,91 +388,31 @@ export default function ResourceWorkspacePage() {
             </small>
           </div>
 
-          {/* Smart Quiz Generator Card */}
+          {/* Grounded Active Recall & Learning Studio Card */}
           <div className="kos-quiz-pane" style={{ background: 'var(--kos-surface)', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--kos-line)' }}>
             <div className="kos-quiz-header">
               <div>
-                <h3>🎯 Smart Quiz Ôn Tập Kiến Thức</h3>
-                <p>Tự động sinh từ nội dung tài liệu này</p>
+                <span className="kos-banner-kicker">TOPIC DEEPDIVE & ACTIVE RECALL</span>
+                <h3 style={{ margin: '0.2rem 0' }}>🎯 Kiểm Tra Ghi Nhớ & Khái Niệm Chuyên Sâu</h3>
+                <p style={{ margin: 0, color: 'var(--kos-muted)', fontSize: '0.86rem' }}>
+                  Hệ thống trắc nghiệm và bóc tách khái niệm đối chứng 100% từ phân đoạn tài liệu nguồn
+                </p>
               </div>
-              {quizSubmitted && (
-                <div className="kos-quiz-score-badge">
-                  Điểm: {correctCount} / {quizQuestions.length} ({Math.round((correctCount / (quizQuestions.length || 1)) * 100)}%)
-                </div>
-              )}
             </div>
 
-            {quizQuestions.length > 0 ? (
-              <div className="kos-quiz-question-list">
-                {quizQuestions.map((q, qIdx) => {
-                  const isCorrect = userAnswers[q.id] === q.correctIndex
-
-                  return (
-                    <div key={q.id} className="kos-quiz-card">
-                      <h4 className="kos-quiz-q-title">
-                        <span className="kos-q-number">Câu {qIdx + 1}:</span> {q.question}
-                      </h4>
-
-                      <div className="kos-quiz-options">
-                        {q.options.map((opt, optIdx) => {
-                          const isSelected = userAnswers[q.id] === optIdx
-                          let optClass = 'kos-quiz-opt'
-                          if (isSelected) optClass += ' is-selected'
-                          if (quizSubmitted) {
-                            if (optIdx === q.correctIndex) optClass += ' is-correct'
-                            else if (isSelected && !isCorrect) optClass += ' is-wrong'
-                          }
-
-                          return (
-                            <button
-                              key={optIdx}
-                              type="button"
-                              className={optClass}
-                              onClick={() => selectAnswer(q.id, optIdx)}
-                              disabled={quizSubmitted}
-                            >
-                              <span className="kos-opt-letter">{String.fromCharCode(65 + optIdx)}</span>
-                              <span className="kos-opt-text">{opt}</span>
-                              {quizSubmitted && optIdx === q.correctIndex && (
-                                <CheckCircle2 size={16} className="kos-text-success" />
-                              )}
-                              {quizSubmitted && isSelected && !isCorrect && (
-                                <XCircle size={16} className="kos-text-danger" />
-                              )}
-                            </button>
-                          )
-                        })}
-                      </div>
-
-                      {quizSubmitted && (
-                        <div className={`kos-quiz-explanation ${isCorrect ? 'is-correct-box' : 'is-wrong-box'}`}>
-                          <strong>💡 Giải thích:</strong> {q.explanation}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-
-                <div className="kos-quiz-actions">
-                  {!quizSubmitted ? (
-                    <button
-                      type="button"
-                      className="kos-button kos-button--primary"
-                      onClick={() => setQuizSubmitted(true)}
-                      disabled={Object.keys(userAnswers).length === 0}
-                    >
-                      <Check size={16} /> Nộp bài & Xem đáp án
-                    </button>
-                  ) : (
-                    <button type="button" className="kos-button" onClick={() => generateQuiz(content)}>
-                      <RotateCcw size={16} /> Làm lại đề thi
-                    </button>
-                  )}
-                </div>
+            <div style={{ padding: '1.25rem', background: 'var(--kos-subtle)', borderRadius: '8px', marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--kos-ink)', lineHeight: '1.5' }}>
+                💡 Tài liệu này đã được phân đoạn (chunking) và vector hóa. Bạn có thể mở <strong>Topic Deepdive Studio</strong> để xây dựng lộ trình học tập theo khái niệm trọng tâm hoặc làm bài kiểm tra <strong>Active Recall 5 câu hỏi có đối chứng</strong>.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                <Link to="/knowledge/focus" className="kos-button kos-button--primary">
+                  <Compass size={16} /> Mở Topic Deepdive Studio
+                </Link>
+                <Link to={`/knowledge/ask?resources=${resource.id}`} className="kos-button">
+                  <BrainCircuit size={16} /> Hỏi RAG AI về tài liệu này
+                </Link>
               </div>
-            ) : (
-              <p className="kos-box-empty">Không có đủ văn bản để tạo câu hỏi trắc nghiệm.</p>
-            )}
+            </div>
           </div>
 
           {/* Embedded Knowledge Graph Section */}

@@ -52,9 +52,20 @@ public class KnowledgeWorkspaceService {
         jdbc.update("delete from resource_tags where resource_id=:resource and tag_id=:tag", Map.of("resource", resourceId, "tag", tagId));
     }
     @Transactional
+    public Map<String, Object> findOrCreateTag(Long ownerId, String name) {
+        return createTag(ownerId, name);
+    }
+    @Transactional
     public Map<String, Object> createCollection(Long ownerId, String name, String description) {
         jdbc.update("insert into collections(owner_id,name,description,created_at,updated_at) values(:owner,:name,:description,now(),now())", Map.of("owner", ownerId, "name", required(name), "description", blankToNull(description)));
         return jdbc.queryForMap("select id,name,description,created_at,updated_at from collections where owner_id=:owner and name=:name", Map.of("owner", ownerId, "name", required(name)));
+    }
+    @Transactional
+    public Map<String, Object> findOrCreateCollection(Long ownerId, String name, String description) {
+        String reqName = required(name);
+        jdbc.update("insert into collections(owner_id,name,description,created_at,updated_at) values(:owner,:name,:description,now(),now()) on conflict(owner_id,name) do update set updated_at=now()",
+                Map.of("owner", ownerId, "name", reqName, "description", blankToNull(description)));
+        return jdbc.queryForMap("select id,name,description,created_at,updated_at from collections where owner_id=:owner and name=:name", Map.of("owner", ownerId, "name", reqName));
     }
     @Transactional
     public Map<String, Object> updateCollection(Long ownerId, Long id, String name, String description) {
