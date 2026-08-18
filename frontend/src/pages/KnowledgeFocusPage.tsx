@@ -964,14 +964,47 @@ export default function KnowledgeFocusPage() {
           </main>
         </div>
       ) : (
-        <div className="kos-empty">
-          <Compass size={36} />
+        <div className="kos-empty" style={{ maxWidth: '640px', margin: '2rem auto' }}>
+          <Compass size={40} />
           <h2>Bắt đầu hành trình học tập chuyên sâu</h2>
-          <p>Tạo một Topic học tập mới và gắn các tài liệu từ thư viện của bạn để hệ thống xây dựng lộ trình học có đối chứng.</p>
+          <p style={{ color: 'var(--kos-muted)', lineHeight: '1.5' }}>
+            Phân hệ Focus giúp bạn biến tài liệu thô thành một chu trình học tập có cấu trúc và đối chứng:
+          </p>
+
+          <div style={{ textAlign: 'left', background: 'var(--kos-surface)', border: '1px solid var(--kos-border)', borderRadius: '10px', padding: '1.25rem', margin: '1.25rem 0', display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+              <span style={{ background: 'var(--kos-blue)', color: '#fff', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold', flexShrink: 0 }}>1</span>
+              <div>
+                <strong style={{ fontSize: '0.9rem' }}>Nạp tài liệu học tập:</strong>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--kos-muted)' }}>Tải lên tệp PDF, DOCX, TXT, Markdown hoặc Ghi chú vào Thư viện.</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+              <span style={{ background: 'var(--kos-blue)', color: '#fff', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold', flexShrink: 0 }}>2</span>
+              <div>
+                <strong style={{ fontSize: '0.9rem' }}>Tạo Topic Học Sâu:</strong>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--kos-muted)' }}>Đặt tên chủ đề, mô tả mục tiêu và tích chọn các tài liệu nguồn liên quan.</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+              <span style={{ background: 'var(--kos-blue)', color: '#fff', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold', flexShrink: 0 }}>3</span>
+              <div>
+                <strong style={{ fontSize: '0.9rem' }}>Lộ trình Khái niệm & Bằng chứng:</strong>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--kos-muted)' }}>Hệ thống tự động phân tách các khái niệm trọng tâm kèm đoạn trích dẫn nguồn đối chứng.</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+              <span style={{ background: 'var(--kos-blue)', color: '#fff', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold', flexShrink: 0 }}>4</span>
+              <div>
+                <strong style={{ fontSize: '0.9rem' }}>Kiểm tra Ghi nhớ (Recall) & Ôn tập:</strong>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--kos-muted)' }}>Làm bài trắc nghiệm tự động, câu sai sẽ tự động đưa vào Hàng đợi Ôn tập (Review Queue).</p>
+              </div>
+            </div>
+          </div>
+
           <button
             type="button"
             className="kos-button kos-button--primary"
-            style={{ marginTop: '1rem' }}
             onClick={() => setNewTopicModal(true)}
           >
             <FolderPlus size={16} /> Tạo Topic Học Sâu Ngay
@@ -1012,25 +1045,58 @@ export default function KnowledgeFocusPage() {
             <label>
               Chọn tài liệu nguồn từ Thư viện ({selectedResourceIds.length} đã chọn)
               <div className="kos-source-picker-list">
-                {allResources.map(r => {
-                  const isChecked = selectedResourceIds.includes(r.id)
-                  return (
-                    <label key={r.id} className="kos-source-picker-item">
+                {allResources.length === 0 ? (
+                  <div style={{ padding: '1rem', textAlign: 'center', background: 'var(--kos-subtle)', borderRadius: '6px', fontSize: '0.84rem' }}>
+                    <p style={{ margin: '0 0 0.5rem', color: 'var(--kos-muted)' }}>
+                      Thư viện chưa có tài liệu. Tải tệp lên ngay tại đây:
+                    </p>
+                    <label className="kos-button kos-button--sm kos-button--primary" style={{ cursor: 'pointer', display: 'inline-flex' }}>
+                      <Upload size={14} /> {uploadBusy ? 'Đang nạp...' : 'Tải lên tài liệu mới'}
                       <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={e => {
-                          if (e.target.checked) {
-                            setSelectedResourceIds(prev => [...prev, r.id])
-                          } else {
-                            setSelectedResourceIds(prev => prev.filter(id => id !== r.id))
+                        type="file"
+                        accept=".pdf,.docx,.txt,.md,.markdown"
+                        hidden
+                        disabled={uploadBusy}
+                        onChange={async e => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            setUploadBusy(true)
+                            try {
+                              const created = await uploadResource(file)
+                              setSelectedResourceIds(prev => [...prev, created.id])
+                              const list = await getResources()
+                              setAllResources(list)
+                            } catch {
+                              setError('Không thể nạp tệp tài liệu.')
+                            } finally {
+                              setUploadBusy(false)
+                            }
                           }
                         }}
                       />
-                      <span>[{r.resourceType}] {r.title}</span>
                     </label>
-                  )
-                })}
+                  </div>
+                ) : (
+                  allResources.map(r => {
+                    const isChecked = selectedResourceIds.includes(r.id)
+                    return (
+                      <label key={r.id} className="kos-source-picker-item">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedResourceIds(prev => [...prev, r.id])
+                            } else {
+                              setSelectedResourceIds(prev => prev.filter(id => id !== r.id))
+                            }
+                          }}
+                        />
+                        <span>[{r.resourceType}] {r.title}</span>
+                      </label>
+                    )
+                  })
+                )}
               </div>
             </label>
 

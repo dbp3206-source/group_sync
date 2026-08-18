@@ -87,10 +87,12 @@ class FocusTester:
         return self.session.get(f"{self.base_url}/focus/next", headers=self.headers(), timeout=30)
 
     def add_topic_source(self, topic_id, resource_id):
-        return self.session.put(f"{self.base_url}/focus/topics/{topic_id}/resources/{resource_id}", headers=self.headers(), timeout=30)
+        self.get_csrf()
+        return self.session.post(f"{self.base_url}/focus/topics/{topic_id}/sources/{resource_id}", headers=self.headers(), timeout=30)
 
     def remove_topic_source(self, topic_id, resource_id):
-        return self.session.delete(f"{self.base_url}/focus/topics/{topic_id}/resources/{resource_id}", headers=self.headers(), timeout=30)
+        self.get_csrf()
+        return self.session.delete(f"{self.base_url}/focus/topics/{topic_id}/sources/{resource_id}", headers=self.headers(), timeout=30)
 
     def create_note(self, res_id, content):
         h = self.headers()
