@@ -233,6 +233,102 @@ class RecallCheckServiceTest {
     }
 
     @Test
+    void testG_duplicateExactOptions_isRejected() {
+        String llmJson = """
+                [
+                  {
+                    "question": "Question with exact duplicate options",
+                    "options": ["RRF", "RRF", "FTS", "Vector Search"],
+                    "correctOption": 0,
+                    "explanation": "Duplicate options",
+                    "sourceChunkId": 101
+                  },
+                  {
+                    "question": "Valid Question",
+                    "options": ["RRF", "BM25", "Vector Search", "Metadata Filtering"],
+                    "correctOption": 0,
+                    "explanation": "Valid unique options",
+                    "sourceChunkId": 101
+                  }
+                ]
+                """;
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(owner));
+        when(topicRepository.findByIdAndOwnerId(10L, 1L)).thenReturn(Optional.of(topic));
+        when(conceptRepository.findByIdAndTopicId(50L, 10L)).thenReturn(Optional.of(concept));
+        when(languageModelClient.answer(anyString())).thenReturn(llmJson);
+        when(chunkRepository.findById(101L)).thenReturn(Optional.of(chunk1));
+        when(attemptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        QuizAttemptResponse response = recallCheckService.generateQuiz(1L, 10L, 50L);
+
+        assertEquals(1, response.totalQuestions(), "Question with exact duplicate options must be rejected");
+        assertEquals("Valid Question", response.questions().get(0).question());
+    }
+
+    @Test
+    void testH_duplicateCaseInsensitiveOptions_isRejected() {
+        String llmJson = """
+                [
+                  {
+                    "question": "Question with case-insensitive duplicate options",
+                    "options": ["RRF", "rrf", "FTS", "Vector Search"],
+                    "correctOption": 0,
+                    "explanation": "Duplicate case-insensitive options",
+                    "sourceChunkId": 101
+                  },
+                  {
+                    "question": "Valid Question",
+                    "options": ["RRF", "BM25", "Vector Search", "Metadata Filtering"],
+                    "correctOption": 0,
+                    "explanation": "Valid unique options",
+                    "sourceChunkId": 101
+                  }
+                ]
+                """;
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(owner));
+        when(topicRepository.findByIdAndOwnerId(10L, 1L)).thenReturn(Optional.of(topic));
+        when(conceptRepository.findByIdAndTopicId(50L, 10L)).thenReturn(Optional.of(concept));
+        when(languageModelClient.answer(anyString())).thenReturn(llmJson);
+        when(chunkRepository.findById(101L)).thenReturn(Optional.of(chunk1));
+        when(attemptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        QuizAttemptResponse response = recallCheckService.generateQuiz(1L, 10L, 50L);
+
+        assertEquals(1, response.totalQuestions(), "Question with case-insensitive duplicate options must be rejected");
+        assertEquals("Valid Question", response.questions().get(0).question());
+    }
+
+    @Test
+    void testI_validUniqueOptions_isAccepted() {
+        String llmJson = """
+                [
+                  {
+                    "question": "What is RRF fusion?",
+                    "options": ["RRF", "BM25", "Vector Search", "Metadata Filtering"],
+                    "correctOption": 0,
+                    "explanation": "Valid unique choices",
+                    "sourceChunkId": 101
+                  }
+                ]
+                """;
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(owner));
+        when(topicRepository.findByIdAndOwnerId(10L, 1L)).thenReturn(Optional.of(topic));
+        when(conceptRepository.findByIdAndTopicId(50L, 10L)).thenReturn(Optional.of(concept));
+        when(languageModelClient.answer(anyString())).thenReturn(llmJson);
+        when(chunkRepository.findById(101L)).thenReturn(Optional.of(chunk1));
+        when(attemptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        QuizAttemptResponse response = recallCheckService.generateQuiz(1L, 10L, 50L);
+
+        assertEquals(1, response.totalQuestions());
+        assertEquals("What is RRF fusion?", response.questions().get(0).question());
+        assertEquals(List.of("RRF", "BM25", "Vector Search", "Metadata Filtering"), response.questions().get(0).options());
+    }
+
+    @Test
     void submitAnswers_scoresCorrectlyAndFlagsReviewOnWrongAnswer() {
         QuizAttempt attempt = new QuizAttempt(topic, owner, concept, 2);
 

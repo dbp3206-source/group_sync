@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.util.unit.DataSize;
 import com.groupsync.backend.knowledge.ingestion.ResourceParserRegistry;
 import com.groupsync.backend.knowledge.model.ResourceType;
 import com.groupsync.backend.knowledge.repository.CitationRepository;
@@ -41,12 +41,18 @@ class ResourceUploadValidationTest {
 
     @BeforeEach
     void setUp() {
-        // Configure with 10MB limit (10 * 1024 * 1024 = 10485760 bytes)
-        long configuredLimit = 10L * 1024 * 1024;
+        // Configure with single source of truth: 10MB DataSize
+        DataSize configuredSize = DataSize.ofMegabytes(10);
         resourceService = new ResourceService(
-                configuredLimit, resourceRepository, userRepository,
+                configuredSize, resourceRepository, userRepository,
                 storageService, events, citationRepository, chunkRepository, parserRegistry
         );
+    }
+
+    @Test
+    void uploadSizeLimitDerivedFromSharedDataSizeConfiguration() {
+        assertEquals(10L * 1024 * 1024, resourceService.getMaxUploadBytes(),
+                "ResourceService maxUploadBytes must derive directly from shared DataSize configuration");
     }
 
     @Test

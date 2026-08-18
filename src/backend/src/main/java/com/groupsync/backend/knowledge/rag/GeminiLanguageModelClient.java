@@ -29,7 +29,10 @@ public class GeminiLanguageModelClient implements LanguageModelClient {
         if (properties.apiKey() == null || properties.apiKey().isBlank()) {
             throw new IllegalStateException("GEMINI_API_KEY must be configured before answers can be generated.");
         }
-        return Client.builder().apiKey(properties.apiKey()).build();
+        return Client.builder()
+                .apiKey(properties.apiKey())
+                .httpOptions(com.google.genai.types.HttpOptions.builder().timeout(properties.timeoutMillis()).build())
+                .build();
     }
 
     @Override

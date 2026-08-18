@@ -17,7 +17,8 @@ import com.groupsync.backend.user.repository.UserAccountRepository;
 
 /**
  * Dedicated transactional boundary service for Recall Check / Quiz persistence operations.
- * Isolates short DB transactions from external Gemini LLM calls.
+ * Isolates short DB transactions from external Gemini LLM calls and returns immutable DTOs
+ * to prevent LazyInitializationException outside transaction boundaries.
  */
 @Service
 public class RecallCheckTransactionService {
@@ -43,13 +44,22 @@ public class RecallCheckTransactionService {
         this.userRepository = userRepository;
     }
 
+    public record QuizEvidenceChunk(
+            Long chunkId,
+            Long resourceId,
+            String resourceTitle,
+            String content,
+            Integer pageNumber,
+            String sectionTitle
+    ) {}
+
     public record QuizEvidence(
             Long topicId,
             String topicTitle,
             Long conceptId,
             String conceptTitle,
-            List<DocumentChunk> allowedChunks,
-            Map<Long, DocumentChunk> allowedChunkMap
+            List<QuizEvidenceChunk> allowedChunks,
+            Map<Long, QuizEvidenceChunk> allowedChunkMap
     ) {}
 
     public record ValidatedQuizQuestion(
@@ -74,37 +84,53 @@ public class RecallCheckTransactionService {
                     .orElseThrow(() -> new NotFoundException("Không tìm thấy khái niệm."));
         }
 
-        List<DocumentChunk> chunks = new ArrayList<>();
+        List<QuizEvidenceChunk> evidenceChunks = new ArrayList<>();
         if (targetConcept != null && !targetConcept.getSourceChunks().isEmpty()) {
-            chunks.addAll(targetConcept.getSourceChunks());
+            for (DocumentChunk chunk : targetConcept.getSourceChunks()) {
+                evidenceChunks.add(toEvidenceChunk(chunk));
+            }
         } else {
             List<Resource> readyResources = topic.getResources().stream()
                     .filter(r -> r.getProcessingStatus() == ResourceProcessingStatus.READY)
                     .toList();
             for (Resource r : readyResources) {
-                chunks.addAll(chunkRepository.findByResourceIdOrderByChunkIndex(r.getId()));
+                for (DocumentChunk chunk : chunkRepository.findByResourceIdOrderByChunkIndex(r.getId())) {
+                    evidenceChunks.add(toEvidenceChunk(chunk));
+                }
             }
         }
 
-        if (chunks.isEmpty()) {
+        if (evidenceChunks.isEmpty()) {
             throw new BadRequestException("Chưa có tài liệu hoặc phân đoạn tri thức khả dụng trong chủ đề này để tạo bài kiểm tra ghi nhớ.");
         }
 
-        Map<Long, DocumentChunk> chunkMap = chunks.stream()
-                .collect(Collectors.toMap(DocumentChunk::getId, c -> c, (a, b) -> a));
+        Map<Long, QuizEvidenceChunk> chunkMap = evidenceChunks.stream()
+                .collect(Collectors.toMap(QuizEvidenceChunk::chunkId, c -> c, (a, b) -> a));
 
         return new QuizEvidence(
                 topic.getId(),
                 topic.getTitle(),
                 targetConcept != null ? targetConcept.getId() : null,
                 targetConcept != null ? targetConcept.getTitle() : null,
-                chunks,
+                evidenceChunks,
                 chunkMap
         );
     }
 
+    private QuizEvidenceChunk toEvidenceChunk(DocumentChunk chunk) {
+        Resource res = chunk.getResource();
+        return new QuizEvidenceChunk(
+                chunk.getId(),
+                res != null ? res.getId() : null,
+                res != null ? res.getTitle() : null,
+                chunk.getContent(),
+                chunk.getPageNumber(),
+                chunk.getSection()
+        );
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public QuizAttemptResponse persistQuizAttempt(Long ownerId, Long topicId, Long conceptId, List<ValidatedQuizQuestion> validQuestions) {
+    public QuizAttemptResponse persistQuizAttempt(Long ownerId, Long topicId, Long conceptId, Set<Long> allowedChunkIds, List<ValidatedQuizQuestion> validQuestions) {
         if (validQuestions == null || validQuestions.isEmpty()) {
             throw new BadRequestException("Không thể tạo bài kiểm tra ghi nhớ: không có câu hỏi hợp lệ nào được sinh ra.");
         }
@@ -124,6 +150,10 @@ public class RecallCheckTransactionService {
         QuizAttempt attempt = new QuizAttempt(topic, owner, targetConcept, validQuestions.size());
 
         for (ValidatedQuizQuestion q : validQuestions) {
+            if (allowedChunkIds != null && !allowedChunkIds.contains(q.sourceChunkId())) {
+                throw new BadRequestException("Phân đoạn nguồn không thuộc danh mục cho phép: " + q.sourceChunkId());
+            }
+
             DocumentChunk sourceChunk = chunkRepository.findById(q.sourceChunkId())
                     .orElseThrow(() -> new BadRequestException("Phân đoạn nguồn không tồn tại: " + q.sourceChunkId()));
             Resource sourceRes = sourceChunk.getResource();

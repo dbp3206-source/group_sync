@@ -13,7 +13,8 @@ public record GeminiProperties(
         @DefaultValue("5") int ragTopK,
         @DefaultValue("2") int ragCandidateMultiplier,
         @DefaultValue("12") int ragMaxCandidateSize,
-        @DefaultValue("60") int ragRrfK
+        @DefaultValue("60") int ragRrfK,
+        @DefaultValue("30000") int timeoutMillis
 ) {
     public int ragCandidateMultiplier() {
         return ragCandidateMultiplier <= 0 ? 2 : ragCandidateMultiplier;
@@ -25,6 +26,10 @@ public record GeminiProperties(
 
     public int ragRrfK() {
         return ragRrfK <= 0 ? 60 : ragRrfK;
+    }
+
+    public int timeoutMillis() {
+        return timeoutMillis <= 0 ? 30000 : timeoutMillis;
     }
 }
 

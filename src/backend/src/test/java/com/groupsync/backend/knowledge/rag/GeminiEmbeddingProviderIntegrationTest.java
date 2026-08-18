@@ -19,7 +19,8 @@ class GeminiEmbeddingProviderIntegrationTest {
                 5,
                 2,
                 12,
-                60);
+                60,
+                30000);
 
         float[] embedding = new GeminiEmbeddingProvider(properties, null)
                 .embedDocument("KnowledgeOS stores learning resources for grounded retrieval.");

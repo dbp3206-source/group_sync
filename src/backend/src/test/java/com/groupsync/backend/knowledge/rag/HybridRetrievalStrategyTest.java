@@ -19,13 +19,13 @@ class HybridRetrievalStrategyTest {
         return new RetrievedChunk(id, resourceId, title, 0, null, null, "content-" + id, distance);
     }
 
-    private final GeminiProperties properties = new GeminiProperties("key", "chat", "quality", "embedding", 768, 6, 2, 12, 60);
+    private final GeminiProperties properties = new GeminiProperties("key", "chat", "quality", "embedding", 768, 6, 2, 12, 60, 30000);
 
     @Mock private SemanticRetrievalStrategy mockSemantic;
     @Mock private KeywordRetrievalStrategy mockKeyword;
 
     private final HybridRetrievalStrategy fuseOnlyStrategy = new HybridRetrievalStrategy(null, null,
-            new GeminiProperties("key", "chat", "quality", "embedding", 768, 6, 2, 12, 60));
+            new GeminiProperties("key", "chat", "quality", "embedding", 768, 6, 2, 12, 60, 30000));
 
     @Test
     void rrfBoostsBothBranchesOverSingleBranch() {

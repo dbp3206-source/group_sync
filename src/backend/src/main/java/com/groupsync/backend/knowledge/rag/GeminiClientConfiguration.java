@@ -1,6 +1,7 @@
 package com.groupsync.backend.knowledge.rag;
 
 import com.google.genai.Client;
+import com.google.genai.types.HttpOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -20,7 +21,10 @@ public class GeminiClientConfiguration {
             log.info("GEMINI_API_KEY is not set. Gemini client will not be initialized.");
             return null;
         }
-        log.info("Initializing shared Gemini GenAI Client.");
-        return Client.builder().apiKey(properties.apiKey()).build();
+        log.info("Initializing shared Gemini GenAI Client with timeout {}ms.", properties.timeoutMillis());
+        return Client.builder()
+                .apiKey(properties.apiKey())
+                .httpOptions(HttpOptions.builder().timeout(properties.timeoutMillis()).build())
+                .build();
     }
 }

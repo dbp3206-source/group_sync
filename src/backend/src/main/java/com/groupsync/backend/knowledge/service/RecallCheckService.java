@@ -1,15 +1,16 @@
 package com.groupsync.backend.knowledge.service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.groupsync.backend.knowledge.dto.FocusStudioDto.*;
-import com.groupsync.backend.knowledge.model.DocumentChunk;
 import com.groupsync.backend.knowledge.rag.LanguageModelClient;
 import com.groupsync.backend.knowledge.service.RecallCheckTransactionService.QuizEvidence;
+import com.groupsync.backend.knowledge.service.RecallCheckTransactionService.QuizEvidenceChunk;
 import com.groupsync.backend.knowledge.service.RecallCheckTransactionService.ValidatedQuizQuestion;
 import com.groupsync.backend.shared.exception.BadRequestException;
 
@@ -31,7 +32,7 @@ public class RecallCheckService {
     }
 
     public QuizAttemptResponse generateQuiz(Long ownerId, Long topicId, Long conceptId) {
-        // Step 1: Prepare evidence in short read-only transaction
+        // Step 1: Prepare evidence in short read-only transaction (pure DTOs returned)
         QuizEvidence evidence = transactionService.prepareEvidence(ownerId, topicId, conceptId);
 
         // Step 2: Generate and strictly validate quiz questions with Gemini outside DB transaction
@@ -48,7 +49,7 @@ public class RecallCheckService {
         }
 
         // Step 3: Persist QuizAttempt and valid QuizItems in short write transaction
-        return transactionService.persistQuizAttempt(ownerId, topicId, conceptId, validQuestions);
+        return transactionService.persistQuizAttempt(ownerId, topicId, conceptId, evidence.allowedChunkMap().keySet(), validQuestions);
     }
 
     public SubmitQuizAnswersResponse submitAnswers(Long ownerId, Long attemptId, SubmitQuizAnswersRequest request) {
@@ -59,9 +60,9 @@ public class RecallCheckService {
         StringBuilder evidenceText = new StringBuilder();
         int limit = Math.min(evidence.allowedChunks().size(), 8);
         for (int i = 0; i < limit; i++) {
-            DocumentChunk c = evidence.allowedChunks().get(i);
-            evidenceText.append("[CHUNK_").append(c.getId()).append(" from ").append(c.getResource().getTitle()).append("]:\n")
-                    .append(c.getContent()).append("\n\n");
+            QuizEvidenceChunk c = evidence.allowedChunks().get(i);
+            evidenceText.append("[CHUNK_").append(c.chunkId()).append(" from ").append(c.resourceTitle()).append("]:\n")
+                    .append(c.content()).append("\n\n");
         }
 
         String targetName = evidence.conceptTitle() != null ? evidence.conceptTitle() : evidence.topicTitle();
@@ -76,7 +77,7 @@ public class RecallCheckService {
                 1. Output ONLY a valid JSON array of 5 objects without markdown code fence blocks.
                 2. Each object must have:
                    - "question": Direct, clear question in Vietnamese.
-                   - "options": Array of 4 plausible choices in Vietnamese.
+                   - "options": Array of 4 distinct, plausible choices in Vietnamese. All 4 choices must be mutually distinct.
                    - "correctOption": Integer index 0, 1, 2, or 3 of the correct choice.
                    - "explanation": Concise explanation of WHY the correct option is right based on the source evidence.
                    - "sourceChunkId": Exact integer CHUNK ID from the brackets above where the fact is stated.
@@ -98,7 +99,7 @@ public class RecallCheckService {
         return parseAndValidateQuestions(raw, evidence.allowedChunkMap());
     }
 
-    public List<ValidatedQuizQuestion> parseAndValidateQuestions(String rawJson, Map<Long, DocumentChunk> allowedChunkMap) {
+    public List<ValidatedQuizQuestion> parseAndValidateQuestions(String rawJson, Map<Long, QuizEvidenceChunk> allowedChunkMap) {
         String cleanJson = rawJson.trim();
         if (cleanJson.startsWith("```json")) cleanJson = cleanJson.substring(7);
         if (cleanJson.startsWith("```")) cleanJson = cleanJson.substring(3);
@@ -147,6 +148,16 @@ public class RecallCheckService {
                     continue;
                 }
 
+                // 2b. Validate option uniqueness (case-insensitive & trimmed comparison)
+                Set<String> normalizedOptions = options.stream()
+                        .map(String::trim)
+                        .map(value -> value.toLowerCase(Locale.ROOT))
+                        .collect(Collectors.toSet());
+                if (normalizedOptions.size() != 4) {
+                    log.warn("Rejecting quiz question '{}': contains duplicate options {}", question, options);
+                    continue;
+                }
+
                 // 3. Validate correctOption index bounds [0, 3]
                 if (correctOpt < 0 || correctOpt > 3) {
                     log.debug("Rejecting quiz question '{}': correctOption {} out of bounds [0, 3]", question, correctOpt);
@@ -167,9 +178,9 @@ public class RecallCheckService {
                     continue;
                 }
 
-                DocumentChunk sourceChunk = allowedChunkMap.get(sourceChunkId);
-                String snippet = sourceChunk != null && sourceChunk.getContent() != null
-                        ? (sourceChunk.getContent().length() > 200 ? sourceChunk.getContent().substring(0, 200) + "…" : sourceChunk.getContent())
+                QuizEvidenceChunk sourceChunk = allowedChunkMap.get(sourceChunkId);
+                String snippet = sourceChunk != null && sourceChunk.content() != null
+                        ? (sourceChunk.content().length() > 200 ? sourceChunk.content().substring(0, 200) + "…" : sourceChunk.content())
                         : "";
 
                 seenQuestions.add(question.toLowerCase(Locale.ROOT));

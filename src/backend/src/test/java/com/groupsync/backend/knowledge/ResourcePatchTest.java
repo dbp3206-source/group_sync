@@ -43,7 +43,7 @@ class ResourcePatchTest {
     @BeforeEach
     void setUp() {
         resourceService = new ResourceService(
-                25L * 1024 * 1024,
+                org.springframework.util.unit.DataSize.ofMegabytes(25),
                 resourceRepository, userRepository, storageService,
                 events, citationRepository, chunkRepository, parserRegistry
         );

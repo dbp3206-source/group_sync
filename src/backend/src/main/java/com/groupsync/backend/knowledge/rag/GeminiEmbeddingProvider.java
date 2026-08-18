@@ -40,7 +40,10 @@ public class GeminiEmbeddingProvider implements EmbeddingProvider {
         if (properties.apiKey() == null || properties.apiKey().isBlank()) {
             throw new IllegalStateException("GEMINI_API_KEY must be configured before embeddings can be created.");
         }
-        return Client.builder().apiKey(properties.apiKey()).build();
+        return Client.builder()
+                .apiKey(properties.apiKey())
+                .httpOptions(com.google.genai.types.HttpOptions.builder().timeout(properties.timeoutMillis()).build())
+                .build();
     }
 
     private float[] embed(String content, String taskType) {

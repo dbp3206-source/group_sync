@@ -38,7 +38,7 @@ public class ResourceService {
     private final ResourceParserRegistry parserRegistry;
 
     public ResourceService(
-            @Value("${knowledge.upload.max-size-bytes:26214400}") long maxUploadBytes,
+            @Value("${knowledge.upload.max-size:25MB}") org.springframework.util.unit.DataSize maxUploadSize,
             ResourceRepository resourceRepository,
             UserAccountRepository userRepository,
             StorageService storageService,
@@ -46,7 +46,7 @@ public class ResourceService {
             CitationRepository citationRepository,
             DocumentChunkRepository chunkRepository,
             ResourceParserRegistry parserRegistry) {
-        this.maxUploadBytes = maxUploadBytes;
+        this.maxUploadBytes = maxUploadSize != null ? maxUploadSize.toBytes() : 25L * 1024 * 1024;
         this.resourceRepository = resourceRepository;
         this.userRepository = userRepository;
         this.storageService = storageService;
