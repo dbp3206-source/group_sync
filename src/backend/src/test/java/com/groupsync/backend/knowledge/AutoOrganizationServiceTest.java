@@ -36,10 +36,10 @@ class AutoOrganizationServiceTest {
                 .thenReturn("Armstrong axioms, superkey, 3nf, bcnf decomposition");
 
         when(workspaceService.findOrCreateCollection(anyLong(), eq("Database Systems"), anyString()))
-                .thenReturn(Map.of("id", 100L, "name", "Database Systems"));
+                .thenReturn(new com.groupsync.backend.knowledge.dto.CollectionResponse(100L, "Database Systems", "desc", null, null));
 
         when(workspaceService.findOrCreateTag(anyLong(), anyString()))
-                .thenReturn(Map.of("id", 200L, "name", "tag"));
+                .thenReturn(new com.groupsync.backend.knowledge.dto.TagResponse(200L, "tag", null));
 
         assertDoesNotThrow(() -> autoOrganizationService.autoOrganize(ownerId, resourceId));
 

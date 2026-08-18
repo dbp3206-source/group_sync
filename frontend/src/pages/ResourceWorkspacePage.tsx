@@ -4,7 +4,9 @@ import {
   BrainCircuit,
   Compass,
   FileText,
+  Loader2,
   Network,
+  RefreshCw,
   Sparkles,
   Trash2,
 } from 'lucide-react'
@@ -26,6 +28,7 @@ import {
   updateResourceProgress,
   type KnowledgeCollection,
   type KnowledgeTag,
+  type RelatedResource,
   type Resource,
   type ResourceActivity,
   type ResourceNote,
@@ -37,50 +40,111 @@ type Tab = 'Overview' | 'Reader' | 'Notes' | 'Related' | 'Activity'
 export default function ResourceWorkspacePage() {
   const resourceId = Number(useParams().resourceId)
   const navigate = useNavigate()
+
+  // Core metadata state
   const [resource, setResource] = useState<Resource | null>(null)
-  const [content, setContent] = useState('')
-  const [tab, setTab] = useState<Tab>('Overview')
-  const [notes, setNotes] = useState<ResourceNote[]>([])
-  const [related, setRelated] = useState<Resource[]>([])
   const [activity, setActivity] = useState<ResourceActivity | null>(null)
+  const [error, setError] = useState('')
+
+  // Active tab
+  const [tab, setTab] = useState<Tab>('Overview')
+
+  // Lazy tab caches
+  const [content, setContent] = useState<string | null>(null)
+  const [contentLoading, setContentLoading] = useState(false)
+  const [contentError, setContentError] = useState('')
+
+  const [notes, setNotes] = useState<ResourceNote[] | null>(null)
+  const [notesLoading, setNotesLoading] = useState(false)
+
+  const [related, setRelated] = useState<RelatedResource[] | null>(null)
+  const [relatedLoading, setRelatedLoading] = useState(false)
+
+  const [graphDataLoaded, setGraphDataLoaded] = useState(false)
   const [allResources, setAllResources] = useState<Resource[]>([])
   const [collections, setCollections] = useState<KnowledgeCollection[]>([])
   const [tags, setTags] = useState<KnowledgeTag[]>([])
+
+  // Note form & UI state
   const [draft, setDraft] = useState('')
   const [noteBusy, setNoteBusy] = useState(false)
-  const [error, setError] = useState('')
   const [autoOrganizeMsg, setAutoOrganizeMsg] = useState('')
   const [organizing, setOrganizing] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [progressVal, setProgressVal] = useState<number | null>(null)
 
-  const load = () =>
+  // Step 1: Initial load fetches ONLY resource metadata & activity
+  useEffect(() => {
+    let active = true
+    setError('')
+    setContent(null)
+    setNotes(null)
+    setRelated(null)
+    setGraphDataLoaded(false)
+
     Promise.all([
       getResource(resourceId),
-      getResourceContent(resourceId),
-      getResourceNotes(resourceId),
-      getRelatedResources(resourceId),
       getResourceActivity(resourceId),
-      getResources().catch(() => []),
-      getCollections().catch(() => []),
-      getTags().catch(() => []),
     ])
-      .then(([item, text, n, r, a, allR, cols, t]) => {
+      .then(([item, act]) => {
+        if (!active) return
         setResource(item)
-        setContent(text)
-        setNotes(n)
-        setRelated(r)
-        setActivity(a)
+        setActivity(act)
+      })
+      .catch(() => {
+        if (!active) return
+        setError('This resource could not be loaded.')
+      })
+
+    return () => {
+      active = false
+    }
+  }, [resourceId])
+
+  // Step 2: Lazy loading on tab activation
+  useEffect(() => {
+    if (tab === 'Reader' && content === null && !contentLoading) {
+      setContentLoading(true)
+      setContentError('')
+      getResourceContent(resourceId)
+        .then(text => setContent(text || ''))
+        .catch(() => setContentError('Không thể đọc nội dung tài liệu. Vui lòng thử lại.'))
+        .finally(() => setContentLoading(false))
+    } else if (tab === 'Notes' && notes === null && !notesLoading) {
+      setNotesLoading(true)
+      getResourceNotes(resourceId)
+        .then(n => setNotes(n))
+        .catch(() => setNotes([]))
+        .finally(() => setNotesLoading(false))
+    } else if (tab === 'Related' && related === null && !relatedLoading) {
+      setRelatedLoading(true)
+      getRelatedResources(resourceId)
+        .then(r => setRelated(r))
+        .catch(() => setRelated([]) )
+        .finally(() => setRelatedLoading(false))
+    } else if (tab === 'Activity' && !graphDataLoaded) {
+      setGraphDataLoaded(true)
+      Promise.all([
+        getResources().catch(() => []),
+        getCollections().catch(() => []),
+        getTags().catch(() => []),
+      ]).then(([allR, cols, t]) => {
         setAllResources(allR)
         setCollections(cols)
         setTags(t)
       })
-      .catch(() => setError('This resource could not be loaded.'))
+    }
+  }, [tab, resourceId, content, contentLoading, notes, notesLoading, related, relatedLoading, graphDataLoaded])
 
-  useEffect(() => {
-    load()
-  }, [resourceId])
+  function handleRetryReader() {
+    setContentLoading(true)
+    setContentError('')
+    getResourceContent(resourceId)
+      .then(text => setContent(text || ''))
+      .catch(() => setContentError('Không thể đọc nội dung tài liệu. Vui lòng thử lại.'))
+      .finally(() => setContentLoading(false))
+  }
 
   async function handleAutoOrganize() {
     setOrganizing(true)
@@ -89,7 +153,9 @@ export default function ResourceWorkspacePage() {
       await autoOrganizeResource(resourceId)
       setAutoOrganizeMsg('Đã tự động phân loại vào Collection & Tags phù hợp!')
       setTimeout(() => setAutoOrganizeMsg(''), 4000)
-      await load()
+      if (related !== null) {
+        getRelatedResources(resourceId).then(r => setRelated(r)).catch(() => {})
+      }
     } catch {
       setAutoOrganizeMsg('Không thể tự động phân loại.')
     } finally {
@@ -103,9 +169,9 @@ export default function ResourceWorkspacePage() {
     setNoteBusy(true)
     try {
       const created = await createResourceNote(resourceId, draft.trim())
-      setNotes(prev => [created, ...prev])
+      setNotes(prev => (prev ? [created, ...prev] : [created]))
       setDraft('')
-      setActivity(prev => (prev ? { ...prev, note_count: prev.note_count + 1 } : prev))
+      setActivity(prev => (prev ? { ...prev, noteCount: prev.noteCount + 1 } : prev))
     } catch {
       setError('Could not save note.')
     } finally {
@@ -116,8 +182,8 @@ export default function ResourceWorkspacePage() {
   async function removeNote(noteId: number) {
     try {
       await deleteResourceNote(resourceId, noteId)
-      setNotes(prev => prev.filter(n => n.id !== noteId))
-      setActivity(prev => (prev ? { ...prev, note_count: Math.max(0, prev.note_count - 1) } : prev))
+      setNotes(prev => (prev ? prev.filter(n => n.id !== noteId) : []))
+      setActivity(prev => (prev ? { ...prev, noteCount: Math.max(0, prev.noteCount - 1) } : prev))
     } catch {
       setError('Could not delete note.')
     }
@@ -276,7 +342,7 @@ export default function ResourceWorkspacePage() {
       {tab === 'Reader' && (
         <div className="kos-workspace-panel kos-workspace-reader">
           <div className="kos-reader-toolbar">
-            <span>{content ? `${content.length} characters extracted` : 'No text available'}</span>
+            <span>{content ? `${content.length} characters extracted` : 'Document text reader'}</span>
             <Link
               to={`/knowledge/ask?resources=${resource.id}`}
               className="kos-button kos-button--sm"
@@ -284,7 +350,25 @@ export default function ResourceWorkspacePage() {
               <BrainCircuit size={14} /> Ground with RAG
             </Link>
           </div>
-          {content ? (
+          {contentLoading ? (
+            <div className="kos-box-empty">
+              <Loader2 size={24} className="kos-spin-fast" />
+              <p>Đang tải và xử lý nội dung văn bản từ lưu trữ...</p>
+            </div>
+          ) : contentError ? (
+            <div className="kos-box-empty">
+              <BookOpen size={24} />
+              <p style={{ color: 'var(--kos-danger, #ef4444)' }}>{contentError}</p>
+              <button
+                type="button"
+                className="kos-button kos-button--sm"
+                onClick={handleRetryReader}
+                style={{ marginTop: '0.5rem' }}
+              >
+                <RefreshCw size={14} /> Thử lại
+              </button>
+            </div>
+          ) : content ? (
             <pre className="kos-reader-content">{content}</pre>
           ) : (
             <div className="kos-box-empty">
@@ -316,12 +400,17 @@ export default function ResourceWorkspacePage() {
           </form>
 
           <div className="kos-notes-list">
-            {notes.length > 0 ? (
+            {notesLoading ? (
+              <div className="kos-box-empty">
+                <Loader2 size={20} className="kos-spin-fast" />
+                <p>Loading notes…</p>
+              </div>
+            ) : notes && notes.length > 0 ? (
               notes.map(n => (
                 <div key={n.id} className="kos-note-card">
                   <p className="kos-note-body">{n.content}</p>
                   <div className="kos-note-footer">
-                    <small>{new Date(n.created_at).toLocaleString()}</small>
+                    <small>{new Date(n.createdAt).toLocaleString()}</small>
                     <button
                       type="button"
                       className="kos-icon-btn kos-icon-btn--danger"
@@ -344,10 +433,15 @@ export default function ResourceWorkspacePage() {
       {tab === 'Related' && (
         <div className="kos-workspace-panel">
           <div className="kos-related-list">
-            {related.length > 0 ? (
+            {relatedLoading ? (
+              <div className="kos-box-empty">
+                <Loader2 size={20} className="kos-spin-fast" />
+                <p>Loading related resources…</p>
+              </div>
+            ) : related && related.length > 0 ? (
               related.map(r => (
                 <div key={r.id} className="kos-related-card">
-                  <span className="kos-workspace-type-badge">{r.resourceType || (r as unknown as { resource_type: string }).resource_type}</span>
+                  <span className="kos-workspace-type-badge">{r.resourceType}</span>
                   <div className="kos-related-info">
                     <h4>{r.title}</h4>
                     <p>{r.description || 'No description'}</p>
@@ -372,14 +466,14 @@ export default function ResourceWorkspacePage() {
           <div className="kos-activity-summary-card">
             <h3>Reading Progress</h3>
             <p>
-              Current progress: <strong>{progressVal !== null ? progressVal : (activity?.progress_percent ?? 0)}%</strong> · Notes:{' '}
-              <strong>{activity?.note_count ?? 0}</strong>
+              Current progress: <strong>{progressVal !== null ? progressVal : (activity?.progressPercent ?? 0)}%</strong> · Notes:{' '}
+              <strong>{activity?.noteCount ?? 0}</strong>
             </p>
             <input
               type="range"
               min={0}
               max={100}
-              value={progressVal !== null ? progressVal : (activity?.progress_percent ?? 0)}
+              value={progressVal !== null ? progressVal : (activity?.progressPercent ?? 0)}
               onChange={e => setProgressVal(Number(e.target.value))}
               onPointerUp={() => {
                 if (progressVal !== null) {
@@ -395,8 +489,8 @@ export default function ResourceWorkspacePage() {
               style={{ maxWidth: '100%', width: '100%', margin: '.6rem 0' }}
             />
             <small style={{ color: 'var(--kos-muted)' }}>
-              Status: {activity?.processing_status} · Last updated:{' '}
-              {activity?.updated_at ? new Date(activity.updated_at).toLocaleString() : 'Not yet recorded'}
+              Status: {activity?.processingStatus} · Last updated:{' '}
+              {activity?.updatedAt ? new Date(activity.updatedAt).toLocaleString() : 'Not yet recorded'}
             </small>
           </div>
 
@@ -433,7 +527,7 @@ export default function ResourceWorkspacePage() {
               <Network size={18} /> Sơ đồ Mạng lưới Tri thức Liên quan
             </h3>
             <KnowledgeGraphView
-              resources={related.length ? [resource, ...related] : allResources.slice(0, 8)}
+              resources={related && related.length ? [resource, ...(related as unknown as Resource[])] : allResources.slice(0, 8)}
               collections={collections}
               tags={tags}
             />

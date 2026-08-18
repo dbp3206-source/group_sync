@@ -6,6 +6,8 @@ import java.util.stream.Collectors;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.groupsync.backend.knowledge.dto.CollectionResponse;
+import com.groupsync.backend.knowledge.dto.TagResponse;
 import com.groupsync.backend.knowledge.rag.RetrievalScope;
 import com.groupsync.backend.knowledge.rag.RetrievedChunk;
 import com.groupsync.backend.knowledge.rag.SemanticRetrievalService;
@@ -21,7 +23,9 @@ public class OrganizationSuggestionService {
     private final SemanticRetrievalService retrieval;
 
     public OrganizationSuggestionService(NamedParameterJdbcTemplate jdbc, KnowledgeWorkspaceService workspace, SemanticRetrievalService retrieval) {
-        this.jdbc = jdbc; this.workspace = workspace; this.retrieval = retrieval;
+        this.jdbc = jdbc;
+        this.workspace = workspace;
+        this.retrieval = retrieval;
     }
 
     @Transactional(readOnly = true)
@@ -30,13 +34,13 @@ public class OrganizationSuggestionService {
         Map<String, Object> resource = jdbc.queryForMap("select id,title,coalesce(description,'') as description from resources where id=:resource and owner_id=:owner", Map.of("resource", resourceId, "owner", ownerId));
         String corpus = ((String) resource.get("title")) + " " + resource.get("description") + " " + jdbc.queryForObject("select coalesce(string_agg(content,' '),'') from document_chunks where resource_id=:resource", Map.of("resource", resourceId), String.class);
         String normalized = corpus.toLowerCase(Locale.ROOT);
-        List<Map<String, Object>> existingTags = workspace.tags(ownerId);
-        Set<String> existingNames = existingTags.stream().map(tag -> String.valueOf(tag.get("name")).toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+        List<TagResponse> existingTags = workspace.tags(ownerId);
+        Set<String> existingNames = existingTags.stream().map(tag -> tag.name().toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
         List<Map<String, Object>> suggestedTags = new ArrayList<>();
         for (String candidate : CONTROLLED_TAGS) {
             if (normalized.contains(candidate.replace('-', ' ')) || normalized.contains(candidate)) {
-                Map<String, Object> tag = existingTags.stream().filter(item -> candidate.equalsIgnoreCase(String.valueOf(item.get("name")))).findFirst().orElse(null);
-                suggestedTags.add(Map.of("name", candidate, "existingTagId", tag == null ? 0L : tag.get("id"), "reason", "Found in the title or extracted text", "confidence", tag == null ? 0.72 : 0.9));
+                TagResponse tag = existingTags.stream().filter(item -> candidate.equalsIgnoreCase(item.name())).findFirst().orElse(null);
+                suggestedTags.add(Map.of("name", candidate, "existingTagId", tag == null ? 0L : tag.id(), "reason", "Found in the title or extracted text", "confidence", tag == null ? 0.72 : 0.9));
             }
         }
         if (suggestedTags.isEmpty()) {
@@ -52,12 +56,12 @@ public class OrganizationSuggestionService {
     public void apply(Long ownerId, Long resourceId, Map<String, Object> body) {
         requireResource(ownerId, resourceId);
         for (String name : strings(body.get("tagNames"))) {
-            Map<String, Object> tag = workspace.createTag(ownerId, name);
-            workspace.assignTag(ownerId, resourceId, ((Number) tag.get("id")).longValue());
+            TagResponse tag = workspace.createTag(ownerId, name);
+            workspace.assignTag(ownerId, resourceId, tag.id());
         }
         for (String name : strings(body.get("newCollectionNames"))) {
-            Map<String, Object> collection = workspace.createCollection(ownerId, name, "Created from a reviewed organization suggestion.");
-            workspace.assignResource(ownerId, ((Number) collection.get("id")).longValue(), resourceId);
+            CollectionResponse collection = workspace.createCollection(ownerId, name, "Created from a reviewed organization suggestion.");
+            workspace.assignResource(ownerId, collection.id(), resourceId);
         }
         for (Object id : values(body.get("collectionIds"))) workspace.assignResource(ownerId, ((Number) id).longValue(), resourceId);
         for (Object id : values(body.get("relatedResourceIds"))) {
@@ -68,11 +72,11 @@ public class OrganizationSuggestionService {
 
     private List<Map<String, Object>> collectionSuggestions(Long ownerId, String text) {
         List<Map<String, Object>> result = new ArrayList<>();
-        for (Map<String, Object> collection : workspace.collections(ownerId)) {
-            String name = String.valueOf(collection.get("name"));
+        for (CollectionResponse collection : workspace.collections(ownerId)) {
+            String name = collection.name();
             String[] terms = WORDS.split(name.toLowerCase(Locale.ROOT));
             long matches = Arrays.stream(terms).filter(term -> term.length() > 2 && text.contains(term)).count();
-            if (matches > 0) result.add(Map.of("name", name, "existingCollectionId", collection.get("id"), "reason", "Collection name matches extracted topics", "confidence", Math.min(0.95, 0.55 + matches * 0.15)));
+            if (matches > 0) result.add(Map.of("name", name, "existingCollectionId", collection.id(), "reason", "Collection name matches extracted topics", "confidence", Math.min(0.95, 0.55 + matches * 0.15)));
         }
         if (result.isEmpty()) {
             String proposed = text.contains("rag") || text.contains("embedding") || text.contains("gemini") ? "AI Engineering" : text.contains("oop") || text.contains("pattern") ? "OOP Semester" : "Review Queue";

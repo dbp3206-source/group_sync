@@ -48,6 +48,7 @@ class ResourceReaderReconstructionTest {
     void setUp() {
         parserRegistry = new ResourceParserRegistry(List.of(new MarkdownResourceParser()));
         resourceService = new ResourceService(
+                25L * 1024 * 1024,
                 resourceRepository, userRepository, storageService,
                 events, citationRepository, chunkRepository, parserRegistry
         );
@@ -73,14 +74,28 @@ class ResourceReaderReconstructionTest {
         String resultText = resourceService.extractedText(ownerId, resourceId);
 
         // Result MUST match canonical content exactly and MUST NOT contain duplicated text from chunk overlap
+        assertNotNull(resultText);
         assertEquals(canonicalContent, resultText);
-        // Ensure "Section A explains modular design." occurs exactly once in reader output
-        int count = 0;
-        int idx = 0;
-        while ((idx = resultText.indexOf("Section A explains modular design.", idx)) != -1) {
-            count++;
-            idx += 10;
-        }
-        assertEquals(1, count, "Canonical reader content must not duplicate text from overlapping chunks");
+    }
+
+    @Test
+    void readerThrowsMeaningfulExceptionWhenStorageFails() throws Exception {
+        Long ownerId = 1L;
+        Long resourceId = 99L;
+        UserAccount owner = new UserAccount("test@example.com", "hash", "Tester");
+        Resource resource = new Resource(
+                owner, "Architecture Overview", "Summary",
+                ResourceType.MARKDOWN, "arch.md", "text/markdown",
+                500L, "1/arch.md", "sha256-hash"
+        );
+
+        when(resourceRepository.findByIdAndOwnerId(resourceId, ownerId)).thenReturn(Optional.of(resource));
+        when(storageService.open("1/arch.md")).thenThrow(new java.io.IOException("Disk read error"));
+
+        com.groupsync.backend.shared.exception.BadRequestException ex = assertThrows(
+                com.groupsync.backend.shared.exception.BadRequestException.class,
+                () -> resourceService.extractedText(ownerId, resourceId)
+        );
+        assertTrue(ex.getMessage().contains("Không thể đọc nội dung tài liệu"));
     }
 }

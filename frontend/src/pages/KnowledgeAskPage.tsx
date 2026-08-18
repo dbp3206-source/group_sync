@@ -2,7 +2,6 @@ import {
   Activity,
   BrainCircuit,
   Check,
-  CheckCircle2,
   Compass,
   Copy,
   Loader2,
@@ -35,7 +34,6 @@ interface ReasoningStep {
   title: string
   detail: string
   badge: string
-  status: 'pending' | 'running' | 'completed'
 }
 
 const DEFAULT_STEPS: ReasoningStep[] = [
@@ -44,42 +42,36 @@ const DEFAULT_STEPS: ReasoningStep[] = [
     title: 'Phân tích truy vấn & Chuẩn hóa',
     detail: 'Bóc tách token kỹ thuật, lọc stopwords và nhận diện ngôn ngữ câu hỏi.',
     badge: 'NLP & Tokenizer',
-    status: 'pending',
   },
   {
     id: 'semantic',
     title: 'Truy xuất Ngữ nghĩa pgvector',
     detail: 'Tạo embedding 768 chiều và tìm kiếm Cosine trên chỉ mục HNSW.',
     badge: 'pgvector / HNSW',
-    status: 'pending',
   },
   {
     id: 'lexical',
     title: 'Truy xuất Từ khóa FTS',
     detail: 'Khớp chính xác mã số, thuật ngữ kỹ thuật qua tsvector và chỉ mục GIN.',
     badge: 'PostgreSQL GIN',
-    status: 'pending',
   },
   {
     id: 'rrf',
     title: 'Hợp nhất Xếp hạng RRF (k=60)',
     detail: 'Tổng hợp điểm số 2 nhánh bằng Reciprocal Rank Fusion, lọc ứng viên tối ưu.',
     badge: 'RRF Fusion',
-    status: 'pending',
   },
   {
     id: 'grounding',
     title: 'Đóng gói Ngữ cảnh Grounding',
     detail: 'Bọc chứng cứ vào thẻ XML <evidence> thụ động, kích hoạt chỉ thị chống ảo giác.',
     badge: 'Anti-Hallucination',
-    status: 'pending',
   },
   {
     id: 'synthesis',
     title: 'Sinh Phản hồi & Trích dẫn',
     detail: 'Mô hình Gemini tổng hợp câu trả lời và gắn nhãn trích dẫn đối chứng [1], [2].',
     badge: 'Gemini 3.5 Flash Lite',
-    status: 'pending',
   },
 ]
 
@@ -129,13 +121,11 @@ export default function KnowledgeAskPage() {
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [steps, setSteps] = useState<ReasoningStep[]>(DEFAULT_STEPS)
   const [elapsedSec, setElapsedSec] = useState<string>('0.0')
   const [copiedId, setCopiedId] = useState<number | null>(null)
   const [highlightedCitation, setHighlightedCitation] = useState<number | null>(null)
   const [zenMode, setZenMode] = useState(false)
   const timerRef = useRef<number | null>(null)
-  const animIntervalRef = useRef<number | null>(null)
 
   const load = () =>
     Promise.all([getResources(), getCollections(), getChatSessions()])
@@ -150,7 +140,6 @@ export default function KnowledgeAskPage() {
     load()
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
-      if (animIntervalRef.current) clearInterval(animIntervalRef.current)
     }
   }, [])
 
@@ -167,67 +156,26 @@ export default function KnowledgeAskPage() {
       setSelected(detail.resourceIds)
       setCollectionId(detail.collectionId || undefined)
       setError('')
-
-      setSteps(
-        DEFAULT_STEPS.map(s => ({
-          ...s,
-          status: 'completed',
-        })),
-      )
     } catch {
       setError('This conversation could not be restored.')
     }
   }
 
-  function startReasoningAnimation() {
+  function startRequestTimer() {
     const startTime = Date.now()
     setElapsedSec('0.0')
-
-    setSteps(
-      DEFAULT_STEPS.map((s, idx) => ({
-        ...s,
-        status: idx === 0 ? 'running' : 'pending',
-      })),
-    )
-
     if (timerRef.current) clearInterval(timerRef.current)
     timerRef.current = window.setInterval(() => {
       const sec = ((Date.now() - startTime) / 1000).toFixed(1)
       setElapsedSec(sec)
     }, 100)
-
-    let currentStepIndex = 0
-    if (animIntervalRef.current) clearInterval(animIntervalRef.current)
-    animIntervalRef.current = window.setInterval(() => {
-      currentStepIndex++
-      if (currentStepIndex < DEFAULT_STEPS.length) {
-        setSteps(prev =>
-          prev.map((s, idx) => ({
-            ...s,
-            status:
-              idx < currentStepIndex
-                ? 'completed'
-                : idx === currentStepIndex
-                  ? 'running'
-                  : 'pending',
-          })),
-        )
-      } else {
-        if (animIntervalRef.current) clearInterval(animIntervalRef.current)
-      }
-    }, 350)
   }
 
-  function completeReasoningAnimation() {
-    if (animIntervalRef.current) clearInterval(animIntervalRef.current)
-    if (timerRef.current) clearInterval(timerRef.current)
-
-    setSteps(prev =>
-      prev.map(s => ({
-        ...s,
-        status: 'completed',
-      })),
-    )
+  function stopRequestTimer() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
   }
 
   async function submit(event: React.FormEvent) {
@@ -244,7 +192,7 @@ export default function KnowledgeAskPage() {
     }
 
     setLoading(true)
-    startReasoningAnimation()
+    startRequestTimer()
 
     try {
       const response = await askKnowledge({
@@ -256,13 +204,12 @@ export default function KnowledgeAskPage() {
         collectionId: scope === 'COLLECTION' ? collectionId : undefined,
       })
       setQuestion('')
-      completeReasoningAnimation()
+      stopRequestTimer()
       await open(response.sessionId)
       await load()
     } catch {
       setError('KnowledgeOS could not answer right now.')
-      if (animIntervalRef.current) clearInterval(animIntervalRef.current)
-      if (timerRef.current) clearInterval(timerRef.current)
+      stopRequestTimer()
     } finally {
       setLoading(false)
     }
@@ -272,7 +219,6 @@ export default function KnowledgeAskPage() {
     setActive(null)
     setQuestion('')
     setError('')
-    setSteps(DEFAULT_STEPS)
     setElapsedSec('0.0')
   }
 
@@ -301,8 +247,6 @@ export default function KnowledgeAskPage() {
     }
     setTimeout(() => setHighlightedCitation(null), 2500)
   }
-
-  const completedCount = steps.filter(s => s.status === 'completed').length
 
   return (
     <section className={`kos-page kos-ask ${zenMode ? 'kos-zen-mode' : ''}`}>
@@ -372,56 +316,44 @@ export default function KnowledgeAskPage() {
               </div>
             </div>
 
-            {/* BOX 3: Live RAG Reasoning & Pipeline Card with Dedicated Scrolling */}
+            {/* BOX 3: Static RAG Pipeline Architecture Card with Dedicated Scrolling */}
             <div className="kos-ask-box kos-reasoning-box">
               <div className="kos-box-header">
                 <div className="kos-box-title">
                   <Activity size={16} className="kos-box-icon kos-pulse-icon" />
                   <span>Kiến trúc Xử lý RAG (Pipeline Architecture)</span>
                 </div>
-                <span className={`kos-status-pill ${loading ? 'is-running' : completedCount === steps.length ? 'is-done' : 'is-idle'}`}>
+                <span className={`kos-status-pill ${loading ? 'is-running' : 'is-idle'}`}>
                   {loading ? (
                     <>
                       <Loader2 size={11} className="kos-spin-fast" /> {elapsedSec}s
                     </>
-                  ) : completedCount === steps.length ? (
-                    'Done'
                   ) : (
-                    'Ready'
+                    'Active Flow'
                   )}
                 </span>
               </div>
 
               <div className="kos-reasoning-scroll-content">
                 <div className="kos-reasoning-timeline">
-                  {steps.map((step, idx) => {
-                    const isDone = step.status === 'completed'
-                    const isRunning = step.status === 'running'
-                    return (
-                      <div
-                        key={step.id}
-                        className={`kos-reasoning-step ${isRunning ? 'is-running' : isDone ? 'is-done' : 'is-pending'}`}
-                      >
-                        <div className="kos-step-indicator">
-                          {isDone ? (
-                            <CheckCircle2 size={14} className="kos-step-icon is-done" />
-                          ) : isRunning ? (
-                            <Loader2 size={14} className="kos-step-icon is-running kos-spin-fast" />
-                          ) : (
-                            <span className="kos-step-dot">{idx + 1}</span>
-                          )}
-                          {idx < steps.length - 1 && <span className="kos-step-line" />}
-                        </div>
-                        <div className="kos-step-content">
-                          <div className="kos-step-header">
-                            <span className="kos-step-title">{step.title}</span>
-                            <span className="kos-step-badge">{step.badge}</span>
-                          </div>
-                          <p className="kos-step-desc">{step.detail}</p>
-                        </div>
+                  {DEFAULT_STEPS.map((step, idx) => (
+                    <div
+                      key={step.id}
+                      className="kos-reasoning-step is-done"
+                    >
+                      <div className="kos-step-indicator">
+                        <span className="kos-step-dot">{idx + 1}</span>
+                        {idx < DEFAULT_STEPS.length - 1 && <span className="kos-step-line" />}
                       </div>
-                    )
-                  })}
+                      <div className="kos-step-content">
+                        <div className="kos-step-header">
+                          <span className="kos-step-title">{step.title}</span>
+                          <span className="kos-step-badge">{step.badge}</span>
+                        </div>
+                        <p className="kos-step-desc">{step.detail}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 

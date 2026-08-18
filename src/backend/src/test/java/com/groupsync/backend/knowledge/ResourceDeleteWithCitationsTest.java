@@ -38,7 +38,19 @@ class ResourceDeleteWithCitationsTest {
     @Mock private StorageService storageService;
     @Mock private ApplicationEventPublisher events;
     @Mock private CitationRepository citationRepository;
-    @InjectMocks private ResourceService resourceService;
+    @Mock private com.groupsync.backend.knowledge.repository.DocumentChunkRepository chunkRepository;
+    @Mock private com.groupsync.backend.knowledge.ingestion.ResourceParserRegistry parserRegistry;
+
+    private ResourceService resourceService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        resourceService = new ResourceService(
+                25L * 1024 * 1024,
+                resourceRepository, userRepository, storageService,
+                events, citationRepository, chunkRepository, parserRegistry
+        );
+    }
 
     @Test
     void deleteCitationsBeforeResourceToAvoidFkViolation() throws IOException {

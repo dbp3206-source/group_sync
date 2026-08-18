@@ -37,32 +37,39 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
         int topK = properties.ragTopK();
         int candidateSize = Math.min(topK * properties.ragCandidateMultiplier(), properties.ragMaxCandidateSize());
 
+        boolean semanticFailed = false;
         List<RetrievedChunk> semanticCandidates;
         try {
             semanticCandidates = semantic.retrieve(ownerId, question, scope, resourceId,
                     selectedResourceIds, collectionId, candidateSize);
         } catch (RuntimeException ex) {
-            log.warn("[semantic_retrieval_failed] strategy=semantic scope={} resourceId={} candidatesCount=0 exception={}: {}",
+            semanticFailed = true;
+            log.warn("[semantic_retrieval_failed] strategy=semantic scope={} resourceId={} exception={}: {}",
                     scope, resourceId, ex.getClass().getSimpleName(), ex.getMessage());
             semanticCandidates = List.of();
         }
 
+        boolean keywordFailed = false;
         List<RetrievedChunk> keywordCandidates;
         try {
             keywordCandidates = keyword.retrieve(ownerId, question, scope, resourceId,
                     selectedResourceIds, collectionId, candidateSize);
         } catch (RuntimeException ex) {
-            log.warn("[keyword_retrieval_failed] strategy=keyword scope={} resourceId={} candidatesCount=0 exception={}: {}",
+            keywordFailed = true;
+            log.warn("[keyword_retrieval_failed] strategy=keyword scope={} resourceId={} exception={}: {}",
                     scope, resourceId, ex.getClass().getSimpleName(), ex.getMessage());
             keywordCandidates = List.of();
         }
 
-        if (semanticCandidates.isEmpty() && !keywordCandidates.isEmpty()) {
-            log.warn("[hybrid_retrieval_degraded] Degrading to keyword-only retrieval. semanticCount=0 keywordCount={}", keywordCandidates.size());
-        } else if (!semanticCandidates.isEmpty() && keywordCandidates.isEmpty()) {
-            log.warn("[hybrid_retrieval_degraded] Degrading to semantic-only retrieval. semanticCount={} keywordCount=0", semanticCandidates.size());
+        if (semanticFailed && keywordFailed) {
+            log.warn("[hybrid_retrieval_failed] Both retrieval branches threw exceptions for query.");
+            return List.of();
+        } else if (semanticFailed) {
+            log.warn("[hybrid_retrieval_degraded] Semantic branch failed; degraded to keyword-only retrieval (keywordCount={}).", keywordCandidates.size());
+        } else if (keywordFailed) {
+            log.warn("[hybrid_retrieval_degraded] Keyword branch failed; degraded to semantic-only retrieval (semanticCount={}).", semanticCandidates.size());
         } else if (semanticCandidates.isEmpty() && keywordCandidates.isEmpty()) {
-            log.warn("[hybrid_retrieval_failed] Both retrieval branches returned 0 candidates for query.");
+            log.info("[hybrid_no_candidates] Neither semantic nor keyword retrieval returned candidates for query.");
             return List.of();
         }
 

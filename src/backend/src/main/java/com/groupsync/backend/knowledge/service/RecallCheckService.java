@@ -1,109 +1,70 @@
 package com.groupsync.backend.knowledge.service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.groupsync.backend.knowledge.dto.FocusStudioDto.*;
-import com.groupsync.backend.knowledge.model.*;
+import com.groupsync.backend.knowledge.model.DocumentChunk;
 import com.groupsync.backend.knowledge.rag.LanguageModelClient;
-import com.groupsync.backend.knowledge.repository.*;
+import com.groupsync.backend.knowledge.service.RecallCheckTransactionService.QuizEvidence;
+import com.groupsync.backend.knowledge.service.RecallCheckTransactionService.ValidatedQuizQuestion;
 import com.groupsync.backend.shared.exception.BadRequestException;
-import com.groupsync.backend.shared.exception.NotFoundException;
-import com.groupsync.backend.user.model.UserAccount;
-import com.groupsync.backend.user.repository.UserAccountRepository;
 
 @Service
 public class RecallCheckService {
 
     private static final Logger log = LoggerFactory.getLogger(RecallCheckService.class);
     private static final ObjectMapper jsonMapper = new ObjectMapper();
+    private static final int TARGET_QUESTION_COUNT = 5;
 
-    private final StudyTopicRepository topicRepository;
-    private final TopicConceptRepository conceptRepository;
-    private final DocumentChunkRepository chunkRepository;
-    private final QuizAttemptRepository attemptRepository;
-    private final UserAccountRepository userRepository;
+    private final RecallCheckTransactionService transactionService;
     private final LanguageModelClient languageModelClient;
 
     public RecallCheckService(
-            StudyTopicRepository topicRepository,
-            TopicConceptRepository conceptRepository,
-            DocumentChunkRepository chunkRepository,
-            QuizAttemptRepository attemptRepository,
-            UserAccountRepository userRepository,
+            RecallCheckTransactionService transactionService,
             LanguageModelClient languageModelClient) {
-        this.topicRepository = topicRepository;
-        this.conceptRepository = conceptRepository;
-        this.chunkRepository = chunkRepository;
-        this.attemptRepository = attemptRepository;
-        this.userRepository = userRepository;
+        this.transactionService = transactionService;
         this.languageModelClient = languageModelClient;
     }
 
-    @Transactional
     public QuizAttemptResponse generateQuiz(Long ownerId, Long topicId, Long conceptId) {
-        UserAccount owner = userRepository.findById(ownerId)
-                .orElseThrow(() -> new NotFoundException("User not found."));
-        StudyTopic topic = topicRepository.findByIdAndOwnerId(topicId, ownerId)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy chủ đề học tập."));
+        // Step 1: Prepare evidence in short read-only transaction
+        QuizEvidence evidence = transactionService.prepareEvidence(ownerId, topicId, conceptId);
 
-        TopicConcept targetConcept = null;
-        if (conceptId != null && conceptId > 0) {
-            targetConcept = conceptRepository.findByIdAndTopicId(conceptId, topicId)
-                    .orElseThrow(() -> new NotFoundException("Không tìm thấy khái niệm."));
+        // Step 2: Generate and strictly validate quiz questions with Gemini outside DB transaction
+        List<ValidatedQuizQuestion> validQuestions = generateAndValidateQuestions(evidence);
+
+        // Retry once if 0 valid questions were generated
+        if (validQuestions.isEmpty()) {
+            log.info("Initial Gemini quiz generation produced 0 valid questions. Retrying once...");
+            validQuestions = generateAndValidateQuestions(evidence);
         }
 
-        // Collect available chunks from topic
-        List<DocumentChunk> chunks = new ArrayList<>();
-        if (targetConcept != null && !targetConcept.getSourceChunks().isEmpty()) {
-            chunks.addAll(targetConcept.getSourceChunks());
-        } else {
-            List<Resource> readyResources = topic.getResources().stream()
-                    .filter(r -> r.getProcessingStatus() == ResourceProcessingStatus.READY)
-                    .toList();
-            for (Resource r : readyResources) {
-                chunks.addAll(chunkRepository.findByResourceIdOrderByChunkIndex(r.getId()));
-            }
+        if (validQuestions.isEmpty()) {
+            throw new BadRequestException("Không thể tạo bài kiểm tra ghi nhớ hợp lệ từ tài liệu đã chọn. Vui lòng thử lại sau.");
         }
 
-        if (chunks.isEmpty()) {
-            throw new BadRequestException("Chưa có tài liệu hoặc phân đoạn tri thức khả dụng trong chủ đề này để tạo bài kiểm tra ghi nhớ.");
-        }
-
-        // Create initial QuizAttempt
-        QuizAttempt attempt = new QuizAttempt(topic, owner, targetConcept, 5);
-
-        boolean generatedByAi = false;
-        try {
-            generatedByAi = generateQuestionsWithAi(attempt, targetConcept, chunks);
-        } catch (Exception e) {
-            log.warn("Gemini quiz generation failed, falling back to deterministic questions: {}", e.getMessage());
-        }
-
-        if (!generatedByAi || attempt.getItems().isEmpty()) {
-            generateQuestionsDeterministically(attempt, targetConcept, chunks);
-        }
-
-        QuizAttempt saved = attemptRepository.save(attempt);
-
-        return mapToQuizAttemptResponse(saved, false);
+        // Step 3: Persist QuizAttempt and valid QuizItems in short write transaction
+        return transactionService.persistQuizAttempt(ownerId, topicId, conceptId, validQuestions);
     }
 
-    private boolean generateQuestionsWithAi(QuizAttempt attempt, TopicConcept concept, List<DocumentChunk> chunks) {
-        StringBuilder evidence = new StringBuilder();
-        int limit = Math.min(chunks.size(), 8);
+    public SubmitQuizAnswersResponse submitAnswers(Long ownerId, Long attemptId, SubmitQuizAnswersRequest request) {
+        return transactionService.submitAnswers(ownerId, attemptId, request);
+    }
+
+    private List<ValidatedQuizQuestion> generateAndValidateQuestions(QuizEvidence evidence) {
+        StringBuilder evidenceText = new StringBuilder();
+        int limit = Math.min(evidence.allowedChunks().size(), 8);
         for (int i = 0; i < limit; i++) {
-            DocumentChunk c = chunks.get(i);
-            evidence.append("[CHUNK_").append(c.getId()).append(" from ").append(c.getResource().getTitle()).append("]:\n")
+            DocumentChunk c = evidence.allowedChunks().get(i);
+            evidenceText.append("[CHUNK_").append(c.getId()).append(" from ").append(c.getResource().getTitle()).append("]:\n")
                     .append(c.getContent()).append("\n\n");
         }
 
-        String targetName = concept != null ? concept.getTitle() : attempt.getTopic().getTitle();
+        String targetName = evidence.conceptTitle() != null ? evidence.conceptTitle() : evidence.topicTitle();
 
         String prompt = """
                 You are a university professor creating an active-recall assessment. Based ONLY on the following source evidence, generate 5 multiple-choice questions testing conceptual recall and understanding for: "%s".
@@ -120,185 +81,109 @@ public class RecallCheckService {
                    - "explanation": Concise explanation of WHY the correct option is right based on the source evidence.
                    - "sourceChunkId": Exact integer CHUNK ID from the brackets above where the fact is stated.
                 3. Ground all answers strictly in the provided evidence.
-                """.formatted(targetName, evidence.toString());
+                """.formatted(targetName, evidenceText.toString());
 
-        String raw = languageModelClient.answer(prompt);
-        if (raw == null || raw.isBlank()) return false;
+        String raw = null;
+        try {
+            raw = languageModelClient.answer(prompt);
+        } catch (Exception e) {
+            log.warn("Gemini quiz generation call failed: {}", e.getMessage());
+            return Collections.emptyList();
+        }
 
-        String cleanJson = raw.trim();
+        if (raw == null || raw.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        return parseAndValidateQuestions(raw, evidence.allowedChunkMap());
+    }
+
+    public List<ValidatedQuizQuestion> parseAndValidateQuestions(String rawJson, Map<Long, DocumentChunk> allowedChunkMap) {
+        String cleanJson = rawJson.trim();
         if (cleanJson.startsWith("```json")) cleanJson = cleanJson.substring(7);
         if (cleanJson.startsWith("```")) cleanJson = cleanJson.substring(3);
         if (cleanJson.endsWith("```")) cleanJson = cleanJson.substring(0, cleanJson.length() - 3);
         cleanJson = cleanJson.trim();
 
+        List<ValidatedQuizQuestion> result = new ArrayList<>();
+        Set<String> seenQuestions = new HashSet<>();
+
         try {
             JsonNode root = jsonMapper.readTree(cleanJson);
-            if (!root.isArray() || root.isEmpty()) return false;
-
-            Map<Long, DocumentChunk> chunkMap = chunks.stream()
-                    .collect(Collectors.toMap(DocumentChunk::getId, c -> c, (a, b) -> a));
+            if (!root.isArray() || root.isEmpty()) {
+                return Collections.emptyList();
+            }
 
             for (JsonNode qNode : root) {
                 String question = qNode.path("question").asText("").trim();
                 JsonNode optsNode = qNode.path("options");
-                int correctOpt = qNode.path("correctOption").asInt(0);
+                int correctOpt = qNode.has("correctOption") ? qNode.path("correctOption").asInt(-1) : -1;
                 String explanation = qNode.path("explanation").asText("").trim();
-                Long sourceChunkId = qNode.path("sourceChunkId").asLong();
+                Long sourceChunkId = qNode.has("sourceChunkId") ? qNode.path("sourceChunkId").asLong() : null;
 
-                if (question.isBlank() || !optsNode.isArray() || optsNode.size() != 4 || explanation.isBlank()) {
+                // 1. Validate question text
+                if (question.isBlank() || seenQuestions.contains(question.toLowerCase(Locale.ROOT))) {
+                    log.debug("Rejecting quiz question: blank or duplicate '{}'", question);
                     continue;
                 }
 
+                // 2. Validate options (must have exactly 4 non-empty options)
+                if (!optsNode.isArray() || optsNode.size() != 4) {
+                    log.debug("Rejecting quiz question '{}': options size is not 4", question);
+                    continue;
+                }
                 List<String> options = new ArrayList<>();
+                boolean allOptsValid = true;
                 for (JsonNode opt : optsNode) {
-                    options.add(opt.asText().trim());
+                    String optText = opt.asText("").trim();
+                    if (optText.isBlank()) {
+                        allOptsValid = false;
+                        break;
+                    }
+                    options.add(optText);
+                }
+                if (!allOptsValid || options.size() != 4) {
+                    log.debug("Rejecting quiz question '{}': contains blank options", question);
+                    continue;
                 }
 
-                DocumentChunk sourceChunk = chunkMap.get(sourceChunkId);
-                if (sourceChunk == null && !chunks.isEmpty()) {
-                    sourceChunk = chunks.get(0);
+                // 3. Validate correctOption index bounds [0, 3]
+                if (correctOpt < 0 || correctOpt > 3) {
+                    log.debug("Rejecting quiz question '{}': correctOption {} out of bounds [0, 3]", question, correctOpt);
+                    continue;
                 }
 
-                Resource res = sourceChunk != null ? sourceChunk.getResource() : null;
+                // 4. Validate explanation
+                if (explanation.isBlank()) {
+                    log.debug("Rejecting quiz question '{}': explanation is blank", question);
+                    continue;
+                }
+
+                // 5. Strict Source Grounding: sourceChunkId MUST belong to the allowed chunk map
+                // NEVER silently fallback to chunks.get(0) or fabricate a source chunk.
+                if (sourceChunkId == null || !allowedChunkMap.containsKey(sourceChunkId)) {
+                    log.warn("Rejecting quiz question '{}': sourceChunkId {} is not in allowed evidence chunk set {}",
+                            question, sourceChunkId, allowedChunkMap.keySet());
+                    continue;
+                }
+
+                DocumentChunk sourceChunk = allowedChunkMap.get(sourceChunkId);
                 String snippet = sourceChunk != null && sourceChunk.getContent() != null
                         ? (sourceChunk.getContent().length() > 200 ? sourceChunk.getContent().substring(0, 200) + "…" : sourceChunk.getContent())
                         : "";
 
-                QuizItem item = new QuizItem(attempt, concept, question, jsonMapper.writeValueAsString(options),
-                        correctOpt, explanation, res, sourceChunk, snippet);
-                attempt.getItems().add(item);
-            }
+                seenQuestions.add(question.toLowerCase(Locale.ROOT));
+                result.add(new ValidatedQuizQuestion(question, options, correctOpt, explanation, sourceChunkId, snippet));
 
-            return !attempt.getItems().isEmpty();
+                if (result.size() >= TARGET_QUESTION_COUNT) {
+                    break;
+                }
+            }
         } catch (Exception e) {
-            log.warn("Failed to parse quiz AI json: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    private void generateQuestionsDeterministically(QuizAttempt attempt, TopicConcept concept, List<DocumentChunk> chunks) {
-        int count = Math.min(chunks.size(), 5);
-        for (int i = 0; i < count; i++) {
-            DocumentChunk chk = chunks.get(i);
-            String text = chk.getContent() != null ? chk.getContent().trim() : "";
-            String snippet = text.length() > 180 ? text.substring(0, 180) + "…" : text;
-
-            String question = "Khái niệm hoặc luận điểm cốt lõi nào được đề cập trong trích đoạn từ " + chk.getResource().getTitle() + "?";
-            List<String> options = List.of(
-                    snippet.length() > 80 ? snippet.substring(0, 80) + "…" : snippet,
-                    "Phương pháp kiểm thử hiệu năng mở rộng quy mô lớn",
-                    "Cấu hình hệ thống cân bằng tải máy chủ phân tán",
-                    "Giao thức mã hóa dữ liệu truyền thông đa luồng"
-            );
-
-            String explanation = "Trích xuất trực tiếp từ phân đoạn tài liệu " + chk.getResource().getTitle() + ": " + snippet;
-
-            try {
-                QuizItem item = new QuizItem(attempt, concept, question, jsonMapper.writeValueAsString(options),
-                        0, explanation, chk.getResource(), chk, snippet);
-                attempt.getItems().add(item);
-            } catch (Exception ignored) {}
-        }
-    }
-
-    @Transactional
-    public SubmitQuizAnswersResponse submitAnswers(Long ownerId, Long attemptId, SubmitQuizAnswersRequest request) {
-        QuizAttempt attempt = attemptRepository.findByIdAndOwnerId(attemptId, ownerId)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy bài kiểm tra ghi nhớ."));
-
-        Map<Long, Integer> answers = request.answers() != null ? request.answers() : Collections.emptyMap();
-
-        int score = 0;
-        Set<TopicConcept> reviewNeededConcepts = new HashSet<>();
-        Set<TopicConcept> checkedConcepts = new HashSet<>();
-
-        for (QuizItem item : attempt.getItems()) {
-            Integer userAns = answers.get(item.getId());
-            item.setUserAnswer(userAns);
-
-            boolean isCorrect = item.isCorrect();
-            if (isCorrect) {
-                score++;
-                if (item.getConcept() != null) {
-                    checkedConcepts.add(item.getConcept());
-                }
-            } else {
-                if (item.getConcept() != null) {
-                    item.getConcept().markReviewNeeded();
-                    conceptRepository.save(item.getConcept());
-                    reviewNeededConcepts.add(item.getConcept());
-                }
-            }
+            log.warn("Failed to parse quiz questions JSON: {}", e.getMessage());
+            return Collections.emptyList();
         }
 
-        // For concepts where all questions were correct and none failed
-        for (TopicConcept c : checkedConcepts) {
-            if (!reviewNeededConcepts.contains(c)) {
-                c.markChecked();
-                conceptRepository.save(c);
-            }
-        }
-
-        attempt.setScoreCorrect(score);
-        attemptRepository.save(attempt);
-
-        List<QuizQuestionDto> questionResults = mapToQuestionDtos(attempt.getItems(), true);
-
-        List<TopicConceptDto> conceptsNeedingReview = reviewNeededConcepts.stream().map(c ->
-                new TopicConceptDto(c.getId(), c.getTitle(), c.getSummary(), c.getWhyItMatters(),
-                        c.getStudyStatus(), c.getPosition(), Collections.emptyList())
-        ).toList();
-
-        double percentage = attempt.getTotalQuestions() > 0
-                ? Math.round(((double) score / attempt.getTotalQuestions()) * 100.0)
-                : 0;
-
-        return new SubmitQuizAnswersResponse(attempt.getId(), score, attempt.getTotalQuestions(),
-                percentage, questionResults, conceptsNeedingReview);
-    }
-
-    private QuizAttemptResponse mapToQuizAttemptResponse(QuizAttempt attempt, boolean revealAnswers) {
-        List<QuizQuestionDto> dtos = mapToQuestionDtos(attempt.getItems(), revealAnswers);
-        return new QuizAttemptResponse(
-                attempt.getId(),
-                attempt.getTopic().getId(),
-                attempt.getConcept() != null ? attempt.getConcept().getId() : null,
-                attempt.getScoreCorrect(),
-                attempt.getTotalQuestions(),
-                revealAnswers,
-                dtos,
-                attempt.getCreatedAt()
-        );
-    }
-
-    private List<QuizQuestionDto> mapToQuestionDtos(List<QuizItem> items, boolean revealAnswers) {
-        return items.stream().map(item -> {
-            List<String> options = new ArrayList<>();
-            try {
-                JsonNode optsNode = jsonMapper.readTree(item.getOptionsJson());
-                if (optsNode.isArray()) {
-                    for (JsonNode n : optsNode) options.add(n.asText());
-                }
-            } catch (Exception e) {
-                options = List.of("Lựa chọn A", "Lựa chọn B", "Lựa chọn C", "Lựa chọn D");
-            }
-
-            Resource res = item.getSourceResource();
-            DocumentChunk chk = item.getSourceChunk();
-
-            return new QuizQuestionDto(
-                    item.getId(),
-                    item.getConcept() != null ? item.getConcept().getId() : null,
-                    item.getQuestion(),
-                    options,
-                    revealAnswers ? item.getCorrectOption() : null,
-                    item.getUserAnswer(),
-                    revealAnswers ? item.getExplanation() : null,
-                    res != null ? res.getId() : null,
-                    res != null ? res.getTitle() : null,
-                    chk != null ? chk.getId() : null,
-                    revealAnswers ? item.getSourceSnippet() : null
-            );
-        }).toList();
+        return result;
     }
 }

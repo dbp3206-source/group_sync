@@ -6,10 +6,11 @@ export type InsightOverview = { totalResources: number; readyResources: number; 
 export type Citation = { chunkId: number; resourceId: number; resourceTitle: string; pageNumber: number | null; section: string | null; citationOrder: number; relevanceScore: number; evidenceExcerpt: string }
 export type AskResponse = { sessionId: number; answer: string; grounded: boolean; citations: Citation[] }
 export type AskInput = { sessionId?: number; question: string; scope: 'THIS_RESOURCE' | 'SELECTED_RESOURCES' | 'COLLECTION' | 'LIBRARY'; resourceId?: number; resourceIds?: number[]; collectionId?: number; sessionTitle?: string }
-export type KnowledgeCollection = { id: number; name: string; description: string | null }
-export type KnowledgeTag = { id: number; name: string; created_at?: string }
-export type ResourceNote = { id: number; content: string; created_at: string; updated_at: string }
-export type ResourceActivity = { processing_status: string; progress_percent: number; note_count: number; created_at: string; updated_at: string; last_opened_at: string | null }
+export type KnowledgeCollection = { id: number; name: string; description: string | null; createdAt?: string; updatedAt?: string }
+export type KnowledgeTag = { id: number; name: string; createdAt?: string }
+export type ResourceNote = { id: number; content: string; createdAt: string; updatedAt: string }
+export type ResourceActivity = { processingStatus: string; progressPercent: number; noteCount: number; createdAt: string; updatedAt: string; lastOpenedAt: string | null }
+export type RelatedResource = { id: number; title: string; description: string | null; resourceType: string; processingStatus: string; relationType?: string; createdAt?: string }
 export type ChatSession = { id: number; title: string; scope: string; collectionId: number; updatedAt: string }
 export type ChatDetail = ChatSession & { resourceIds: number[]; messages: { id:number; role:'USER'|'ASSISTANT'; content:string; citations:Citation[] }[] }
 export type OrganizationTagSuggestion = { name: string; existingTagId: number; reason: string; confidence: number }
@@ -40,7 +41,7 @@ export async function getResourceNotes(id:number) { return (await apiClient.get<
 export async function createResourceNote(id:number, content:string) { return (await apiClient.post<ResourceNote>(`/resources/${id}/notes`, { content })).data }
 export async function updateResourceNote(id:number,noteId:number,content:string) { return (await apiClient.patch<ResourceNote>(`/resources/${id}/notes/${noteId}`, { content })).data }
 export async function deleteResourceNote(id:number,noteId:number) { await apiClient.delete(`/resources/${id}/notes/${noteId}`) }
-export async function getRelatedResources(id:number) { return (await apiClient.get<Resource[]>(`/resources/${id}/related`)).data }
+export async function getRelatedResources(id:number) { return (await apiClient.get<RelatedResource[]>(`/resources/${id}/related`)).data }
 export async function getResourceActivity(id:number) { return (await apiClient.get<ResourceActivity>(`/resources/${id}/activity`)).data }
 export async function updateResourceProgress(id:number, progressPercent:number) { return (await apiClient.put<ResourceActivity>(`/resources/${id}/progress`, { progressPercent })).data }
 export async function getOrganizationSuggestions(id:number) { return (await apiClient.get<OrganizationSuggestions>(`/resources/${id}/organization/suggestions`)).data }
