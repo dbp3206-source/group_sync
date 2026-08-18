@@ -78,7 +78,7 @@ const DEFAULT_STEPS: ReasoningStep[] = [
     id: 'synthesis',
     title: 'Sinh Phản hồi & Trích dẫn',
     detail: 'Mô hình Gemini tổng hợp câu trả lời và gắn nhãn trích dẫn đối chứng [1], [2].',
-    badge: 'Gemini 3.5 Flash',
+    badge: 'Gemini 3.5 Flash Lite',
     status: 'pending',
   },
 ]
@@ -377,7 +377,7 @@ export default function KnowledgeAskPage() {
               <div className="kos-box-header">
                 <div className="kos-box-title">
                   <Activity size={16} className="kos-box-icon kos-pulse-icon" />
-                  <span>RAG Reasoning & Pipeline</span>
+                  <span>Kiến trúc Xử lý RAG (Pipeline Architecture)</span>
                 </div>
                 <span className={`kos-status-pill ${loading ? 'is-running' : completedCount === steps.length ? 'is-done' : 'is-idle'}`}>
                   {loading ? (

@@ -13,8 +13,8 @@ class GeminiLanguageModelClientIntegrationTest {
                 System.getenv("GEMINI_API_KEY"),
                 "gemini-3.5-flash-lite",
                 "gemini-3.5-flash",
-                "gemini-embedding-001", 768, 5);
-        String answer = new GeminiLanguageModelClient(properties).answer("""
+                "gemini-embedding-001", 768, 5, 2, 12, 60);
+        String answer = new GeminiLanguageModelClient(properties, null).answer("""
                 You answer only from the evidence below. If it is insufficient, say so.
                 Evidence: KnowledgeOS organizes a personal library of learning resources.
                 Question: What does KnowledgeOS organize?

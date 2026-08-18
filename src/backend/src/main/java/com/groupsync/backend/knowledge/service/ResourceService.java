@@ -26,16 +26,19 @@ public class ResourceService {
     private final ApplicationEventPublisher events;
     private final CitationRepository citationRepository;
     private final com.groupsync.backend.knowledge.repository.DocumentChunkRepository chunkRepository;
+    private final com.groupsync.backend.knowledge.ingestion.ResourceParserRegistry parserRegistry;
 
     public ResourceService(ResourceRepository resourceRepository, UserAccountRepository userRepository,
             StorageService storageService, ApplicationEventPublisher events, CitationRepository citationRepository,
-            com.groupsync.backend.knowledge.repository.DocumentChunkRepository chunkRepository) {
+            com.groupsync.backend.knowledge.repository.DocumentChunkRepository chunkRepository,
+            com.groupsync.backend.knowledge.ingestion.ResourceParserRegistry parserRegistry) {
         this.resourceRepository = resourceRepository;
         this.userRepository = userRepository;
         this.storageService = storageService;
         this.events = events;
         this.citationRepository = citationRepository;
         this.chunkRepository = chunkRepository;
+        this.parserRegistry = parserRegistry;
     }
     @Transactional
     public ResourceResponse upload(Long ownerId, MultipartFile file, String requestedTitle, String description) {
@@ -64,7 +67,16 @@ public class ResourceService {
     }
     @Transactional(readOnly = true) public List<ResourceResponse> list(Long ownerId, String query, Long tagId, Long collectionId) { List<Resource> resources = resourceRepository.search(ownerId, query == null || query.isBlank() ? null : query.trim(), tagId, collectionId); return resources.stream().map(ResourceResponse::from).toList(); }
     @Transactional(readOnly = true) public ResourceResponse get(Long ownerId, Long resourceId) { return ResourceResponse.from(find(ownerId, resourceId)); }
-    @Transactional public ResourceResponse update(Long ownerId, Long resourceId, UpdateResourceRequest request) { Resource resource = find(ownerId, resourceId); resource.updateMetadata(request.title().trim(), normalize(request.description()), request.favorite(), request.priority()); return ResourceResponse.from(resource); }
+    @Transactional
+    public ResourceResponse update(Long ownerId, Long resourceId, UpdateResourceRequest request) {
+        Resource resource = find(ownerId, resourceId);
+        String title = request.title() != null && !request.title().isBlank() ? request.title().trim() : resource.getTitle();
+        String description = request.description() != null ? normalize(request.description()) : resource.getDescription();
+        boolean favorite = request.favorite() != null ? request.favorite() : resource.isFavorite();
+        int priority = request.priority() != null ? request.priority() : resource.getPriority();
+        resource.updateMetadata(title, description, favorite, priority);
+        return ResourceResponse.from(resource);
+    }
     @Transactional
     public void delete(Long ownerId, Long resourceId) {
         Resource resource = find(ownerId, resourceId);
@@ -85,16 +97,16 @@ public class ResourceService {
     @Transactional(readOnly = true)
     public String extractedText(Long ownerId, Long resourceId) {
         Resource resource = find(ownerId, resourceId);
-        List<DocumentChunk> chunks = chunkRepository.findByResourceIdOrderByChunkIndex(resourceId);
-        if (chunks != null && !chunks.isEmpty()) {
-            StringBuilder sb = new StringBuilder();
-            for (DocumentChunk chunk : chunks) {
-                if (chunk.getContent() != null && !chunk.getContent().isBlank()) {
-                    if (sb.length() > 0) sb.append("\n\n");
-                    sb.append(chunk.getContent().trim());
+        // Phase 1.2: Canonical extracted text directly from stored document via parser registry (no chunk overlap duplication)
+        if (resource.getStorageKey() != null) {
+            try (InputStream is = storageService.open(resource.getStorageKey())) {
+                com.groupsync.backend.knowledge.ingestion.ParsedResourceContent parsed =
+                        parserRegistry.forType(resource.getResourceType()).parse(is);
+                if (parsed != null && parsed.content() != null && !parsed.content().isBlank()) {
+                    return parsed.content();
                 }
+            } catch (Exception ignored) {
             }
-            if (sb.length() > 0) return sb.toString();
         }
         if (resource.getResourceType() == ResourceType.NOTE || resource.getResourceType() == ResourceType.TEXT || resource.getResourceType() == ResourceType.MARKDOWN) {
             try (InputStream is = storageService.open(resource.getStorageKey())) {

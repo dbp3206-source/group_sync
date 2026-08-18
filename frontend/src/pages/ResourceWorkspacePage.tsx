@@ -53,6 +53,7 @@ export default function ResourceWorkspacePage() {
   const [organizing, setOrganizing] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [progressVal, setProgressVal] = useState<number | null>(null)
 
   const load = () =>
     Promise.all([
@@ -126,6 +127,7 @@ export default function ResourceWorkspacePage() {
     try {
       const updated = await updateResourceProgress(resourceId, percent)
       setActivity(updated)
+      setProgressVal(null)
     } catch {
       setError('Could not update progress.')
     }
@@ -345,7 +347,7 @@ export default function ResourceWorkspacePage() {
             {related.length > 0 ? (
               related.map(r => (
                 <div key={r.id} className="kos-related-card">
-                  <span className="kos-workspace-type-badge">{r.resourceType}</span>
+                  <span className="kos-workspace-type-badge">{r.resourceType || (r as unknown as { resource_type: string }).resource_type}</span>
                   <div className="kos-related-info">
                     <h4>{r.title}</h4>
                     <p>{r.description || 'No description'}</p>
@@ -370,15 +372,25 @@ export default function ResourceWorkspacePage() {
           <div className="kos-activity-summary-card">
             <h3>Reading Progress</h3>
             <p>
-              Current progress: <strong>{activity?.progress_percent ?? 0}%</strong> · Notes:{' '}
+              Current progress: <strong>{progressVal !== null ? progressVal : (activity?.progress_percent ?? 0)}%</strong> · Notes:{' '}
               <strong>{activity?.note_count ?? 0}</strong>
             </p>
             <input
               type="range"
               min={0}
               max={100}
-              value={activity?.progress_percent ?? 0}
-              onChange={e => saveProgress(Number(e.target.value))}
+              value={progressVal !== null ? progressVal : (activity?.progress_percent ?? 0)}
+              onChange={e => setProgressVal(Number(e.target.value))}
+              onPointerUp={() => {
+                if (progressVal !== null) {
+                  saveProgress(progressVal)
+                }
+              }}
+              onKeyUp={() => {
+                if (progressVal !== null) {
+                  saveProgress(progressVal)
+                }
+              }}
               className="kos-range-slider"
               style={{ maxWidth: '100%', width: '100%', margin: '.6rem 0' }}
             />

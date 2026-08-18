@@ -24,6 +24,7 @@ import com.groupsync.backend.knowledge.model.*;
 import com.groupsync.backend.knowledge.rag.*;
 import com.groupsync.backend.knowledge.repository.*;
 import com.groupsync.backend.knowledge.service.KnowledgeChatService;
+import com.groupsync.backend.knowledge.service.KnowledgeChatTransactionService;
 import com.groupsync.backend.knowledge.service.KnowledgeWorkspaceService;
 import com.groupsync.backend.user.model.UserAccount;
 import com.groupsync.backend.user.repository.UserAccountRepository;
@@ -41,7 +42,20 @@ class KnowledgeChatCitationTest {
     @Mock private LanguageModelClient languageModelClient;
     @Mock private KnowledgeWorkspaceService workspaceService;
 
-    @InjectMocks private KnowledgeChatService chatService;
+    private KnowledgeChatTransactionService chatTransactionService;
+    private KnowledgeChatService chatService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        chatTransactionService = new KnowledgeChatTransactionService(
+                sessionRepository, messageRepository, citationRepository,
+                chunkRepository, resourceRepository, userRepository, workspaceService
+        );
+        chatService = new KnowledgeChatService(
+                chatTransactionService, sessionRepository, messageRepository,
+                citationRepository, retrievalStrategy, languageModelClient
+        );
+    }
 
     @Test
     void askReturnsOnlyActuallyCitedChunksAndPreservesMarkerNumbersAcrossPersistenceAndReload() {
@@ -55,6 +69,7 @@ class KnowledgeChatCitationTest {
 
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
         when(sessionRepository.save(any(ChatSession.class))).thenReturn(session);
+        when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
         when(messageRepository.save(any(ChatMessage.class))).thenAnswer(inv -> {
             ChatMessage msg = inv.getArgument(0);
             ReflectionTestUtils.setField(msg, "id", 999L);
@@ -126,6 +141,7 @@ class KnowledgeChatCitationTest {
 
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
         when(sessionRepository.save(any(ChatSession.class))).thenReturn(session);
+        when(sessionRepository.findById(any())).thenReturn(Optional.of(session));
         when(messageRepository.save(any(ChatMessage.class))).thenAnswer(inv -> inv.getArgument(0));
 
         List<RetrievedChunk> retrieved = List.of(

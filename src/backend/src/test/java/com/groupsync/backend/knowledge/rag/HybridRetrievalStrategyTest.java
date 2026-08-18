@@ -14,7 +14,7 @@ class HybridRetrievalStrategyTest {
 
     // HybridRetrievalStrategy is tested only for its fuse() method — no Spring wiring needed.
     private final HybridRetrievalStrategy strategy = new HybridRetrievalStrategy(null, null,
-            new GeminiProperties("key", "chat", "quality", "embedding", 768, 6));
+            new GeminiProperties("key", "chat", "quality", "embedding", 768, 6, 2, 12, 60));
 
     @Test
     void rrfBoostsBothBranchesOverSingleBranch() {

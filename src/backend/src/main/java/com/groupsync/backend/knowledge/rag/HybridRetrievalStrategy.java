@@ -4,45 +4,18 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 /**
  * Hybrid retrieval using Reciprocal Rank Fusion (RRF).
- *
- * <p>Architecture:
- * <pre>
- *   Question
- *     ├── SemanticRetrievalStrategy  →  semantic candidates  (top K×2)
- *     │         (pgvector cosine)
- *     └── KeywordRetrievalStrategy   →  keyword candidates   (top K×2)
- *               (PostgreSQL FTS)
- *                        │
- *                   Deduplicate
- *                   by chunk ID
- *                        │
- *              Reciprocal Rank Fusion
- *            score = Σ 1/(k + rank_i)
- *              k = 60  (standard RRF constant)
- *                        │
- *              Top-K fused candidates
- *                        │
- *                 Existing Gemini LLM
- *                        │
- *              Answer + persisted citations
- * </pre>
- *
- * <p>RRF is deterministic, requires no external model or calibrated weights, and handles the
- * case where a chunk appears in only one branch (missing rank contributes 0 to that branch).
- *
- * <p>Scope isolation: both underlying branches enforce identical owner + scope filters.
- * This strategy adds no post-hoc filtering and therefore cannot introduce leakage.
  */
 @Component("hybridRetrieval")
 public class HybridRetrievalStrategy implements RetrievalStrategy {
 
-    /** Standard RRF constant. Reduces the impact of high-rank outliers. */
-    private static final int RRF_K = 60;
+    private static final Logger log = LoggerFactory.getLogger(HybridRetrievalStrategy.class);
 
     private final SemanticRetrievalStrategy semantic;
     private final KeywordRetrievalStrategy keyword;
@@ -62,14 +35,15 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                                          Long resourceId, List<Long> selectedResourceIds,
                                          Long collectionId) {
         int topK = properties.ragTopK();
-        // Expand candidate pool before fusion so both branches have enough candidates to fuse from.
-        int candidateSize = Math.min(topK * 2, 12);
+        int candidateSize = Math.min(topK * properties.ragCandidateMultiplier(), properties.ragMaxCandidateSize());
 
         List<RetrievedChunk> semanticCandidates;
         try {
             semanticCandidates = semantic.retrieve(ownerId, question, scope, resourceId,
                     selectedResourceIds, collectionId, candidateSize);
         } catch (RuntimeException ex) {
+            log.warn("[semantic_retrieval_failed] strategy=semantic scope={} resourceId={} candidatesCount=0 exception={}: {}",
+                    scope, resourceId, ex.getClass().getSimpleName(), ex.getMessage());
             semanticCandidates = List.of();
         }
 
@@ -78,7 +52,18 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
             keywordCandidates = keyword.retrieve(ownerId, question, scope, resourceId,
                     selectedResourceIds, collectionId, candidateSize);
         } catch (RuntimeException ex) {
+            log.warn("[keyword_retrieval_failed] strategy=keyword scope={} resourceId={} candidatesCount=0 exception={}: {}",
+                    scope, resourceId, ex.getClass().getSimpleName(), ex.getMessage());
             keywordCandidates = List.of();
+        }
+
+        if (semanticCandidates.isEmpty() && !keywordCandidates.isEmpty()) {
+            log.warn("[hybrid_retrieval_degraded] Degrading to keyword-only retrieval. semanticCount=0 keywordCount={}", keywordCandidates.size());
+        } else if (!semanticCandidates.isEmpty() && keywordCandidates.isEmpty()) {
+            log.warn("[hybrid_retrieval_degraded] Degrading to semantic-only retrieval. semanticCount={} keywordCount=0", semanticCandidates.size());
+        } else if (semanticCandidates.isEmpty() && keywordCandidates.isEmpty()) {
+            log.warn("[hybrid_retrieval_failed] Both retrieval branches returned 0 candidates for query.");
+            return List.of();
         }
 
         return fuse(semanticCandidates, keywordCandidates, topK);
@@ -112,8 +97,9 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 .map(entry -> {
                     RetrievedChunk source = representatives.get(entry.getKey());
                     double rrfScore = entry.getValue()[0];
-                    // Normalize score relative to theoretical maximum (rank 1 in both branches = 2.0 / (RRF_K + 1))
-                    double maxPossibleRrf = 2.0 / (RRF_K + 1.0);
+                    int rrfK = properties.ragRrfK();
+                    // Normalize score relative to theoretical maximum (rank 1 in both branches = 2.0 / (rrfK + 1))
+                    double maxPossibleRrf = 2.0 / (rrfK + 1.0);
                     double normalizedScore = Math.min(1.0, rrfScore / maxPossibleRrf);
                     double normalizedDistance = Math.max(0.0, 1.0 - normalizedScore);
                     return new RetrievedChunk(
@@ -126,10 +112,11 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
 
     private void accumulate(List<RetrievedChunk> candidates, Map<Long, double[]> scores,
                             Map<Long, RetrievedChunk> representatives) {
+        int rrfK = properties.ragRrfK();
         for (int i = 0; i < candidates.size(); i++) {
             RetrievedChunk chunk = candidates.get(i);
             int rank = i + 1; // 1-based rank
-            double rrfContribution = 1.0 / (RRF_K + rank);
+            double rrfContribution = 1.0 / (rrfK + rank);
             scores.computeIfAbsent(chunk.chunkId(), id -> new double[]{0.0})[0] += rrfContribution;
             representatives.putIfAbsent(chunk.chunkId(), chunk);
         }
