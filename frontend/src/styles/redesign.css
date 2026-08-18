@@ -2812,56 +2812,132 @@
 
 .kos-topic-selector-bar {
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.85rem 1.1rem;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem 1.15rem;
   background: var(--kos-surface);
   border: 1px solid var(--kos-line);
-  border-radius: 8px;
+  border-radius: 10px;
   margin-bottom: 1.5rem;
-  flex-wrap: wrap;
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--kos-ink) 4%, transparent);
+}
+
+.kos-topic-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .kos-topic-bar-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font: 600 0.85rem var(--kos-font-display), sans-serif;
+  font: 600 0.86rem var(--kos-font-display), sans-serif;
   color: var(--kos-ink);
   white-space: nowrap;
+}
+
+.kos-topic-pills-scroll-container {
+  overflow-x: auto;
+  padding-bottom: 3px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--kos-line) transparent;
+}
+
+.kos-topic-pills-scroll-container::-webkit-scrollbar {
+  height: 4px;
+}
+
+.kos-topic-pills-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--kos-line);
+  border-radius: 4px;
 }
 
 .kos-topic-pills {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  flex: 1;
+  gap: 0.55rem;
+  flex-wrap: nowrap;
+  min-width: max-content;
 }
 
-.kos-topic-pill {
+.kos-topic-pill-wrapper {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 8px;
+  padding: 5px 8px 5px 12px;
   background: color-mix(in srgb, var(--kos-line) 40%, transparent);
   border: 1px solid var(--kos-line);
   border-radius: 20px;
-  font: 500 0.82rem var(--kos-font-body), sans-serif;
+  font: 500 0.83rem var(--kos-font-body), sans-serif;
   color: var(--kos-ink);
   cursor: pointer;
-  transition: all 140ms ease;
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  white-space: nowrap;
 }
 
-.kos-topic-pill:hover {
+.kos-topic-pill-wrapper:hover {
   background: color-mix(in srgb, var(--kos-blue) 12%, transparent);
-  border-color: var(--kos-blue);
+  border-color: color-mix(in srgb, var(--kos-blue) 50%, var(--kos-line));
+  transform: translateY(-1px);
 }
 
-.kos-topic-pill.is-active {
+.kos-topic-pill-wrapper.is-active {
   background: var(--kos-blue);
-  color: white;
+  color: #ffffff;
   border-color: var(--kos-blue);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--kos-blue) 32%, transparent);
+}
+
+.kos-topic-pill-title {
+  font-weight: 600;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kos-topic-pill-count {
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--kos-ink) 8%, transparent);
+  color: inherit;
+  opacity: 0.9;
+}
+
+.kos-topic-pill-wrapper.is-active .kos-topic-pill-count {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.kos-topic-pill-delete-btn {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  opacity: 0.45;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 50%;
+  transition: all 120ms ease;
+  margin-left: 2px;
+}
+
+.kos-topic-pill-delete-btn:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--kos-red) 25%, transparent);
+  color: var(--kos-red);
+}
+
+.kos-topic-pill-wrapper.is-active .kos-topic-pill-delete-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
 }
 
 .kos-focus-stage-layout {

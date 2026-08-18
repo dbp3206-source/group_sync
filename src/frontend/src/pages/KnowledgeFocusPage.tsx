@@ -27,6 +27,7 @@ import {
   addTopicSource,
   createResourceNote,
   createStudyTopic,
+  deleteStudyTopic,
   generateTopicPlan,
   generateTopicQuiz,
   getResources,
@@ -70,6 +71,7 @@ export default function KnowledgeFocusPage() {
   const [newTopicTitle, setNewTopicTitle] = useState('')
   const [newTopicGoal, setNewTopicGoal] = useState('')
   const [selectedResourceIds, setSelectedResourceIds] = useState<number[]>([])
+  const [topicToDelete, setTopicToDelete] = useState<{ id: number; title: string } | null>(null)
 
   const [addSourceModal, setAddSourceModal] = useState(false)
   const [uploadBusy, setUploadBusy] = useState(false)
@@ -276,6 +278,29 @@ export default function KnowledgeFocusPage() {
     }
   }
 
+  // Delete Topic
+  const handleDeleteTopic = async (topicId: number) => {
+    setError('')
+    try {
+      await deleteStudyTopic(topicId)
+      setTopicToDelete(null)
+      const tList = await getStudyTopics()
+      setTopics(tList)
+      if (tList.length > 0) {
+        const nextId = tList[0].id
+        setSelectedTopicId(nextId)
+        await loadTopicDetail(nextId)
+      } else {
+        setSelectedTopicId(null)
+        setTopicDetail(null)
+      }
+      const qList = await getReviewQueue().catch(() => [])
+      setReviewQueue(qList)
+    } catch {
+      setError('Không thể xóa chủ đề học tập.')
+    }
+  }
+
   // Direct Ingest into Topic (reuses standard ingestion)
   const handleDirectUpload = async (file?: File) => {
     if (!file || !selectedTopicId) return
@@ -346,28 +371,58 @@ export default function KnowledgeFocusPage() {
         </div>
       )}
 
-      {/* Topic Switcher Pills */}
+      {/* Sleek Topic Switcher Ribbon */}
       <div className="kos-topic-selector-bar">
-        <span className="kos-topic-bar-label">
-          <Folder size={15} /> Chủ đề Học tập (Topics):
-        </span>
-        <div className="kos-topic-pills">
-          {topics.map(t => (
-            <button
-              key={t.id}
-              type="button"
-              className={`kos-topic-pill ${selectedTopicId === t.id ? 'is-active' : ''}`}
-              onClick={() => handleSelectTopic(t.id)}
-            >
-              <span>🎯 {t.title}</span>
-              <small style={{ opacity: 0.7 }}>({t.conceptCount} mục)</small>
-            </button>
-          ))}
-          {topics.length === 0 && (
-            <span style={{ fontSize: '0.84rem', color: 'var(--kos-muted)' }}>
-              Chưa có Chủ đề nào. Hãy bấm "Tạo Topic Học Sâu" để bắt đầu!
-            </span>
-          )}
+        <div className="kos-topic-bar-header">
+          <span className="kos-topic-bar-label">
+            <Folder size={15} /> Danh sách Chủ đề ({topics.length})
+          </span>
+          <button
+            type="button"
+            className="kos-button kos-button--sm kos-button--primary"
+            onClick={() => setNewTopicModal(true)}
+          >
+            <Plus size={14} /> Thêm Topic Mới
+          </button>
+        </div>
+
+        <div className="kos-topic-pills-scroll-container">
+          <div className="kos-topic-pills">
+            {topics.map(t => {
+              const isActive = selectedTopicId === t.id
+              return (
+                <div
+                  key={t.id}
+                  className={`kos-topic-pill-wrapper ${isActive ? 'is-active' : ''}`}
+                  onClick={() => handleSelectTopic(t.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') handleSelectTopic(t.id)
+                  }}
+                >
+                  <span className="kos-topic-pill-title">🎯 {t.title}</span>
+                  <span className="kos-topic-pill-count">{t.conceptCount} mục</span>
+                  <button
+                    type="button"
+                    className="kos-topic-pill-delete-btn"
+                    title={`Xóa chủ đề "${t.title}"`}
+                    onClick={e => {
+                      e.stopPropagation()
+                      setTopicToDelete({ id: t.id, title: t.title })
+                    }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              )
+            })}
+            {topics.length === 0 && (
+              <span style={{ fontSize: '0.84rem', color: 'var(--kos-muted)', padding: '0.25rem 0.5rem' }}>
+                Chưa có Chủ đề nào. Hãy bấm "Thêm Topic Mới" để bắt đầu!
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -380,15 +435,25 @@ export default function KnowledgeFocusPage() {
                 <h3>{topicDetail.title}</h3>
                 <p>{topicDetail.resources.length} tài liệu • {topicDetail.concepts.length} khái niệm</p>
               </div>
-              <button
-                type="button"
-                className="kos-icon-btn"
-                title="Tạo lại lộ trình học từ tài liệu"
-                onClick={handleGeneratePlan}
-                disabled={planBusy}
-              >
-                <RefreshCw size={14} className={planBusy ? 'kos-spin' : ''} />
-              </button>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button
+                  type="button"
+                  className="kos-icon-btn"
+                  title="Tạo lại lộ trình học từ tài liệu"
+                  onClick={handleGeneratePlan}
+                  disabled={planBusy}
+                >
+                  <RefreshCw size={14} className={planBusy ? 'kos-spin' : ''} />
+                </button>
+                <button
+                  type="button"
+                  className="kos-icon-btn kos-icon-btn--danger"
+                  title="Xóa chủ đề học tập này"
+                  onClick={() => setTopicToDelete({ id: topicDetail.id, title: topicDetail.title })}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
 
             {/* Discrete Status Summary Bar */}
@@ -1140,6 +1205,40 @@ export default function KnowledgeFocusPage() {
                     </button>
                   </div>
                 ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DELETE TOPIC CONFIRMATION */}
+      {topicToDelete && (
+        <div className="kos-modal" role="dialog" aria-modal="true">
+          <div style={{ maxWidth: '460px', background: 'var(--kos-surface)', padding: '1.5rem', borderRadius: '10px', border: '1px solid var(--kos-line)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--kos-red)', marginBottom: '0.75rem' }}>
+              <AlertCircle size={22} />
+              <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Xác nhận xóa Chủ đề?</h3>
+            </div>
+            <p style={{ fontSize: '0.9rem', color: 'var(--kos-ink)', lineHeight: '1.5', margin: '0 0 1rem' }}>
+              Bạn có chắc chắn muốn xóa chủ đề <strong>"{topicToDelete.title}"</strong>?
+            </p>
+            <p style={{ fontSize: '0.82rem', color: 'var(--kos-muted)', lineHeight: '1.4', margin: '0 0 1.25rem', padding: '0.6rem 0.75rem', background: 'var(--kos-subtle)', borderRadius: '6px' }}>
+              💡 Lộ trình học và bài kiểm tra thuộc chủ đề này sẽ bị xóa. Toàn bộ tài liệu gốc trong Thư viện vẫn được bảo toàn nguyên vẹn.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                className="kos-button"
+                onClick={() => setTopicToDelete(null)}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="kos-button kos-button--danger"
+                onClick={() => handleDeleteTopic(topicToDelete.id)}
+              >
+                <Trash2 size={15} /> Xóa Chủ Đề
+              </button>
             </div>
           </div>
         </div>
