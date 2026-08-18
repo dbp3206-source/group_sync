@@ -9,47 +9,44 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionalEventListener;
 import com.groupsync.backend.knowledge.chunking.RecursiveChunkingStrategy;
 import com.groupsync.backend.knowledge.ingestion.ParsedResourceContent;
 import com.groupsync.backend.knowledge.ingestion.ResourceParserRegistry;
 import com.groupsync.backend.knowledge.ingestion.ResourceProcessingRequestedEvent;
-import com.groupsync.backend.knowledge.model.DocumentChunk;
 import com.groupsync.backend.knowledge.model.Resource;
 import com.groupsync.backend.knowledge.model.ResourceProcessingStatus;
-import com.groupsync.backend.knowledge.repository.DocumentChunkRepository;
 import com.groupsync.backend.knowledge.repository.ResourceRepository;
 import com.groupsync.backend.knowledge.rag.EmbeddingProvider;
-import com.groupsync.backend.knowledge.rag.GeminiProperties;
 import com.groupsync.backend.knowledge.storage.StorageService;
 
+/**
+ * Coordinates resource ingestion workflow.
+ * Parsing, recursive chunking, and external Gemini embedding generation are executed
+ * outside active database transactions to prevent connection pool starvation.
+ * Database claims and final status transitions are delegated to {@link ResourceIngestionTransactionService}.
+ */
 @Service
 public class ResourceIngestionService {
     private static final Logger log = LoggerFactory.getLogger(ResourceIngestionService.class);
 
     private final ResourceRepository resourceRepository;
-    private final DocumentChunkRepository chunkRepository;
     private final ResourceParserRegistry parserRegistry;
     private final RecursiveChunkingStrategy chunkingStrategy;
     private final StorageService storageService;
     private final EmbeddingProvider embeddingProvider;
-    private final GeminiProperties geminiProperties;
-    private final AutoOrganizationService autoOrganizationService;
+    private final ResourceIngestionTransactionService transactionService;
 
-    public ResourceIngestionService(ResourceRepository resourceRepository, DocumentChunkRepository chunkRepository,
+    public ResourceIngestionService(ResourceRepository resourceRepository,
             ResourceParserRegistry parserRegistry, RecursiveChunkingStrategy chunkingStrategy,
-            StorageService storageService, EmbeddingProvider embeddingProvider, GeminiProperties geminiProperties,
-            AutoOrganizationService autoOrganizationService) {
+            StorageService storageService, EmbeddingProvider embeddingProvider,
+            ResourceIngestionTransactionService transactionService) {
         this.resourceRepository = resourceRepository;
-        this.chunkRepository = chunkRepository;
         this.parserRegistry = parserRegistry;
         this.chunkingStrategy = chunkingStrategy;
         this.storageService = storageService;
         this.embeddingProvider = embeddingProvider;
-        this.geminiProperties = geminiProperties;
-        this.autoOrganizationService = autoOrganizationService;
+        this.transactionService = transactionService;
     }
 
     @Async
@@ -70,17 +67,11 @@ public class ResourceIngestionService {
         }
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean claimResourceForProcessing(Long resourceId) {
-        int updated = resourceRepository.updateStatusIfMatches(resourceId, ResourceProcessingStatus.UPLOADED, ResourceProcessingStatus.PARSING);
-        return updated > 0;
-    }
-
     public void process(Long resourceId) {
         if (resourceId == null) return;
 
-        // Step 1: Atomic claim UPLOADED -> PARSING
-        boolean claimed = claimResourceForProcessing(resourceId);
+        // Step 1: Atomic claim UPLOADED -> PARSING via dedicated transaction service
+        boolean claimed = transactionService.claim(resourceId);
         if (!claimed) {
             return;
         }
@@ -91,10 +82,10 @@ public class ResourceIngestionService {
         }
 
         try {
-            // Step 2: Parse file (in memory / stream)
+            // Step 2: Parse file (in memory / stream - OUTSIDE database transaction)
             ParsedResourceContent parsed = parse(resource);
 
-            // Step 3: Chunk content (in memory)
+            // Step 3: Chunk content (in memory - OUTSIDE database transaction)
             List<String> pieces = chunkingStrategy.chunk(parsed.content());
             if (pieces.isEmpty()) {
                 throw new IllegalArgumentException("No readable text was found in this resource.");
@@ -106,53 +97,12 @@ public class ResourceIngestionService {
                 embeddings.add(embeddingProvider.embedDocument(piece));
             }
 
-            // Step 5: Short dedicated database transaction to save chunks and mark READY
-            saveChunksAndMarkReady(resourceId, pieces, embeddings, parsed);
+            // Step 5: Save chunks and mark READY via dedicated transaction service
+            transactionService.saveReady(resourceId, pieces, embeddings, parsed);
 
         } catch (Exception exception) {
             log.error("Resource processing failed for id {}: {}", resourceId, exception.getMessage(), exception);
-            markResourceFailed(resourceId, safeMessage(exception));
-        }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void saveChunksAndMarkReady(Long resourceId, List<String> pieces, List<float[]> embeddings, ParsedResourceContent parsed) {
-        Resource resource = resourceRepository.findById(resourceId)
-                .orElseThrow(() -> new IllegalStateException("Resource not found during final save: " + resourceId));
-
-        resource.beginChunking();
-        chunkRepository.deleteByResourceId(resource.getId());
-
-        List<DocumentChunk> chunks = new ArrayList<>();
-        for (int index = 0; index < pieces.size(); index++) {
-            DocumentChunk chunk = new DocumentChunk(resource, index, parsed.pageNumber(), parsed.section(), pieces.get(index));
-            if (index < embeddings.size() && embeddings.get(index) != null) {
-                chunk.embed(embeddings.get(index), geminiProperties.embeddingModel());
-            }
-            chunks.add(chunk);
-        }
-        chunkRepository.saveAll(chunks);
-
-        resource.markReady();
-        resourceRepository.save(resource);
-
-        try {
-            autoOrganizationService.autoOrganize(resource.getOwner().getId(), resource.getId());
-        } catch (Exception e) {
-            log.warn("Auto-organization skipped for resource {}: {}", resourceId, e.getMessage());
-        }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void markResourceFailed(Long resourceId, String errorMessage) {
-        try {
-            Resource resource = resourceRepository.findById(resourceId).orElse(null);
-            if (resource != null) {
-                resource.markFailed(errorMessage);
-                resourceRepository.save(resource);
-            }
-        } catch (Exception e) {
-            log.error("Failed to mark resource {} as FAILED: {}", resourceId, e.getMessage());
+            transactionService.markFailed(resourceId, safeMessage(exception));
         }
     }
 

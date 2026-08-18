@@ -76,27 +76,22 @@ public class KnowledgeChatService {
         String answer = languageModelClient.answer(groundedPrompt);
         ChatMessage assistantMessage = messageRepository.save(new ChatMessage(session, ChatMessageRole.ASSISTANT, answer));
 
-        // P0.4: Parse citation markers from generated answer output and validate indices
+        // P0.4: Parse citation markers from generated answer output and validate indices against available chunks
         Set<Integer> referencedIndices = extractCitationIndices(answer, chunks.size());
-        if (referencedIndices.isEmpty() && !chunks.isEmpty() && !answer.contains(INSUFFICIENT_CONTEXT)) {
-            // Fallback: If no explicit [X] notation used but evidence was grounded, cite top match
-            referencedIndices.add(1);
-        }
 
         Map<Long, DocumentChunk> persistedChunks = new HashMap<>();
         chunkRepository.findAllById(chunks.stream().map(RetrievedChunk::chunkId).toList())
                 .forEach(chunk -> persistedChunks.put(chunk.getId(), chunk));
 
         List<CitationResponse> citations = new ArrayList<>();
-        int citationOrder = 1;
         for (Integer index : referencedIndices) {
             RetrievedChunk chunk = chunks.get(index - 1);
             DocumentChunk persisted = persistedChunks.get(chunk.chunkId());
             if (persisted == null) continue;
-            citationRepository.save(new Citation(assistantMessage, persisted, citationOrder, 1 - chunk.distance(), excerpt(chunk.content())));
+            // Preserve the original 1-based evidence marker number in citationOrder
+            citationRepository.save(new Citation(assistantMessage, persisted, index, 1 - chunk.distance(), excerpt(chunk.content())));
             citations.add(new CitationResponse(chunk.chunkId(), chunk.resourceId(), chunk.resourceTitle(), chunk.pageNumber(),
                     chunk.section(), index, 1 - chunk.distance(), excerpt(chunk.content())));
-            citationOrder++;
         }
 
         return new AskKnowledgeResponse(session.getId(), answer, true, citations);
@@ -117,11 +112,21 @@ public class KnowledgeChatService {
         return indices;
     }
 
-    private String contextualizeSearchQuery(String currentQuestion, List<ChatMessage> history) {
-        if (history == null || history.isEmpty()) {
-            return currentQuestion;
+    private static final Pattern FOLLOW_UP_PATTERN = Pattern.compile(
+            "\\b(it|this|that|these|those|they|them|its|their|the above|previous|earlier)\\b" +
+            "|(?iu)\\b(nó|chúng|chúng nó|cách trên|phương pháp trên|phần đó|ở trên|điều này|vấn đề này|cái này|đoạn trên)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
+    );
+
+    public static boolean isFollowUpQuestion(String question) {
+        if (question == null || question.isBlank()) return false;
+        return FOLLOW_UP_PATTERN.matcher(question).find();
+    }
+
+    public static String contextualizeSearchQuery(String currentQuestion, List<ChatMessage> history) {
+        if (history == null || history.isEmpty() || currentQuestion == null || currentQuestion.isBlank()) {
+            return currentQuestion != null ? currentQuestion.trim() : "";
         }
-        // Extract recent user query terms or keywords from previous turn to provide context for relative queries
         ChatMessage lastUserMsg = null;
         for (int i = history.size() - 1; i >= 0; i--) {
             if (history.get(i).getRole() == ChatMessageRole.USER) {
@@ -129,18 +134,15 @@ public class KnowledgeChatService {
                 break;
             }
         }
-        if (lastUserMsg == null) return currentQuestion;
+        if (lastUserMsg == null || lastUserMsg.getContent() == null || lastUserMsg.getContent().isBlank()) {
+            return currentQuestion.trim();
+        }
 
         String prevText = lastUserMsg.getContent().trim();
-        String lowerQ = currentQuestion.toLowerCase(Locale.ROOT);
-        boolean isRelative = lowerQ.contains("it") || lowerQ.contains("this") || lowerQ.contains("that")
-                || lowerQ.contains("they") || lowerQ.contains("previous") || lowerQ.contains("above")
-                || lowerQ.contains("này") || lowerQ.contains("đó") || lowerQ.contains("trên") || lowerQ.contains("trước");
-
-        if (isRelative && !prevText.isBlank()) {
-            return prevText + " " + currentQuestion;
+        if (isFollowUpQuestion(currentQuestion)) {
+            return prevText + " " + currentQuestion.trim();
         }
-        return currentQuestion;
+        return currentQuestion.trim();
     }
 
     @Transactional(readOnly = true)
