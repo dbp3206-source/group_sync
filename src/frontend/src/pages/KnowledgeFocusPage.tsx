@@ -318,7 +318,7 @@ export default function KnowledgeFocusPage() {
       <header className="kos-page-header">
         <div>
           <p className="kos-kicker">TOPIC DEEPDIVE LEARNING STUDIO</p>
-          <h1>Learn $\to$ Recall $\to$ Verify $\to$ Connect $\to$ Continue</h1>
+          <h1>Learn → Recall → Verify → Connect → Continue</h1>
         </div>
         <div className="kos-library-actions">
           <button
