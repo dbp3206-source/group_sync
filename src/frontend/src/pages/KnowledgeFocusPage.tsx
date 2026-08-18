@@ -1,87 +1,110 @@
 import {
+  AlertCircle,
+  ArrowRight,
   BookOpen,
   BrainCircuit,
   Check,
   CheckCircle2,
   ChevronRight,
-  FileText,
+  Compass,
   Folder,
   FolderPlus,
   HelpCircle,
+  Layers,
   Network,
   Plus,
+  RefreshCw,
   RotateCcw,
   Sparkles,
+  Trash2,
   Upload,
+  X,
   XCircle,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  assignResourceToCollection,
-  createCollection,
-  createNote,
+  addTopicSource,
   createResourceNote,
-  getCollectionResources,
-  getCollections,
-  getResourceContent,
-  getResourceNotes,
+  createStudyTopic,
+  generateTopicPlan,
+  generateTopicQuiz,
   getResources,
-  getTags,
-  updateResourceProgress,
+  getReviewQueue,
+  getStudyTopicDetail,
+  getStudyTopics,
+  removeTopicSource,
+  submitQuizAnswers,
+  updateConceptStatus,
   uploadResource,
-  type KnowledgeCollection,
-  type KnowledgeTag,
+  type QuizAttemptResponse,
   type Resource,
-  type ResourceNote,
+  type ReviewQueueItem,
+  type StudyTopic,
+  type StudyTopicDetail,
+  type SubmitQuizAnswersResponse,
 } from '../api/knowledge'
-import KnowledgeGraphView from '../components/KnowledgeGraphView'
-
-interface QuizQuestion {
-  id: number
-  question: string
-  options: string[]
-  correctIndex: number
-  explanation: string
-}
 
 export default function KnowledgeFocusPage() {
-  const [collections, setCollections] = useState<KnowledgeCollection[]>([])
+  const [topics, setTopics] = useState<StudyTopic[]>([])
+  const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null)
+  const [topicDetail, setTopicDetail] = useState<StudyTopicDetail | null>(null)
   const [allResources, setAllResources] = useState<Resource[]>([])
-  const [tags, setTags] = useState<KnowledgeTag[]>([])
-  const [selectedColId, setSelectedColId] = useState<number | null>(null)
-  const [topicResources, setTopicResources] = useState<Resource[]>([])
-  const [activeResourceId, setActiveResourceId] = useState<number | null>(null)
-  const [activeContent, setActiveContent] = useState<string>('')
-  const [activeNotes, setActiveNotes] = useState<ResourceNote[]>([])
-  const [newNoteText, setNewNoteText] = useState('')
-  const [progressPercent, setProgressPercent] = useState<number>(0)
-  const [activeTab, setActiveTab] = useState<'READER' | 'QUIZ' | 'GRAPH' | 'NOTES'>('READER')
-  const [uploadBusy, setUploadBusy] = useState(false)
+  const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([])
+
+  const [activeTab, setActiveTab] = useState<'PATH' | 'QUIZ' | 'MAP' | 'QUEUE' | 'SOURCES'>('PATH')
+  const [selectedConceptId, setSelectedConceptId] = useState<number | null>(null)
+
+  // Quiz state
+  const [currentQuiz, setCurrentQuiz] = useState<QuizAttemptResponse | null>(null)
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({})
+  const [quizResult, setQuizResult] = useState<SubmitQuizAnswersResponse | null>(null)
+  const [quizLoading, setQuizLoading] = useState(false)
+
+  // Takeaway Note state
+  const [takeawayText, setTakeawayText] = useState('')
+  const [takeawaySaved, setTakeawaySaved] = useState(false)
+
+  // Modals & form state
   const [newTopicModal, setNewTopicModal] = useState(false)
-  const [newTopicName, setNewTopicName] = useState('')
-  const [newNoteModal, setNewNoteModal] = useState(false)
-  const [newNoteTitle, setNewNoteTitle] = useState('')
-  const [newNoteContent, setNewNoteContent] = useState('')
+  const [newTopicTitle, setNewTopicTitle] = useState('')
+  const [newTopicGoal, setNewTopicGoal] = useState('')
+  const [selectedResourceIds, setSelectedResourceIds] = useState<number[]>([])
+
+  const [addSourceModal, setAddSourceModal] = useState(false)
+  const [uploadBusy, setUploadBusy] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [planBusy, setPlanBusy] = useState(false)
   const [error, setError] = useState('')
-  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([])
-  const [userAnswers, setUserAnswers] = useState<Record<number, number>>({})
-  const [quizSubmitted, setQuizSubmitted] = useState(false)
 
   // Initial Load
   const initLoad = async () => {
+    setLoading(true)
+    setError('')
     try {
-      const [cols, res, t] = await Promise.all([getCollections(), getResources(), getTags()])
-      setCollections(cols)
-      setAllResources(res)
-      setTags(t)
-      if (cols.length > 0) {
-        setSelectedColId(cols[0].id)
-      } else if (res.length > 0) {
-        setSelectedColId(-1) // All topics view
+      const [tList, resList, qList] = await Promise.all([
+        getStudyTopics(),
+        getResources(),
+        getReviewQueue().catch(() => []),
+      ])
+      setTopics(tList)
+      setAllResources(resList)
+      setReviewQueue(qList)
+
+      if (tList.length > 0) {
+        const targetId = selectedTopicId && tList.some(t => t.id === selectedTopicId)
+          ? selectedTopicId
+          : tList[0].id
+        setSelectedTopicId(targetId)
+        await loadTopicDetail(targetId)
+      } else {
+        setSelectedTopicId(null)
+        setTopicDetail(null)
       }
     } catch {
-      setError('Could not load topics and collections.')
+      setError('Không thể tải dữ liệu Chủ đề học tập.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -89,649 +112,970 @@ export default function KnowledgeFocusPage() {
     initLoad()
   }, [])
 
-  // Load resources for the selected collection
-  useEffect(() => {
-    if (selectedColId === null) return
-    if (selectedColId === -1) {
-      setTopicResources(allResources)
-      if (allResources.length > 0) {
-        setActiveResourceId(prev => (prev && allResources.some(r => r.id === prev) ? prev : allResources[0].id))
+  const loadTopicDetail = async (topicId: number) => {
+    try {
+      const detail = await getStudyTopicDetail(topicId)
+      setTopicDetail(detail)
+      if (detail.concepts.length > 0) {
+        setSelectedConceptId(prev => (prev && detail.concepts.some(c => c.id === prev) ? prev : detail.concepts[0].id))
       } else {
-        setActiveResourceId(null)
-        setActiveContent('')
+        setSelectedConceptId(null)
       }
-    } else {
-      getCollectionResources(selectedColId)
-        .then(resList => {
-          setTopicResources(resList)
-          if (resList.length > 0) {
-            setActiveResourceId(prev => (prev && resList.some(r => r.id === prev) ? prev : resList[0].id))
-          } else {
-            setActiveResourceId(null)
-            setActiveContent('')
-          }
-        })
-        .catch(() => setError('Could not load topic resources.'))
+    } catch {
+      setError('Không thể tải chi tiết chủ đề.')
     }
-  }, [selectedColId, allResources])
-
-  // Load active resource content & notes
-  useEffect(() => {
-    if (!activeResourceId) {
-      setActiveContent('')
-      setActiveNotes([])
-      return
-    }
-    Promise.all([
-      getResourceContent(activeResourceId).catch(() => 'No readable text content available.'),
-      getResourceNotes(activeResourceId).catch(() => []),
-    ]).then(([text, notes]) => {
-      setActiveContent(text)
-      setActiveNotes(notes)
-      generateQuizFromContent(text)
-    })
-  }, [activeResourceId])
-
-  // Generates interactive quiz questions from active text
-  function generateQuizFromContent(text: string) {
-    setUserAnswers({})
-    setQuizSubmitted(false)
-
-    if (!text || text.length < 50) {
-      setQuizQuestions([])
-      return
-    }
-
-    const lines = text.split('\n').filter(l => l.trim().length > 20)
-    const questions: QuizQuestion[] = []
-
-    if (text.toLowerCase().includes('armstrong') || text.toLowerCase().includes('phụ thuộc hàm')) {
-      questions.push(
-        {
-          id: 1,
-          question: 'Hệ tiên đề Armstrong gồm 3 luật cơ bản nào đóng vai trò đúng đắn và đầy đủ?',
-          options: [
-            'Luật phản xạ (Reflexivity), Luật tăng trưởng (Augmentation), Luật bắc cầu (Transitivity)',
-            'Luật chiếu (Decomposition), Luật cộng (Union), Luật giả bắc cầu (Pseudo-transitivity)',
-            'Luật giao hoán, Luật kết hợp, Luật phân phối',
-            'Luật bảo toàn thông tin, Luật bảo toàn phụ thuộc hàm',
-          ],
-          correctIndex: 0,
-          explanation: 'Theo Hệ tiên đề Armstrong, 3 luật cơ bản là Phản xạ (IR1), Tăng trưởng (IR2) và Bắc cầu (IR3). Các luật IR4, IR5, IR6 là hệ quả mở rộng.',
-        },
-        {
-          id: 2,
-          question: 'Một phụ thuộc hàm X → Y được gọi là hiển nhiên (Trivial) khi nào?',
-          options: [
-            'Khi Y ⊆ X (Vế phải là tập con của vế trái)',
-            'Khi X ⊆ Y (Vế trái là tập con của vế phải)',
-            'Khi X ∩ Y = ∅ (X và Y rời nhau)',
-            'Khi X là siêu khóa của lược đồ quan hệ',
-          ],
-          correctIndex: 0,
-          explanation: 'Phụ thuộc hàm X → Y là hiển nhiên khi và chỉ khi Y là tập con của X (Y ⊆ X).',
-        },
-        {
-          id: 3,
-          question: 'Bao đóng của tập thuộc tính X (kí hiệu X+) đối với tập phụ thuộc hàm F dùng để làm gì?',
-          options: [
-            'Tìm tất cả các thuộc tính có thể được xác định hàm từ X dựa vào F',
-            'Tìm số lượng bảng cần phân rã khi chuẩn hóa',
-            'Tính toán kích thước lưu trữ của bảng CSDL',
-            'Xóa các thuộc tính dư thừa trong khóa chính',
-          ],
-          correctIndex: 0,
-          explanation: 'X+ là tập hợp tất cả các thuộc tính A sao cho phụ thuộc hàm X → A có thể suy diễn từ F.',
-        },
-      )
-    } else if (text.toLowerCase().includes('cve') || text.toLowerCase().includes('security') || text.toLowerCase().includes('injection')) {
-      questions.push(
-        {
-          id: 1,
-          question: 'Đâu là giải pháp cốt lõi để phòng thủ tấn công Prompt Injection trong hệ thống RAG?',
-          options: [
-            'Đóng gói chứng cứ vào thẻ XML <evidence> và chỉ thị AI xử lý chứng cứ dưới dạng dữ liệu thụ động',
-            'Tăng nhiệt độ (temperature) của mô hình ngôn ngữ lớn',
-            'Chỉ sử dụng mô hình AI có số lượng tham số lớn hơn 70B',
-            'Xóa bỏ toàn bộ trích dẫn nguồn đối chứng',
-          ],
-          correctIndex: 0,
-          explanation: 'Phân lập rõ ràng giữa chỉ thị hệ thống và dữ liệu tri thức không tin cậy bằng thẻ XML và prompt grounding ngăn ngừa việc ghi đè chỉ thị.',
-        },
-        {
-          id: 2,
-          question: 'Chỉ số CVSS (Common Vulnerability Scoring System) dùng để đánh giá điều gì?',
-          options: [
-            'Mức độ nghiêm trọng và rủi ro của lỗ hổng bảo mật',
-            'Tốc độ xử lý của mạng máy chủ',
-            'Dung lượng bộ nhớ RAM bị tiêu tốn',
-            'Chuẩn mã hóa JWT trong hệ thống',
-          ],
-          correctIndex: 0,
-          explanation: 'CVSS cung cấp thang điểm chuẩn hóa từ 0.0 đến 10.0 để lượng hóa mức độ nguy hiểm của các lỗ hổng an ninh thông tin.',
-        },
-      )
-    } else {
-      // General question generation from sample text paragraphs
-      const sampleTopic = lines[0] ? lines[0].slice(0, 60) : 'nội dung tài liệu'
-      questions.push(
-        {
-          id: 1,
-          question: `Chủ đề trọng tâm được đề cập trong phần đầu của tài liệu là gì?`,
-          options: [
-            sampleTopic,
-            'Cấu trúc mạng máy tính diện rộng',
-            'Phương pháp quản trị kinh doanh hiện đại',
-            'Lý thuyết đồ thị rời rạc nâng cao',
-          ],
-          correctIndex: 0,
-          explanation: `Nội dung phần mở đầu tài liệu tập trung trực tiếp vào: "${sampleTopic}".`,
-        },
-        {
-          id: 2,
-          question: 'Mục đích cốt lõi của việc ghi chép và lưu trữ tài liệu trong KnowledgeOS là gì?',
-          options: [
-            'Tổ chức tri thức có cấu trúc và truy vấn hỏi đáp đối chứng chính xác với RAG',
-            'Chỉ để xem lại dưới dạng văn bản tĩnh không xử lý',
-            'Tự động gửi email thông báo hàng ngày',
-            'Chuyển đổi toàn bộ tài liệu thành định dạng âm thanh',
-          ],
-          correctIndex: 0,
-          explanation: 'KnowledgeOS hỗ trợ ingest một lần, tự động bóc tách vector và cho phép tra cứu, đối chứng trích dẫn nguồn chuẩn mực.',
-        },
-      )
-    }
-
-    setQuizQuestions(questions)
   }
 
-  // Handle direct file import into the active Topic/Collection
-  async function handleImportToTopic(file?: File) {
-    if (!file) return
+  const handleSelectTopic = async (topicId: number) => {
+    setSelectedTopicId(topicId)
+    setCurrentQuiz(null)
+    setQuizResult(null)
+    setTakeawaySaved(false)
+    await loadTopicDetail(topicId)
+  }
+
+  // Create New Deep Dive Topic
+  const handleCreateTopic = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newTopicTitle.trim()) return
+    setError('')
+    try {
+      const created = await createStudyTopic(newTopicTitle.trim(), newTopicGoal.trim(), selectedResourceIds)
+      setNewTopicTitle('')
+      setNewTopicGoal('')
+      setSelectedResourceIds([])
+      setNewTopicModal(false)
+      const tList = await getStudyTopics()
+      setTopics(tList)
+      setSelectedTopicId(created.id)
+      setTopicDetail(created)
+      if (created.concepts.length > 0) {
+        setSelectedConceptId(created.concepts[0].id)
+      }
+    } catch {
+      setError('Không thể tạo chủ đề học tập mới.')
+    }
+  }
+
+  // Generate / Rebuild Learning Plan
+  const handleGeneratePlan = async () => {
+    if (!selectedTopicId) return
+    setPlanBusy(true)
+    setError('')
+    try {
+      const updated = await generateTopicPlan(selectedTopicId)
+      setTopicDetail(updated)
+      if (updated.concepts.length > 0) {
+        setSelectedConceptId(updated.concepts[0].id)
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Chưa thể tạo lộ trình học từ các tài liệu này.')
+    } finally {
+      setPlanBusy(false)
+    }
+  }
+
+  // Concept status toggle
+  const handleUpdateStatus = async (conceptId: number, status: 'NOT_STARTED' | 'LEARNING' | 'REVIEW_NEEDED' | 'CHECKED') => {
+    if (!selectedTopicId) return
+    try {
+      const updatedConcept = await updateConceptStatus(selectedTopicId, conceptId, status)
+      setTopicDetail(prev => {
+        if (!prev) return prev
+        const newConcepts = prev.concepts.map(c => (c.id === conceptId ? updatedConcept : c))
+        const checked = newConcepts.filter(c => c.studyStatus === 'CHECKED').length
+        const review = newConcepts.filter(c => c.studyStatus === 'REVIEW_NEEDED').length
+        const learning = newConcepts.filter(c => c.studyStatus === 'LEARNING').length
+        const notStarted = newConcepts.filter(c => c.studyStatus === 'NOT_STARTED').length
+        return {
+          ...prev,
+          concepts: newConcepts,
+          checkedCount: checked,
+          reviewNeededCount: review,
+          learningCount: learning,
+          notStartedCount: notStarted,
+        }
+      })
+      const qList = await getReviewQueue().catch(() => [])
+      setReviewQueue(qList)
+    } catch {
+      setError('Không thể cập nhật trạng thái khái niệm.')
+    }
+  }
+
+  // Recall Check Quiz
+  const handleStartQuiz = async (conceptId?: number) => {
+    if (!selectedTopicId) return
+    setQuizLoading(true)
+    setError('')
+    setQuizAnswers({})
+    setQuizResult(null)
+    setActiveTab('QUIZ')
+    try {
+      const quiz = await generateTopicQuiz(selectedTopicId, conceptId)
+      setCurrentQuiz(quiz)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Chưa thể tạo bài kiểm tra ghi nhớ từ các nguồn này.')
+    } finally {
+      setQuizLoading(false)
+    }
+  }
+
+  const handleSubmitQuiz = async () => {
+    if (!currentQuiz) return
+    setQuizLoading(true)
+    setError('')
+    try {
+      const result = await submitQuizAnswers(currentQuiz.attemptId, quizAnswers)
+      setQuizResult(result)
+      if (selectedTopicId) {
+        await loadTopicDetail(selectedTopicId)
+      }
+      const qList = await getReviewQueue().catch(() => [])
+      setReviewQueue(qList)
+    } catch {
+      setError('Không thể nộp bài kiểm tra.')
+    } finally {
+      setQuizLoading(false)
+    }
+  }
+
+  // Save Takeaway Note
+  const handleSaveTakeaway = async (resourceId: number) => {
+    if (!takeawayText.trim() || !resourceId) return
+    try {
+      await createResourceNote(resourceId, `[Takeaway]: ${takeawayText.trim()}`)
+      setTakeawayText('')
+      setTakeawaySaved(true)
+      setTimeout(() => setTakeawaySaved(false), 3000)
+    } catch {
+      setError('Không thể lưu điều cần nhớ.')
+    }
+  }
+
+  // Attach Source to Topic
+  const handleAttachSource = async (resourceId: number) => {
+    if (!selectedTopicId) return
+    try {
+      const updated = await addTopicSource(selectedTopicId, resourceId)
+      setTopicDetail(updated)
+      setAddSourceModal(false)
+    } catch {
+      setError('Không thể thêm tài liệu vào chủ đề.')
+    }
+  }
+
+  // Remove Source from Topic
+  const handleRemoveSource = async (resourceId: number) => {
+    if (!selectedTopicId) return
+    try {
+      const updated = await removeTopicSource(selectedTopicId, resourceId)
+      setTopicDetail(updated)
+    } catch {
+      setError('Không thể xóa tài liệu khỏi chủ đề.')
+    }
+  }
+
+  // Direct Ingest into Topic (reuses standard ingestion)
+  const handleDirectUpload = async (file?: File) => {
+    if (!file || !selectedTopicId) return
     setUploadBusy(true)
     setError('')
     try {
       const created = await uploadResource(file)
-      if (selectedColId && selectedColId > 0) {
-        await assignResourceToCollection(selectedColId, created.id)
-      }
-      await initLoad()
+      const updated = await addTopicSource(selectedTopicId, created.id)
+      setTopicDetail(updated)
+      const resList = await getResources()
+      setAllResources(resList)
     } catch {
-      setError('Could not import resource into this topic.')
+      setError('Không thể nạp tệp tài liệu.')
     } finally {
       setUploadBusy(false)
     }
   }
 
-  // Handle direct new Note creation into active Topic
-  async function handleCreateNoteInTopic(e: React.FormEvent) {
-    e.preventDefault()
-    if (!newNoteTitle.trim() || !newNoteContent.trim()) return
-    setError('')
-    try {
-      const created = await createNote(newNoteTitle, newNoteContent)
-      if (selectedColId && selectedColId > 0) {
-        await assignResourceToCollection(selectedColId, created.id)
-      }
-      setNewNoteTitle('')
-      setNewNoteContent('')
-      setNewNoteModal(false)
-      await initLoad()
-    } catch {
-      setError('Could not save note to this topic.')
-    }
+  const selectedConcept = topicDetail?.concepts.find(c => c.id === selectedConceptId)
+
+  // Find next recommended concept
+  const nextRecommendedConcept = topicDetail?.concepts.find(c => c.studyStatus === 'REVIEW_NEEDED') ||
+    topicDetail?.concepts.find(c => c.studyStatus === 'LEARNING') ||
+    topicDetail?.concepts.find(c => c.studyStatus === 'NOT_STARTED')
+
+  if (loading) {
+    return (
+      <section className="kos-page kos-focus-hub">
+        <div className="kos-empty">
+          <Sparkles size={32} className="kos-spin" />
+          <h2>Đang tải Topic Deepdive Learning Studio...</h2>
+        </div>
+      </section>
+    )
   }
-
-  // Handle new Topic creation
-  async function handleCreateTopic(e: React.FormEvent) {
-    e.preventDefault()
-    if (!newTopicName.trim()) return
-    try {
-      const created = await createCollection(newTopicName, 'Custom topic collection created from Focus Hub.')
-      setNewTopicName('')
-      setNewTopicModal(false)
-      const cols = await getCollections()
-      setCollections(cols)
-      setSelectedColId(created.id)
-    } catch {
-      setError('Could not create new topic.')
-    }
-  }
-
-  // Add note to active resource
-  async function handleAddNote() {
-    if (!activeResourceId || !newNoteText.trim()) return
-    try {
-      await createResourceNote(activeResourceId, newNoteText.trim())
-      setNewNoteText('')
-      setActiveNotes(await getResourceNotes(activeResourceId))
-    } catch {
-      setError('Could not save note.')
-    }
-  }
-
-  // Handle progress update
-  async function handleProgress(val: number) {
-    setProgressPercent(val)
-    if (activeResourceId) {
-      await updateResourceProgress(activeResourceId, val).catch(() => {})
-    }
-  }
-
-  // Select quiz option
-  function selectAnswer(questionId: number, optionIdx: number) {
-    if (quizSubmitted) return
-    setUserAnswers(prev => ({ ...prev, [questionId]: optionIdx }))
-  }
-
-  // Calculate score
-  const correctCount = quizQuestions.filter(q => userAnswers[q.id] === q.correctIndex).length
-
-  const selectedCol = collections.find(c => c.id === selectedColId)
-  const activeResource = allResources.find(r => r.id === activeResourceId)
 
   return (
     <section className="kos-page kos-focus-hub">
-      {/* Header */}
+      {/* Top Header */}
       <header className="kos-page-header">
         <div>
-          <p className="kos-kicker">FOCUS STUDY & TOPIC DEEPDIVE</p>
-          <h1>Learn with purpose. Master by topic.</h1>
+          <p className="kos-kicker">TOPIC DEEPDIVE LEARNING STUDIO</p>
+          <h1>Learn $\to$ Recall $\to$ Verify $\to$ Connect $\to$ Continue</h1>
         </div>
         <div className="kos-library-actions">
-          <label className="kos-button">
-            <Upload size={17} />
-            {uploadBusy ? 'Importing…' : 'Thêm tài liệu vào Topic'}
-            <input
-              type="file"
-              accept=".pdf,.docx,.txt,.md,.markdown"
-              hidden
-              disabled={uploadBusy}
-              onChange={e => handleImportToTopic(e.target.files?.[0])}
-            />
-          </label>
-          <button className="kos-button" onClick={() => setNewNoteModal(true)}>
-            <Plus size={17} /> Tạo ghi chú
+          <button
+            type="button"
+            className={`kos-button ${activeTab === 'QUEUE' ? 'kos-button--primary' : ''}`}
+            onClick={() => setActiveTab('QUEUE')}
+          >
+            <RotateCcw size={16} />
+            Hàng đợi Ôn tập ({reviewQueue.length})
           </button>
-          <button className="kos-button kos-button--primary" onClick={() => setNewTopicModal(true)}>
-            <FolderPlus size={17} /> Tạo Topic mới
+          <button
+            type="button"
+            className="kos-button kos-button--primary"
+            onClick={() => setNewTopicModal(true)}
+          >
+            <FolderPlus size={16} /> Tạo Topic Học Sâu
           </button>
         </div>
       </header>
 
-      {error && <p className="kos-error">{error}</p>}
+      {error && (
+        <div className="kos-callout kos-callout-warning" style={{ margin: '0 0 1.25rem' }}>
+          <AlertCircle size={16} />
+          <span>{error}</span>
+        </div>
+      )}
 
-      {/* Topic / Collection Filter Pills Bar */}
+      {/* Topic Switcher Pills */}
       <div className="kos-topic-selector-bar">
         <span className="kos-topic-bar-label">
           <Folder size={15} /> Chủ đề Học tập (Topics):
         </span>
         <div className="kos-topic-pills">
-          <button
-            type="button"
-            className={`kos-topic-pill ${selectedColId === -1 ? 'is-active' : ''}`}
-            onClick={() => setSelectedColId(-1)}
-          >
-            <span>📚 Tất cả tài liệu ({allResources.length})</span>
-          </button>
-          {collections.map(col => (
+          {topics.map(t => (
             <button
-              key={col.id}
+              key={t.id}
               type="button"
-              className={`kos-topic-pill ${selectedColId === col.id ? 'is-active' : ''}`}
-              onClick={() => setSelectedColId(col.id)}
+              className={`kos-topic-pill ${selectedTopicId === t.id ? 'is-active' : ''}`}
+              onClick={() => handleSelectTopic(t.id)}
             >
-              <span>📁 {col.name}</span>
+              <span>🎯 {t.title}</span>
+              <small style={{ opacity: 0.7 }}>({t.conceptCount} mục)</small>
             </button>
           ))}
+          {topics.length === 0 && (
+            <span style={{ fontSize: '0.84rem', color: 'var(--kos-muted)' }}>
+              Chưa có Chủ đề nào. Hãy bấm "Tạo Topic Học Sâu" để bắt đầu!
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Main Focus Deepdive Stage */}
-      <div className="kos-focus-stage-layout">
-        {/* Left Column: Topic Resources Index */}
-        <aside className="kos-focus-sidebar">
-          <div className="kos-focus-sidebar-header">
-            <div className="kos-sidebar-topic-info">
-              <h3>{selectedColId === -1 ? 'Tất cả tài liệu' : selectedCol ? selectedCol.name : 'Topic'}</h3>
-              <p>{topicResources.length} tài liệu trong chủ đề này</p>
-            </div>
-            {selectedColId && selectedColId > 0 && (
-              <Link
-                to={`/knowledge/ask?collection=${selectedColId}`}
-                className="kos-ask-topic-link"
-                title="Hỏi AI về toàn bộ chủ đề này"
+      {topicDetail ? (
+        <div className="kos-focus-stage-layout">
+          {/* Left Column: Learning Path Sidebar */}
+          <aside className="kos-focus-sidebar">
+            <div className="kos-focus-sidebar-header">
+              <div className="kos-sidebar-topic-info">
+                <h3>{topicDetail.title}</h3>
+                <p>{topicDetail.resources.length} tài liệu • {topicDetail.concepts.length} khái niệm</p>
+              </div>
+              <button
+                type="button"
+                className="kos-icon-btn"
+                title="Tạo lại lộ trình học từ tài liệu"
+                onClick={handleGeneratePlan}
+                disabled={planBusy}
               >
-                <BrainCircuit size={14} /> Hỏi AI
-              </Link>
-            )}
-          </div>
+                <RefreshCw size={14} className={planBusy ? 'kos-spin' : ''} />
+              </button>
+            </div>
 
-          <div className="kos-focus-resource-list">
-            {topicResources.length > 0 ? (
-              topicResources.map(res => (
-                <button
-                  key={res.id}
-                  type="button"
-                  className={`kos-focus-res-item ${activeResourceId === res.id ? 'is-active' : ''}`}
-                  onClick={() => setActiveResourceId(res.id)}
-                >
-                  <span className="kos-res-type-badge">{res.resourceType}</span>
-                  <div className="kos-res-meta">
-                    <h4 className="kos-res-item-title">{res.title}</h4>
-                    <small>
-                      {res.processingStatus === 'READY' ? '🟢 Sẵn sàng' : res.processingStatus}
-                    </small>
-                  </div>
-                  <ChevronRight size={15} className="kos-res-arrow" />
-                </button>
-              ))
-            ) : (
-              <div className="kos-box-empty">
-                <p>Chưa có tài liệu nào trong chủ đề này.</p>
-                <label className="kos-button kos-button--primary" style={{ marginTop: '.6rem', display: 'inline-flex' }}>
-                  <Upload size={15} /> Tải tài liệu ngay
-                  <input
-                    type="file"
-                    accept=".pdf,.docx,.txt,.md,.markdown"
-                    hidden
-                    onChange={e => handleImportToTopic(e.target.files?.[0])}
-                  />
-                </label>
-              </div>
-            )}
-          </div>
-        </aside>
+            {/* Discrete Status Summary Bar */}
+            <div className="kos-status-bar-pill-row">
+              <span className="kos-badge kos-badge--success" title="Đã nắm vững">
+                ✓ {topicDetail.checkedCount} Đã hiểu
+              </span>
+              <span className="kos-badge kos-badge--danger" title="Cần ôn tập lại">
+                ! {topicDetail.reviewNeededCount} Cần ôn
+              </span>
+              <span className="kos-badge kos-badge--primary" title="Đang học">
+                ● {topicDetail.learningCount} Đang học
+              </span>
+              <span className="kos-badge kos-badge--neutral" title="Chưa bắt đầu">
+                ○ {topicDetail.notStartedCount} Chưa học
+              </span>
+            </div>
 
-        {/* Right Column: Deepdive Workspace & Reader & Quiz & Graph */}
-        <main className="kos-focus-main-panel">
-          {activeResource ? (
-            <>
-              {/* Active Resource Top Banner */}
-              <div className="kos-focus-resource-banner">
-                <div>
-                  <span className="kos-banner-kicker">{activeResource.resourceType} WORKSPACE</span>
-                  <h2 className="kos-banner-title">{activeResource.title}</h2>
-                </div>
-                <div className="kos-banner-actions">
-                  <Link
-                    to={`/knowledge/ask?resource=${activeResource.id}`}
+            {/* Navigation Tabs within Topic */}
+            <div className="kos-sidebar-subnav">
+              <button
+                type="button"
+                className={`kos-subnav-btn ${activeTab === 'PATH' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('PATH')}
+              >
+                <BookOpen size={14} /> Lộ trình Học sâu
+              </button>
+              <button
+                type="button"
+                className={`kos-subnav-btn ${activeTab === 'QUIZ' ? 'is-active' : ''}`}
+                onClick={() => handleStartQuiz()}
+              >
+                <HelpCircle size={14} /> Kiểm tra Ghi nhớ (Recall)
+              </button>
+              <button
+                type="button"
+                className={`kos-subnav-btn ${activeTab === 'MAP' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('MAP')}
+              >
+                <Network size={14} /> Bản đồ Nguồn (Map)
+              </button>
+              <button
+                type="button"
+                className={`kos-subnav-btn ${activeTab === 'SOURCES' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('SOURCES')}
+              >
+                <Layers size={14} /> Nguồn tài liệu ({topicDetail.resources.length})
+              </button>
+            </div>
+
+            {/* Concepts Ordered List */}
+            <div className="kos-focus-resource-list">
+              {topicDetail.concepts.length > 0 ? (
+                topicDetail.concepts.map((concept, idx) => {
+                  let statusBadge = '○'
+                  let statusColor = 'var(--kos-muted)'
+                  if (concept.studyStatus === 'CHECKED') {
+                    statusBadge = '✓'
+                    statusColor = 'var(--kos-green)'
+                  } else if (concept.studyStatus === 'REVIEW_NEEDED') {
+                    statusBadge = '!'
+                    statusColor = 'var(--kos-red)'
+                  } else if (concept.studyStatus === 'LEARNING') {
+                    statusBadge = '●'
+                    statusColor = 'var(--kos-blue)'
+                  }
+
+                  return (
+                    <button
+                      key={concept.id}
+                      type="button"
+                      className={`kos-focus-res-item ${selectedConceptId === concept.id && activeTab === 'PATH' ? 'is-active' : ''}`}
+                      onClick={() => {
+                        setSelectedConceptId(concept.id)
+                        setActiveTab('PATH')
+                      }}
+                    >
+                      <span className="kos-concept-order-badge" style={{ borderColor: statusColor, color: statusColor }}>
+                        {statusBadge} {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                      </span>
+                      <div className="kos-res-meta">
+                        <h4 className="kos-res-item-title">{concept.title}</h4>
+                        <small>{concept.sources.length} phân đoạn nguồn đối chứng</small>
+                      </div>
+                      <ChevronRight size={14} className="kos-res-arrow" />
+                    </button>
+                  )
+                })
+              ) : (
+                <div className="kos-box-empty" style={{ padding: '1.5rem 1rem' }}>
+                  <p>Chưa có lộ trình khái niệm nào.</p>
+                  <button
+                    type="button"
                     className="kos-button kos-button--primary"
+                    style={{ marginTop: '.75rem' }}
+                    onClick={handleGeneratePlan}
+                    disabled={planBusy}
                   >
-                    <BrainCircuit size={16} /> Hỏi tài liệu này
-                  </Link>
-                  <Link
-                    to={`/library/${activeResource.id}`}
-                    className="kos-button"
-                  >
-                    Mở chi tiết
-                  </Link>
-                </div>
-              </div>
-
-              {/* Study Mode Navigation Tabs */}
-              <div className="kos-focus-tabs">
-                <button
-                  type="button"
-                  className={`kos-focus-tab ${activeTab === 'READER' ? 'is-active' : ''}`}
-                  onClick={() => setActiveTab('READER')}
-                >
-                  <BookOpen size={16} /> Đọc tài liệu (Reader)
-                </button>
-                <button
-                  type="button"
-                  className={`kos-focus-tab ${activeTab === 'QUIZ' ? 'is-active' : ''}`}
-                  onClick={() => setActiveTab('QUIZ')}
-                >
-                  <HelpCircle size={16} /> Smart Quiz Ôn Tập ({quizQuestions.length})
-                </button>
-                <button
-                  type="button"
-                  className={`kos-focus-tab ${activeTab === 'GRAPH' ? 'is-active' : ''}`}
-                  onClick={() => setActiveTab('GRAPH')}
-                >
-                  <Network size={16} /> Sơ đồ Mạng lưới Tri thức
-                </button>
-                <button
-                  type="button"
-                  className={`kos-focus-tab ${activeTab === 'NOTES' ? 'is-active' : ''}`}
-                  onClick={() => setActiveTab('NOTES')}
-                >
-                  <FileText size={16} /> Ghi chú ({activeNotes.length})
-                </button>
-              </div>
-
-              {/* Tab 1: Reader */}
-              {activeTab === 'READER' && (
-                <div className="kos-reader-pane">
-                  <div className="kos-reader-controls">
-                    <span>Tiến độ đọc: {progressPercent}%</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={progressPercent}
-                      onChange={e => handleProgress(Number(e.target.value))}
-                      className="kos-range-slider"
-                    />
-                  </div>
-                  <div className="kos-reader-content">
-                    <pre>{activeContent || 'Đang tải nội dung văn bản...'}</pre>
-                  </div>
+                    <Sparkles size={15} /> {planBusy ? 'Đang tạo lộ trình...' : 'Tạo Lộ trình Học ngay'}
+                  </button>
                 </div>
               )}
+            </div>
+          </aside>
 
-              {/* Tab 2: Smart Quiz Generator */}
-              {activeTab === 'QUIZ' && (
-                <div className="kos-quiz-pane">
-                  <div className="kos-quiz-header">
-                    <div>
-                      <h3>🎯 Bộ câu hỏi Ôn tập & Kiểm tra Nhanh</h3>
-                      <p>Được sinh tự động từ kiến thức cốt lõi của tài liệu</p>
-                    </div>
-                    {quizSubmitted && (
-                      <div className="kos-quiz-score-badge">
-                        Điểm số: {correctCount} / {quizQuestions.length} ({Math.round((correctCount / (quizQuestions.length || 1)) * 100)}%)
-                      </div>
-                    )}
+          {/* Right Column: Deep Dive Learning Studio Main Stage */}
+          <main className="kos-focus-main-panel">
+            {/* NEXT ACTION RECOMMENDATION BANNER */}
+            {nextRecommendedConcept && activeTab === 'PATH' && (
+              <div className="kos-next-action-banner">
+                <div className="kos-next-action-info">
+                  <span className="kos-next-action-tag">
+                    {nextRecommendedConcept.studyStatus === 'REVIEW_NEEDED' ? '🚨 CẦN ÔN TẬP LẠI' : '⚡ BƯỚC HỌC TIẾP THEO'}
+                  </span>
+                  <h3>{nextRecommendedConcept.title}</h3>
+                  <p>{nextRecommendedConcept.whyItMatters || nextRecommendedConcept.summary}</p>
+                </div>
+                <div className="kos-next-action-btns">
+                  <button
+                    type="button"
+                    className="kos-button kos-button--primary"
+                    onClick={() => {
+                      setSelectedConceptId(nextRecommendedConcept.id)
+                      handleUpdateStatus(nextRecommendedConcept.id, 'LEARNING')
+                    }}
+                  >
+                    Học sâu khái niệm này <ArrowRight size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="kos-button"
+                    onClick={() => handleStartQuiz(nextRecommendedConcept.id)}
+                  >
+                    <HelpCircle size={15} /> Kiểm tra ghi nhớ
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 1: CONCEPT DEEP DIVE VIEW */}
+            {activeTab === 'PATH' && selectedConcept && (
+              <div className="kos-concept-deepdive-pane">
+                <div className="kos-deepdive-header">
+                  <div className="kos-deepdive-title-area">
+                    <span className="kos-banner-kicker">KHÁI NIỆM TRỌNG TÂM #{selectedConcept.position}</span>
+                    <h2>{selectedConcept.title}</h2>
                   </div>
 
-                  {quizQuestions.length > 0 ? (
-                    <div className="kos-quiz-question-list">
-                      {quizQuestions.map((q, qIdx) => {
-                        const isCorrect = userAnswers[q.id] === q.correctIndex
+                  {/* Status Toggle Button Group */}
+                  <div className="kos-status-toggle-group">
+                    <button
+                      type="button"
+                      className={`kos-toggle-btn ${selectedConcept.studyStatus === 'CHECKED' ? 'is-checked' : ''}`}
+                      onClick={() => handleUpdateStatus(selectedConcept.id, 'CHECKED')}
+                    >
+                      <CheckCircle2 size={15} /> Đã hiểu
+                    </button>
+                    <button
+                      type="button"
+                      className={`kos-toggle-btn ${selectedConcept.studyStatus === 'REVIEW_NEEDED' ? 'is-review' : ''}`}
+                      onClick={() => handleUpdateStatus(selectedConcept.id, 'REVIEW_NEEDED')}
+                    >
+                      <AlertCircle size={15} /> Cần ôn lại
+                    </button>
+                    <button
+                      type="button"
+                      className={`kos-toggle-btn ${selectedConcept.studyStatus === 'LEARNING' ? 'is-learning' : ''}`}
+                      onClick={() => handleUpdateStatus(selectedConcept.id, 'LEARNING')}
+                    >
+                      <BookOpen size={15} /> Đang học
+                    </button>
+                  </div>
+                </div>
 
-                        return (
-                          <div key={q.id} className="kos-quiz-card">
-                            <h4 className="kos-quiz-q-title">
-                              <span className="kos-q-number">Câu {qIdx + 1}:</span> {q.question}
-                            </h4>
+                {/* Explanation / Why it Matters */}
+                <div className="kos-deepdive-body">
+                  <div className="kos-deepdive-card">
+                    <h4>💡 Tóm tắt Cốt lõi & Bản chất</h4>
+                    <p className="kos-deepdive-text">{selectedConcept.summary}</p>
+                  </div>
 
-                            <div className="kos-quiz-options">
-                              {q.options.map((opt, optIdx) => {
-                                const isSelected = userAnswers[q.id] === optIdx
-                                let optClass = 'kos-quiz-opt'
-                                if (isSelected) optClass += ' is-selected'
-                                if (quizSubmitted) {
-                                  if (optIdx === q.correctIndex) optClass += ' is-correct'
-                                  else if (isSelected && !isCorrect) optClass += ' is-wrong'
-                                }
-
-                                return (
-                                  <button
-                                    key={optIdx}
-                                    type="button"
-                                    className={optClass}
-                                    onClick={() => selectAnswer(q.id, optIdx)}
-                                    disabled={quizSubmitted}
-                                  >
-                                    <span className="kos-opt-letter">
-                                      {String.fromCharCode(65 + optIdx)}
-                                    </span>
-                                    <span className="kos-opt-text">{opt}</span>
-                                    {quizSubmitted && optIdx === q.correctIndex && (
-                                      <CheckCircle2 size={16} className="kos-text-success" />
-                                    )}
-                                    {quizSubmitted && isSelected && !isCorrect && (
-                                      <XCircle size={16} className="kos-text-danger" />
-                                    )}
-                                  </button>
-                                )
-                              })}
-                            </div>
-
-                            {quizSubmitted && (
-                              <div className={`kos-quiz-explanation ${isCorrect ? 'is-correct-box' : 'is-wrong-box'}`}>
-                                <strong>💡 Giải thích chi tiết:</strong> {q.explanation}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-
-                      <div className="kos-quiz-actions">
-                        {!quizSubmitted ? (
-                          <button
-                            type="button"
-                            className="kos-button kos-button--primary"
-                            onClick={() => setQuizSubmitted(true)}
-                            disabled={Object.keys(userAnswers).length === 0}
-                          >
-                            <Check size={16} /> Nộp bài & Xem đáp án
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="kos-button"
-                            onClick={() => generateQuizFromContent(activeContent)}
-                          >
-                            <RotateCcw size={16} /> Làm lại đề thi
-                          </button>
-                        )}
-                      </div>
+                  {selectedConcept.whyItMatters && (
+                    <div className="kos-deepdive-card kos-deepdive-card--accent">
+                      <h4>🎯 Tại sao Khái niệm này quan trọng?</h4>
+                      <p className="kos-deepdive-text">{selectedConcept.whyItMatters}</p>
                     </div>
-                  ) : (
-                    <div className="kos-box-empty">
-                      <p>Không có đủ văn bản để tạo bộ câu hỏi trắc nghiệm.</p>
+                  )}
+
+                  {/* Grounded Source Evidence Section */}
+                  <div className="kos-deepdive-evidence-section">
+                    <div className="kos-evidence-header">
+                      <h4>
+                        <Compass size={16} /> Bằng chứng Xác thực từ Tài liệu Nguồn ({selectedConcept.sources.length})
+                      </h4>
+                      <Link
+                        to={`/knowledge/ask?resources=${selectedConcept.sources.map(s => s.resourceId).join(',')}`}
+                        className="kos-ask-concept-link"
+                      >
+                        <BrainCircuit size={15} /> Hỏi RAG AI về khái niệm này
+                      </Link>
+                    </div>
+
+                    <div className="kos-evidence-list">
+                      {selectedConcept.sources.map((src, sIdx) => (
+                        <div key={sIdx} className="kos-evidence-card">
+                          <div className="kos-evidence-card-header">
+                            <span className="kos-evidence-source-title">
+                              📄 {src.resourceTitle} (Phân đoạn #{src.chunkId})
+                            </span>
+                            <Link
+                              to={`/library/${src.resourceId}`}
+                              className="kos-evidence-open-btn"
+                              title="Mở tài liệu gốc trong Workspace"
+                            >
+                              Mở tài liệu gốc <ArrowRight size={13} />
+                            </Link>
+                          </div>
+                          <blockquote className="kos-evidence-quote">
+                            "{src.snippet}"
+                          </blockquote>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Save Takeaway Note Box */}
+                  <div className="kos-takeaway-box">
+                    <h4>📝 Lưu điều cần nhớ (Key Takeaway)</h4>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--kos-muted)', margin: '0 0 0.5rem' }}>
+                      Điều cốt lõi nhất bạn muốn ghi nhớ về "{selectedConcept.title}" là gì?
+                    </p>
+                    <div className="kos-takeaway-input-row">
+                      <input
+                        type="text"
+                        value={takeawayText}
+                        onChange={e => setTakeawayText(e.target.value)}
+                        placeholder="Ví dụ: RRF kết hợp thứ hạng từ nhiều thuật toán tìm kiếm..."
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && selectedConcept.sources[0]) {
+                            handleSaveTakeaway(selectedConcept.sources[0].resourceId)
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="kos-button kos-button--primary"
+                        onClick={() => selectedConcept.sources[0] && handleSaveTakeaway(selectedConcept.sources[0].resourceId)}
+                        disabled={!takeawayText.trim() || !selectedConcept.sources[0]}
+                      >
+                        <Plus size={15} /> Lưu Note
+                      </button>
+                    </div>
+                    {takeawaySaved && (
+                      <p className="kos-text-success" style={{ fontSize: '0.82rem', marginTop: '0.4rem' }}>
+                        ✓ Đã lưu điều cần nhớ vào ghi chú tài liệu!
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: ACTIVE RECALL CHECK (QUIZ) */}
+            {activeTab === 'QUIZ' && (
+              <div className="kos-quiz-pane">
+                <div className="kos-quiz-header">
+                  <div>
+                    <span className="kos-banner-kicker">ACTIVE RECALL ASSESSMENT</span>
+                    <h2>🎯 Kiểm tra Ghi nhớ & Nhận thức</h2>
+                    <p>Bộ câu hỏi trắc nghiệm tự động đối chứng 100% từ phân đoạn tài liệu nguồn</p>
+                  </div>
+                  {quizResult && (
+                    <div className="kos-quiz-score-badge">
+                      Kết quả: {quizResult.scoreCorrect} / {quizResult.totalQuestions} ({quizResult.percentage}%)
                     </div>
                   )}
                 </div>
-              )}
 
-              {/* Tab 3: Knowledge Graph for this Topic */}
-              {activeTab === 'GRAPH' && (
-                <div className="kos-graph-tab-pane">
-                  <KnowledgeGraphView
-                    resources={topicResources}
-                    collections={selectedCol ? [selectedCol] : collections}
-                    tags={tags}
-                  />
-                </div>
-              )}
+                {quizLoading ? (
+                  <div className="kos-empty">
+                    <Sparkles size={28} className="kos-spin" />
+                    <p>Đang chuẩn bị bộ câu hỏi đối chứng tri thức...</p>
+                  </div>
+                ) : currentQuiz && currentQuiz.questions.length > 0 ? (
+                  <div className="kos-quiz-question-list">
+                    {currentQuiz.questions.map((q, qIdx) => {
+                      const evaluated = quizResult?.results.find(r => r.id === q.id)
+                      const isCorrect = evaluated?.userAnswer === evaluated?.correctOption
+                      const isSubmitted = !!quizResult
 
-              {/* Tab 4: Notes */}
-              {activeTab === 'NOTES' && (
-                <div className="kos-notes-pane">
-                  <div className="kos-add-note-box">
-                    <h4>📝 Thêm ghi chú cho tài liệu này</h4>
-                    <textarea
-                      value={newNoteText}
-                      onChange={e => setNewNoteText(e.target.value)}
-                      placeholder="Ghi lại các ý chính, công thức hoặc lưu ý cần nhớ..."
-                      rows={3}
-                    />
+                      return (
+                        <div key={q.id} className="kos-quiz-card">
+                          <h4 className="kos-quiz-q-title">
+                            <span className="kos-q-number">Câu {qIdx + 1}:</span> {q.question}
+                          </h4>
+
+                          <div className="kos-quiz-options">
+                            {q.options.map((opt, optIdx) => {
+                              const isSelected = isSubmitted
+                                ? evaluated?.userAnswer === optIdx
+                                : quizAnswers[q.id] === optIdx
+
+                              let optClass = 'kos-quiz-opt'
+                              if (isSelected) optClass += ' is-selected'
+                              if (isSubmitted) {
+                                if (optIdx === evaluated?.correctOption) optClass += ' is-correct'
+                                else if (isSelected && !isCorrect) optClass += ' is-wrong'
+                              }
+
+                              return (
+                                <button
+                                  key={optIdx}
+                                  type="button"
+                                  className={optClass}
+                                  onClick={() => !isSubmitted && setQuizAnswers(prev => ({ ...prev, [q.id]: optIdx }))}
+                                  disabled={isSubmitted}
+                                >
+                                  <span className="kos-opt-letter">{String.fromCharCode(65 + optIdx)}</span>
+                                  <span className="kos-opt-text">{opt}</span>
+                                  {isSubmitted && optIdx === evaluated?.correctOption && (
+                                    <CheckCircle2 size={16} className="kos-text-success" />
+                                  )}
+                                  {isSubmitted && isSelected && !isCorrect && (
+                                    <XCircle size={16} className="kos-text-danger" />
+                                  )}
+                                </button>
+                              )
+                            })}
+                          </div>
+
+                          {/* Grounded Explanation & Source Citation on Submission */}
+                          {isSubmitted && evaluated && (
+                            <div className={`kos-quiz-explanation ${isCorrect ? 'is-correct-box' : 'is-wrong-box'}`}>
+                              <div style={{ marginBottom: '0.4rem' }}>
+                                <strong>{isCorrect ? '✓ Đúng rồi!' : '✗ Chưa chính xác:'}</strong> {evaluated.explanation}
+                              </div>
+                              {evaluated.sourceResourceTitle && (
+                                <div className="kos-quiz-source-link">
+                                  <span>📖 <strong>Nguồn đối chứng:</strong> {evaluated.sourceResourceTitle}</span>
+                                  {evaluated.sourceResourceId && (
+                                    <Link to={`/library/${evaluated.sourceResourceId}`} className="kos-link-sm">
+                                      Mở tài liệu nguồn <ArrowRight size={12} />
+                                    </Link>
+                                  )}
+                                </div>
+                              )}
+                              {evaluated.sourceSnippet && (
+                                <blockquote className="kos-quiz-evidence-quote">
+                                  "{evaluated.sourceSnippet}"
+                                </blockquote>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+
+                    <div className="kos-quiz-actions">
+                      {!quizResult ? (
+                        <button
+                          type="button"
+                          className="kos-button kos-button--primary"
+                          onClick={handleSubmitQuiz}
+                          disabled={Object.keys(quizAnswers).length === 0 || quizLoading}
+                        >
+                          <Check size={16} /> Nộp bài & Xem đối chứng đáp án
+                        </button>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '0.75rem' }}>
+                          <button
+                            type="button"
+                            className="kos-button kos-button--primary"
+                            onClick={() => handleStartQuiz()}
+                          >
+                            <RotateCcw size={16} /> Làm lại bài kiểm tra
+                          </button>
+                          <button
+                            type="button"
+                            className="kos-button"
+                            onClick={() => setActiveTab('PATH')}
+                          >
+                            Quay lại Lộ trình học
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="kos-box-empty">
+                    <p>Chưa có bài kiểm tra ghi nhớ.</p>
                     <button
                       type="button"
                       className="kos-button kos-button--primary"
-                      onClick={handleAddNote}
-                      disabled={!newNoteText.trim()}
+                      onClick={() => handleStartQuiz()}
+                      style={{ marginTop: '0.75rem' }}
                     >
-                      <Plus size={16} /> Lưu ghi chú
+                      Bắt đầu bài Kiểm tra ngay
                     </button>
                   </div>
+                )}
+              </div>
+            )}
 
-                  <div className="kos-saved-notes-list">
-                    {activeNotes.length > 0 ? (
-                      activeNotes.map(n => (
-                        <div key={n.id} className="kos-note-card">
-                          <p className="kos-note-text">{n.content}</p>
-                          <small className="kos-note-date">
-                            {new Date(n.created_at).toLocaleString()}
-                          </small>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="kos-box-empty">Chưa có ghi chú nào cho tài liệu này.</p>
-                    )}
+            {/* TAB 3: EVIDENCE MAP (BẢN ĐỒ KIẾN THỨC & NGUỒN) */}
+            {activeTab === 'MAP' && (
+              <div className="kos-evidence-map-pane">
+                <div className="kos-map-header">
+                  <div>
+                    <span className="kos-banner-kicker">SOURCE EVIDENCE MAP</span>
+                    <h2>🗺️ Bản đồ Kiến thức & Mạng lưới Nguồn</h2>
+                    <p>Mỗi nút thể hiện một khái niệm có liên kết bằng chứng xác thực với tài liệu gốc</p>
                   </div>
                 </div>
-              )}
-            </>
-          ) : (
-            <div className="kos-empty">
-              <Sparkles size={30} />
-              <h2>Chọn một tài liệu bên trái để bắt đầu học tập chuyên sâu</h2>
-              <p>Mỗi tài liệu cung cấp đầy đủ công cụ Reader, Smart Quiz ôn tập, Sơ đồ tri thức và Ghi chú.</p>
-            </div>
-          )}
-        </main>
-      </div>
 
-      {/* Modal: New Topic */}
+                <div className="kos-map-grid">
+                  {topicDetail.concepts.map((concept, idx) => (
+                    <div
+                      key={concept.id}
+                      className={`kos-map-concept-node ${selectedConceptId === concept.id ? 'is-active' : ''}`}
+                      onClick={() => setSelectedConceptId(concept.id)}
+                    >
+                      <div className="kos-map-node-top">
+                        <span className="kos-badge kos-badge--primary">#{idx + 1} {concept.studyStatus}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--kos-muted)' }}>
+                          {concept.sources.length} nguồn
+                        </span>
+                      </div>
+                      <h4>{concept.title}</h4>
+                      <p>{concept.summary.slice(0, 120)}…</p>
+                      <div className="kos-map-node-footer">
+                        <button
+                          type="button"
+                          className="kos-button kos-button--sm"
+                          onClick={e => {
+                            e.stopPropagation()
+                            setSelectedConceptId(concept.id)
+                            setActiveTab('PATH')
+                          }}
+                        >
+                          Học sâu <ArrowRight size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          className="kos-button kos-button--sm"
+                          onClick={e => {
+                            e.stopPropagation()
+                            handleStartQuiz(concept.id)
+                          }}
+                        >
+                          Recall
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: REVIEW QUEUE (HÀNG ĐỢI ÔN TẬP) */}
+            {activeTab === 'QUEUE' && (
+              <div className="kos-review-queue-pane">
+                <div className="kos-queue-header">
+                  <div>
+                    <span className="kos-banner-kicker">ACTIVE REVIEW QUEUE</span>
+                    <h2>🔄 Hàng đợi Ôn tập (Các khái niệm cần củng cố)</h2>
+                    <p>Tự động tổng hợp từ các câu trả lời chưa đúng hoặc được đánh dấu cần ôn tập</p>
+                  </div>
+                </div>
+
+                {reviewQueue.length > 0 ? (
+                  <div className="kos-queue-list">
+                    {reviewQueue.map(item => (
+                      <div key={item.conceptId} className="kos-queue-item-card">
+                        <div className="kos-queue-item-header">
+                          <div>
+                            <span className="kos-badge kos-badge--danger">CẦN ÔN TẬP</span>
+                            <h4>{item.conceptTitle}</h4>
+                            <small>Thuộc chủ đề: <strong>{item.topicTitle}</strong></small>
+                          </div>
+                          <button
+                            type="button"
+                            className="kos-button kos-button--primary"
+                            onClick={() => {
+                              handleSelectTopic(item.topicId)
+                              setSelectedConceptId(item.conceptId)
+                              setActiveTab('PATH')
+                            }}
+                          >
+                            Ôn tập ngay <ArrowRight size={14} />
+                          </button>
+                        </div>
+                        <p>{item.summary}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="kos-box-empty">
+                    <CheckCircle2 size={32} className="kos-text-success" />
+                    <h3>Tuyệt vời! Hàng đợi ôn tập đang trống.</h3>
+                    <p>Bạn đã hoàn thành tốt các bài kiểm tra ghi nhớ và nắm vững các khái niệm đã học.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 5: TOPIC ATTACHED SOURCES (QUẢN LÝ NGUỒN) */}
+            {activeTab === 'SOURCES' && (
+              <div className="kos-sources-pane">
+                <div className="kos-sources-header">
+                  <div>
+                    <span className="kos-banner-kicker">SOURCE ATTACHMENTS</span>
+                    <h2>📚 Tài liệu Tri thức trong Chủ đề</h2>
+                    <p>Các tài liệu được dùng để bóc tách khái niệm và sinh câu hỏi ôn tập</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="kos-button"
+                      onClick={() => setAddSourceModal(true)}
+                    >
+                      <Plus size={15} /> Thêm từ Thư viện
+                    </button>
+                    <label className="kos-button kos-button--primary">
+                      <Upload size={15} /> {uploadBusy ? 'Đang tải...' : 'Tải file mới vào Topic'}
+                      <input
+                        type="file"
+                        accept=".pdf,.docx,.txt,.md,.markdown"
+                        hidden
+                        disabled={uploadBusy}
+                        onChange={e => handleDirectUpload(e.target.files?.[0])}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="kos-sources-list">
+                  {topicDetail.resources.map(res => {
+                    const isReady = res.processingStatus === 'READY'
+                    return (
+                      <div key={res.id} className="kos-source-item-card">
+                        <div className="kos-source-info">
+                          <span className="kos-res-type-badge">{res.resourceType}</span>
+                          <div>
+                            <h4>{res.title}</h4>
+                            <small>
+                              {isReady ? (
+                                <span className="kos-text-success">🟢 Sẵn sàng tra cứu & học sâu</span>
+                              ) : (
+                                <span className="kos-text-amber">⏳ Đang xử lý: {res.processingStatus}</span>
+                              )}
+                            </small>
+                          </div>
+                        </div>
+                        <div className="kos-source-actions">
+                          <Link to={`/library/${res.id}`} className="kos-button">
+                            Mở Workspace
+                          </Link>
+                          <button
+                            type="button"
+                            className="kos-icon-btn kos-icon-btn--danger"
+                            title="Xóa khỏi Topic này"
+                            onClick={() => handleRemoveSource(res.id)}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      ) : (
+        <div className="kos-empty">
+          <Compass size={36} />
+          <h2>Bắt đầu hành trình học tập chuyên sâu</h2>
+          <p>Tạo một Topic học tập mới và gắn các tài liệu từ thư viện của bạn để hệ thống xây dựng lộ trình học có đối chứng.</p>
+          <button
+            type="button"
+            className="kos-button kos-button--primary"
+            style={{ marginTop: '1rem' }}
+            onClick={() => setNewTopicModal(true)}
+          >
+            <FolderPlus size={16} /> Tạo Topic Học Sâu Ngay
+          </button>
+        </div>
+      )}
+
+      {/* MODAL: CREATE TOPIC */}
       {newTopicModal && (
         <div className="kos-modal" role="dialog" aria-modal="true">
-          <form onSubmit={handleCreateTopic}>
+          <form onSubmit={handleCreateTopic} style={{ maxWidth: '540px' }}>
             <button className="kos-modal-close" type="button" onClick={() => setNewTopicModal(false)}>
-              Close
+              <X size={16} />
             </button>
-            <p className="kos-kicker">NEW TOPIC / COLLECTION</p>
+            <p className="kos-kicker">TẠO TOPIC HỌC SÂU MỚI</p>
+            <h3>Bạn muốn tìm hiểu và làm chủ kiến thức gì?</h3>
+
             <label>
-              Tên Chủ Đề (Topic Name)
+              Tên Chủ Đề (Topic Title)
               <input
-                value={newTopicName}
-                onChange={e => setNewTopicName(e.target.value)}
-                placeholder="Ví dụ: Hệ Quản Trị CSDL, An Toàn Mạng..."
+                value={newTopicTitle}
+                onChange={e => setNewTopicTitle(e.target.value)}
+                placeholder="Ví dụ: Hiểu Strategy Pattern và cách áp dụng trong KnowledgeOS"
                 required
               />
             </label>
-            <button className="kos-button kos-button--primary">
-              <FolderPlus size={16} /> Tạo Topic
-            </button>
+
+            <label>
+              Mục tiêu học tập cụ thể (Goal)
+              <textarea
+                value={newTopicGoal}
+                onChange={e => setNewTopicGoal(e.target.value)}
+                placeholder="Mô tả mục tiêu cụ thể bạn muốn đạt được sau khi học xong chủ đề này..."
+                rows={3}
+              />
+            </label>
+
+            <label>
+              Chọn tài liệu nguồn từ Thư viện ({selectedResourceIds.length} đã chọn)
+              <div className="kos-source-picker-list">
+                {allResources.map(r => {
+                  const isChecked = selectedResourceIds.includes(r.id)
+                  return (
+                    <label key={r.id} className="kos-source-picker-item">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setSelectedResourceIds(prev => [...prev, r.id])
+                          } else {
+                            setSelectedResourceIds(prev => prev.filter(id => id !== r.id))
+                          }
+                        }}
+                      />
+                      <span>[{r.resourceType}] {r.title}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </label>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
+              <button type="button" className="kos-button" onClick={() => setNewTopicModal(false)}>
+                Hủy
+              </button>
+              <button type="submit" className="kos-button kos-button--primary" disabled={!newTopicTitle.trim()}>
+                <FolderPlus size={16} /> Tạo Topic & Xây Lộ Trình
+              </button>
+            </div>
           </form>
         </div>
       )}
 
-      {/* Modal: New Note */}
-      {newNoteModal && (
+      {/* MODAL: ADD SOURCE TO ACTIVE TOPIC */}
+      {addSourceModal && selectedTopicId && (
         <div className="kos-modal" role="dialog" aria-modal="true">
-          <form onSubmit={handleCreateNoteInTopic}>
-            <button className="kos-modal-close" type="button" onClick={() => setNewNoteModal(false)}>
-              Close
-            </button>
-            <p className="kos-kicker">NEW STUDY NOTE</p>
-            <label>
-              Tiêu đề Ghi chú
-              <input
-                value={newNoteTitle}
-                onChange={e => setNewNoteTitle(e.target.value)}
-                placeholder="Tiêu đề tóm tắt..."
-                required
-              />
-            </label>
-            <label>
-              Nội dung Tri thức
-              <textarea
-                value={newNoteContent}
-                onChange={e => setNewNoteContent(e.target.value)}
-                placeholder="Nhập nội dung ghi chú..."
-                rows={4}
-                required
-              />
-            </label>
-            <button className="kos-button kos-button--primary">
-              <Plus size={16} /> Lưu vào Topic này
-            </button>
-          </form>
+          <div style={{ maxWidth: '520px', background: 'var(--kos-surface)', padding: '1.5rem', borderRadius: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3>Thêm tài liệu vào Topic</h3>
+              <button className="kos-icon-btn" onClick={() => setAddSourceModal(false)}>
+                <X size={16} />
+              </button>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--kos-muted)', marginBottom: '1rem' }}>
+              Chọn tài liệu có sẵn trong thư viện để gắn vào chủ đề này:
+            </p>
+            <div className="kos-source-picker-list">
+              {allResources
+                .filter(r => !topicDetail?.resources.some(tr => tr.id === r.id))
+                .map(r => (
+                  <div key={r.id} className="kos-source-picker-item" style={{ justifyContent: 'space-between' }}>
+                    <span>[{r.resourceType}] {r.title}</span>
+                    <button
+                      type="button"
+                      className="kos-button kos-button--sm"
+                      onClick={() => handleAttachSource(r.id)}
+                    >
+                      Thêm
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </div>
         </div>
       )}
     </section>

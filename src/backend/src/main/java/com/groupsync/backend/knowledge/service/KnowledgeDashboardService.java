@@ -14,6 +14,73 @@ public class KnowledgeDashboardService {
     public KnowledgeDashboardService(NamedParameterJdbcTemplate jdbcTemplate) { this.jdbcTemplate = jdbcTemplate; }
 
     public Optional<FocusNextResponse> focusNext(Long ownerId) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource("ownerId", ownerId);
+
+        // 1. Check for REVIEW_NEEDED concepts in active study topics
+        String conceptReviewSql = """
+                SELECT r.id AS resource_id, c.title AS concept_title, t.title AS topic_title,
+                       r.title AS resource_title, r.resource_type, r.priority, r.favorite,
+                       COALESCE(lp.progress_percent, 0) AS progress_percent
+                FROM topic_concepts c
+                JOIN study_topics t ON t.id = c.topic_id
+                JOIN topic_concept_sources tcs ON tcs.concept_id = c.id
+                JOIN document_chunks dc ON dc.id = tcs.document_chunk_id
+                JOIN resources r ON r.id = dc.resource_id
+                LEFT JOIN learning_progress lp ON lp.resource_id = r.id AND lp.owner_id = r.owner_id
+                WHERE t.owner_id = :ownerId AND c.study_status = 'REVIEW_NEEDED' AND r.processing_status = 'READY'
+                ORDER BY c.updated_at DESC
+                LIMIT 1
+                """;
+        List<FocusNextResponse> reviewResults = jdbcTemplate.query(conceptReviewSql, parameters, (row, idx) -> {
+            String conceptTitle = row.getString("concept_title");
+            String topicTitle = row.getString("topic_title");
+            return new FocusNextResponse(
+                    row.getLong("resource_id"),
+                    row.getString("resource_title"),
+                    row.getString("resource_type"),
+                    row.getInt("priority"),
+                    row.getBoolean("favorite"),
+                    row.getInt("progress_percent"),
+                    "Ôn tập lại: \"" + conceptTitle + "\" (" + topicTitle + ")"
+            );
+        });
+        if (!reviewResults.isEmpty()) {
+            return reviewResults.stream().findFirst();
+        }
+
+        // 2. Check for in-progress LEARNING concepts
+        String conceptLearningSql = """
+                SELECT r.id AS resource_id, c.title AS concept_title, t.title AS topic_title,
+                       r.title AS resource_title, r.resource_type, r.priority, r.favorite,
+                       COALESCE(lp.progress_percent, 0) AS progress_percent
+                FROM topic_concepts c
+                JOIN study_topics t ON t.id = c.topic_id
+                JOIN topic_concept_sources tcs ON tcs.concept_id = c.id
+                JOIN document_chunks dc ON dc.id = tcs.document_chunk_id
+                JOIN resources r ON r.id = dc.resource_id
+                LEFT JOIN learning_progress lp ON lp.resource_id = r.id AND lp.owner_id = r.owner_id
+                WHERE t.owner_id = :ownerId AND c.study_status = 'LEARNING' AND r.processing_status = 'READY'
+                ORDER BY c.updated_at DESC
+                LIMIT 1
+                """;
+        List<FocusNextResponse> learningResults = jdbcTemplate.query(conceptLearningSql, parameters, (row, idx) -> {
+            String conceptTitle = row.getString("concept_title");
+            String topicTitle = row.getString("topic_title");
+            return new FocusNextResponse(
+                    row.getLong("resource_id"),
+                    row.getString("resource_title"),
+                    row.getString("resource_type"),
+                    row.getInt("priority"),
+                    row.getBoolean("favorite"),
+                    row.getInt("progress_percent"),
+                    "Tiếp tục học: \"" + conceptTitle + "\" (" + topicTitle + ")"
+            );
+        });
+        if (!learningResults.isEmpty()) {
+            return learningResults.stream().findFirst();
+        }
+
+        // 3. Fallback to resource-level priority and progress
         String sql = """
                 SELECT r.id, r.title, r.resource_type, r.priority, r.favorite,
                        COALESCE(lp.progress_percent, 0) AS progress_percent
@@ -25,14 +92,13 @@ public class KnowledgeDashboardService {
                          r.updated_at DESC
                 LIMIT 1
                 """;
-        List<FocusNextResponse> results = jdbcTemplate.query(sql, new MapSqlParameterSource("ownerId", ownerId),
-                (row, index) -> {
-                    int progress = row.getInt("progress_percent");
-                    String reason = progress > 0 && progress < 100 ? "Continue where you left off"
-                            : row.getBoolean("favorite") ? "A saved favorite" : "Highest priority ready resource";
-                    return new FocusNextResponse(row.getLong("id"), row.getString("title"), row.getString("resource_type"),
-                            row.getInt("priority"), row.getBoolean("favorite"), progress, reason);
-                });
+        List<FocusNextResponse> results = jdbcTemplate.query(sql, parameters, (row, index) -> {
+            int progress = row.getInt("progress_percent");
+            String reason = progress > 0 && progress < 100 ? "Continue where you left off"
+                    : row.getBoolean("favorite") ? "A saved favorite" : "Highest priority ready resource";
+            return new FocusNextResponse(row.getLong("id"), row.getString("title"), row.getString("resource_type"),
+                    row.getInt("priority"), row.getBoolean("favorite"), progress, reason);
+        });
         return results.stream().findFirst();
     }
 

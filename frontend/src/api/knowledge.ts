@@ -49,3 +49,154 @@ export async function deleteResource(id:number) { await apiClient.delete(`/resou
 export async function updateResourceFavorite(id:number, favorite:boolean) { return (await apiClient.patch<Resource>(`/resources/${id}`, { favorite })).data }
 export async function autoOrganizeAll() { return (await apiClient.post<{ message: string }>('/resources/auto-organize-all')).data }
 export async function autoOrganizeResource(id: number) { return (await apiClient.post<{ message: string }>(`/resources/${id}/auto-organize`)).data }
+
+// ==========================================
+// Focus Topic Deepdive Learning Studio Types & API
+// ==========================================
+
+export type ConceptSource = {
+  resourceId: number
+  resourceTitle: string
+  chunkId: number
+  snippet: string
+}
+
+export type TopicConcept = {
+  id: number
+  title: string
+  summary: string
+  whyItMatters: string
+  studyStatus: 'NOT_STARTED' | 'LEARNING' | 'REVIEW_NEEDED' | 'CHECKED'
+  position: number
+  sources: ConceptSource[]
+}
+
+export type TopicResource = {
+  id: number
+  title: string
+  resourceType: string
+  processingStatus: string
+  progressPercent: number
+}
+
+export type StudyTopic = {
+  id: number
+  title: string
+  goal: string
+  status: string
+  resourceCount: number
+  conceptCount: number
+  checkedCount: number
+  reviewNeededCount: number
+  learningCount: number
+  notStartedCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type StudyTopicDetail = {
+  id: number
+  title: string
+  goal: string
+  status: string
+  resources: TopicResource[]
+  concepts: TopicConcept[]
+  checkedCount: number
+  reviewNeededCount: number
+  learningCount: number
+  notStartedCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type QuizQuestion = {
+  id: number
+  conceptId: number | null
+  question: string
+  options: string[]
+  correctOption: number | null
+  userAnswer: number | null
+  explanation: string | null
+  sourceResourceId: number | null
+  sourceResourceTitle: string | null
+  sourceChunkId: number | null
+  sourceSnippet: string | null
+}
+
+export type QuizAttemptResponse = {
+  attemptId: number
+  topicId: number
+  conceptId: number | null
+  scoreCorrect: number
+  totalQuestions: number
+  submitted: boolean
+  questions: QuizQuestion[]
+  createdAt: string
+}
+
+export type SubmitQuizAnswersResponse = {
+  attemptId: number
+  scoreCorrect: number
+  totalQuestions: number
+  percentage: number
+  results: QuizQuestion[]
+  conceptsNeedingReview: TopicConcept[]
+}
+
+export type ReviewQueueItem = {
+  conceptId: number
+  conceptTitle: string
+  topicId: number
+  topicTitle: string
+  studyStatus: string
+  summary: string
+  whyItMatters: string
+  updatedAt: string
+}
+
+export async function getStudyTopics() {
+  return (await apiClient.get<StudyTopic[]>('/focus/topics')).data
+}
+
+export async function createStudyTopic(title: string, goal: string, resourceIds: number[] = []) {
+  return (await apiClient.post<StudyTopicDetail>('/focus/topics', { title, goal, resourceIds })).data
+}
+
+export async function getStudyTopicDetail(id: number) {
+  return (await apiClient.get<StudyTopicDetail>(`/focus/topics/${id}`)).data
+}
+
+export async function deleteStudyTopic(id: number) {
+  await apiClient.delete(`/focus/topics/${id}`)
+}
+
+export async function addTopicSource(topicId: number, resourceId: number) {
+  return (await apiClient.post<StudyTopicDetail>(`/focus/topics/${topicId}/sources/${resourceId}`)).data
+}
+
+export async function removeTopicSource(topicId: number, resourceId: number) {
+  return (await apiClient.delete<StudyTopicDetail>(`/focus/topics/${topicId}/sources/${resourceId}`)).data
+}
+
+export async function generateTopicPlan(topicId: number) {
+  return (await apiClient.post<StudyTopicDetail>(`/focus/topics/${topicId}/plan`)).data
+}
+
+export async function updateConceptStatus(topicId: number, conceptId: number, status: string) {
+  return (await apiClient.patch<TopicConcept>(`/focus/topics/${topicId}/concepts/${conceptId}/status`, { status })).data
+}
+
+export async function generateTopicQuiz(topicId: number, conceptId?: number) {
+  return (await apiClient.post<QuizAttemptResponse>(`/focus/topics/${topicId}/quiz`, null, {
+    params: conceptId ? { conceptId } : {},
+  })).data
+}
+
+export async function submitQuizAnswers(attemptId: number, answers: Record<number, number>) {
+  return (await apiClient.post<SubmitQuizAnswersResponse>(`/focus/quiz/attempts/${attemptId}/answers`, { answers })).data
+}
+
+export async function getReviewQueue() {
+  return (await apiClient.get<ReviewQueueItem[]>('/focus/review-queue')).data
+}
+
