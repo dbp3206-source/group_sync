@@ -12,6 +12,7 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
     Optional<Resource> findByOwnerIdAndChecksumSha256(Long ownerId, String checksumSha256);
     List<Resource> findByOwnerIdAndTitleContainingIgnoreCaseOrderByUpdatedAtDesc(Long ownerId, String query);
     List<Resource> findByOwnerIdOrderByUpdatedAtDesc(Long ownerId);
+    List<Resource> findByProcessingStatus(com.groupsync.backend.knowledge.model.ResourceProcessingStatus processingStatus);
 
     @Query(value = """
             select distinct r.* from resources r

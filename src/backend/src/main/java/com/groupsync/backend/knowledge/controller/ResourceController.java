@@ -101,7 +101,7 @@ public class ResourceController {
                 .body(new org.springframework.core.io.InputStreamResource(input));
     }
 
-    @GetMapping(value = "/{resourceId}/text", produces = MediaType.TEXT_PLAIN_VALUE)
+    @GetMapping("/{resourceId}/text")
     public ResponseEntity<String> extractedText(
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable Long resourceId) {

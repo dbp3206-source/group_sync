@@ -89,7 +89,6 @@ public class RecallCheckService {
             generateQuestionsDeterministically(attempt, targetConcept, chunks);
         }
 
-        attempt.getItems().forEach(item -> attempt.addItem(item));
         QuizAttempt saved = attemptRepository.save(attempt);
 
         return mapToQuizAttemptResponse(saved, false);

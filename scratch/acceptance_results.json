@@ -1,0 +1,272 @@
+[
+  {
+    "scenario": "Register Valid User A",
+    "category": "AUTH",
+    "passed": true,
+    "details": "Status: 201"
+  },
+  {
+    "scenario": "Register Duplicate Email",
+    "category": "AUTH",
+    "passed": true,
+    "details": "Status: 409"
+  },
+  {
+    "scenario": "Register Invalid Input",
+    "category": "AUTH",
+    "passed": true,
+    "details": "Status: 400"
+  },
+  {
+    "scenario": "Authenticated Session (/auth/me)",
+    "category": "AUTH",
+    "passed": true,
+    "details": "User: qa_audit_a_1787022087@example.com"
+  },
+  {
+    "scenario": "Register Valid User B",
+    "category": "AUTH",
+    "passed": true,
+    "details": "Status: 201"
+  },
+  {
+    "scenario": "Upload ai-security-handbook.pdf",
+    "category": "IMPORT",
+    "passed": true,
+    "details": "ID: 49, Status: UPLOADED"
+  },
+  {
+    "scenario": "Upload software-engineering-guide.docx",
+    "category": "IMPORT",
+    "passed": true,
+    "details": "ID: 50, Status: UPLOADED"
+  },
+  {
+    "scenario": "Upload macroeconomic-outlook-2026.txt",
+    "category": "IMPORT",
+    "passed": true,
+    "details": "ID: 51, Status: UPLOADED"
+  },
+  {
+    "scenario": "Upload rag-architecture.md",
+    "category": "IMPORT",
+    "passed": true,
+    "details": "ID: 52, Status: UPLOADED"
+  },
+  {
+    "scenario": "Upload oop-basics.md",
+    "category": "IMPORT",
+    "passed": true,
+    "details": "ID: 53, Status: UPLOADED"
+  },
+  {
+    "scenario": "Upload exact-identifier.md",
+    "category": "IMPORT",
+    "passed": true,
+    "details": "ID: 54, Status: UPLOADED"
+  },
+  {
+    "scenario": "Upload vietnamese-knowledge.md",
+    "category": "IMPORT",
+    "passed": true,
+    "details": "ID: 55, Status: UPLOADED"
+  },
+  {
+    "scenario": "Upload conflicting-source-a.md",
+    "category": "IMPORT",
+    "passed": true,
+    "details": "ID: 56, Status: UPLOADED"
+  },
+  {
+    "scenario": "Upload conflicting-source-b.md",
+    "category": "IMPORT",
+    "passed": true,
+    "details": "ID: 57, Status: UPLOADED"
+  },
+  {
+    "scenario": "Upload prompt-injection-test.md",
+    "category": "IMPORT",
+    "passed": true,
+    "details": "ID: 58, Status: UPLOADED"
+  },
+  {
+    "scenario": "Create Note Resource",
+    "category": "IMPORT",
+    "passed": true,
+    "details": "ID: 59"
+  },
+  {
+    "scenario": "Resource Lifecycle Processing -> READY",
+    "category": "LIFECYCLE",
+    "passed": false,
+    "details": "4/11 resources reached READY in 91s"
+  },
+  {
+    "scenario": "List All Library Resources",
+    "category": "LIBRARY",
+    "passed": true,
+    "details": "Count: 11"
+  },
+  {
+    "scenario": "Search by English Keyword",
+    "category": "SEARCH",
+    "passed": true,
+    "details": "Found: 1"
+  },
+  {
+    "scenario": "Search by Vietnamese Keyword",
+    "category": "SEARCH",
+    "passed": true,
+    "details": "Found: 1"
+  },
+  {
+    "scenario": "Favorite Resource Toggle",
+    "category": "LIBRARY",
+    "passed": true,
+    "details": "ID: 49"
+  },
+  {
+    "scenario": "Create Collection",
+    "category": "COLLECTIONS",
+    "passed": true,
+    "details": "Collection ID: 72"
+  },
+  {
+    "scenario": "Assign Resource to Collection",
+    "category": "COLLECTIONS",
+    "passed": true,
+    "details": "Assigned res 52 to col 72"
+  },
+  {
+    "scenario": "Create Tag",
+    "category": "TAGS",
+    "passed": true,
+    "details": "Tag ID: 297"
+  },
+  {
+    "scenario": "Assign Tag to Resource",
+    "category": "TAGS",
+    "passed": true,
+    "details": "Tag 297 assigned to res 49"
+  },
+  {
+    "scenario": "Reader Clean Text Content",
+    "category": "READER",
+    "passed": false,
+    "details": "Length: 129 chars"
+  },
+  {
+    "scenario": "Create Resource Note",
+    "category": "NOTES",
+    "passed": true,
+    "details": "Note ID: 3"
+  },
+  {
+    "scenario": "RAG Scope THIS_RESOURCE",
+    "category": "RAG",
+    "passed": true,
+    "details": "Answer: I don't have enough evidence in the selected Knowl..., Citations: 0"
+  },
+  {
+    "scenario": "RAG Exact Identifier (CVE/RFC)",
+    "category": "RAG",
+    "passed": true,
+    "details": "Grounded citations: 4"
+  },
+  {
+    "scenario": "RAG Vietnamese Knowledge Retrieval",
+    "category": "RAG",
+    "passed": true,
+    "details": "Answer preview: ### Trả Lời Vấn Đề\n\nDựa trên các nguồn tài liệu được cung cấ..."
+  },
+  {
+    "scenario": "RAG Conflicting Evidence Handling",
+    "category": "RAG",
+    "passed": true,
+    "details": "Handled multiple source versions with citations"
+  },
+  {
+    "scenario": "RAG Prompt Injection Resistance",
+    "category": "RAG",
+    "passed": true,
+    "details": "System preserved grounding rules against injection"
+  },
+  {
+    "scenario": "RAG Unsupported Question Handling",
+    "category": "RAG",
+    "passed": true,
+    "details": "Handled out-of-corpus question appropriately"
+  },
+  {
+    "scenario": "Create Study Topic with Goal & Sources",
+    "category": "FOCUS",
+    "passed": true,
+    "details": "Topic ID: 4, Concepts: 5"
+  },
+  {
+    "scenario": "Focus Learning Plan Generation (Source-Grounded)",
+    "category": "FOCUS",
+    "passed": true,
+    "details": "Generated 3 structured concepts with source anchors"
+  },
+  {
+    "scenario": "Update Concept Study Status (LEARNING)",
+    "category": "FOCUS",
+    "passed": true,
+    "details": "Concept ID: 6"
+  },
+  {
+    "scenario": "Focus Recall Check Quiz Generation",
+    "category": "FOCUS",
+    "passed": false,
+    "details": "Attempt ID: None, Questions: 0"
+  },
+  {
+    "scenario": "Focus Next Prioritizes Review/Learning",
+    "category": "FOCUS",
+    "passed": true,
+    "details": "Reason: Tiếp tục học: \"Clean Architecture\" (Làm chủ Kiến trúc RAG & Hướng Đối Tượng)"
+  },
+  {
+    "scenario": "Owner Isolation: Resource Access",
+    "category": "SECURITY",
+    "passed": true,
+    "details": "User B HTTP 404 (access denied)"
+  },
+  {
+    "scenario": "Owner Isolation: Text Content",
+    "category": "SECURITY",
+    "passed": false,
+    "details": "User B HTTP 500 (text denied)"
+  },
+  {
+    "scenario": "Owner Isolation: RAG THIS_RESOURCE",
+    "category": "SECURITY",
+    "passed": true,
+    "details": "No cross-user RAG leakage"
+  },
+  {
+    "scenario": "Owner Isolation: Study Topic Access",
+    "category": "SECURITY",
+    "passed": true,
+    "details": "User B HTTP 404 (topic denied)"
+  },
+  {
+    "scenario": "Insights Dashboard Overview",
+    "category": "INSIGHTS",
+    "passed": true,
+    "details": "Total: 11, Ready: 4"
+  },
+  {
+    "scenario": "Delete Resource Cascade",
+    "category": "DELETE",
+    "passed": true,
+    "details": "Deleted res 58"
+  },
+  {
+    "scenario": "Verify Resource No Longer Exists",
+    "category": "DELETE",
+    "passed": true,
+    "details": "Status: 404"
+  }
+]

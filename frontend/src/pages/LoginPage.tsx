@@ -56,7 +56,12 @@ function LoginPage() {
           <label htmlFor="login-password">Mật khẩu<span className="password-field"><input id="login-password" type={showPassword ? 'text' : 'password'} name="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" className="password-toggle" onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? 'Ẩn' : 'Hiện'}</button></span></label>
           <p className="auth-help">KnowledgeOS uses its own password and never reads your email password.</p>
           {import.meta.env.DEV && <button type="button" className="button button--secondary" onClick={useDemoAccount}>Dùng tài khoản demo</button>}
-          <button className="button button--primary" disabled={saving}>{saving ? 'Đang đăng nhập…' : 'Đăng nhập'}</button>
+          <button className="button button--primary" disabled={saving}>{saving ? 'Đang kết nối & đăng nhập…' : 'Đăng nhập'}</button>
+          {saving && (
+            <p style={{ fontSize: '0.82rem', color: 'var(--kos-muted)', textAlign: 'center', margin: '0.5rem 0 0' }}>
+              ⏳ Đang xác thực với máy chủ... (Nếu máy chủ đang khởi động lại từ chế độ ngủ, quá trình có thể mất ~30 giây)
+            </p>
+          )}
         </form>
         <p className="auth-switch">Chưa có tài khoản? <Link to="/register">Tạo tài khoản</Link></p>
       </div>

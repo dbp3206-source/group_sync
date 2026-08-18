@@ -53,9 +53,24 @@ public class ResourceIngestionService {
         process(event.resourceId());
     }
 
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 10000)
+    public void sweepPendingUploads() {
+        List<Resource> pending = resourceRepository.findByProcessingStatus(com.groupsync.backend.knowledge.model.ResourceProcessingStatus.UPLOADED);
+        for (Resource res : pending) {
+            try {
+                process(res.getId());
+            } catch (Exception ignored) {}
+        }
+    }
+
     @Transactional
     public void process(Long resourceId) {
-        Resource resource = resourceRepository.findById(resourceId).orElse(null);
+        Resource resource = null;
+        for (int i = 0; i < 5; i++) {
+            resource = resourceRepository.findById(resourceId).orElse(null);
+            if (resource != null) break;
+            try { Thread.sleep(80); } catch (InterruptedException ignored) {}
+        }
         if (resource == null || resource.getProcessingStatus().isTerminal()) {
             return;
         }

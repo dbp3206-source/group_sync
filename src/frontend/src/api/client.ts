@@ -12,6 +12,7 @@ export const apiClient = axios.create({
   headers: {
     Accept: 'application/json',
   },
+  timeout: 120000,
 })
 
 // Redirect to /login on session expiry so the app never loops on 401 errors.
