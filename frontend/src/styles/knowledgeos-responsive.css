@@ -1,0 +1,17 @@
+/* knowledgeos-responsive.css
+   Supplemental workspace-specific rules not covered in redesign.css.
+   These override or extend workspace panel styles for narrow screens. */
+
+/* =========================================================================
+   REDUCED MOTION SAFETY NET (belt-and-suspenders, redesign.css is primary)
+   ========================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

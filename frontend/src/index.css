@@ -1,0 +1,28 @@
+/* KnowledgeOS global base
+   Fonts: Outfit (display + UI) loaded via fontsource (self-hosted, no render-blocking import).
+   Import statements are in main.tsx to let Vite bundle them correctly.
+   Fallback stack: ui-sans-serif → system-ui → safe system fonts. */
+
+:root {
+  font-family: 'Outfit', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #1c2a33;
+  background: #f4f7f6;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+a {
+  font: inherit;
+}
