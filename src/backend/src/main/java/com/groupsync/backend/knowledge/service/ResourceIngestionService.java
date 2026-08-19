@@ -2,29 +2,31 @@ package com.groupsync.backend.knowledge.service;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionalEventListener;
-import com.groupsync.backend.knowledge.chunking.RecursiveChunkingStrategy;
-import com.groupsync.backend.knowledge.ingestion.ParsedResourceContent;
+import com.groupsync.backend.knowledge.chunking.StructureAwareChunkingStrategy;
+import com.groupsync.backend.knowledge.chunking.StructureAwareChunkingStrategy.HierarchicalChunk;
+import com.groupsync.backend.knowledge.ingestion.ParsedDocument;
 import com.groupsync.backend.knowledge.ingestion.ResourceParserRegistry;
 import com.groupsync.backend.knowledge.ingestion.ResourceProcessingRequestedEvent;
+import com.groupsync.backend.knowledge.model.ChunkLevel;
 import com.groupsync.backend.knowledge.model.Resource;
 import com.groupsync.backend.knowledge.model.ResourceProcessingStatus;
-import com.groupsync.backend.knowledge.repository.ResourceRepository;
 import com.groupsync.backend.knowledge.rag.EmbeddingProvider;
+import com.groupsync.backend.knowledge.rag.EmbeddingTextBuilder;
+import com.groupsync.backend.knowledge.rag.EmbeddingTextBuilder.SemanticMetadata;
+import com.groupsync.backend.knowledge.repository.ResourceRepository;
 import com.groupsync.backend.knowledge.storage.StorageService;
 
 /**
- * Coordinates resource ingestion workflow.
- * Parsing, recursive chunking, and external Gemini embedding generation are executed
- * outside active database transactions to prevent connection pool starvation.
- * Database claims and final status transitions are delegated to {@link ResourceIngestionTransactionService}.
+ * Coordinates resource ingestion workflow for RAG v2.
+ * Executes structure-aware parsing, hierarchical chunking, rich embedding text generation,
+ * and batch Gemini embedding completely outside database transactions.
  */
 @Service
 public class ResourceIngestionService {
@@ -32,20 +34,26 @@ public class ResourceIngestionService {
 
     private final ResourceRepository resourceRepository;
     private final ResourceParserRegistry parserRegistry;
-    private final RecursiveChunkingStrategy chunkingStrategy;
+    private final StructureAwareChunkingStrategy chunkingStrategy;
     private final StorageService storageService;
     private final EmbeddingProvider embeddingProvider;
+    private final EmbeddingTextBuilder embeddingTextBuilder;
     private final ResourceIngestionTransactionService transactionService;
 
-    public ResourceIngestionService(ResourceRepository resourceRepository,
-            ResourceParserRegistry parserRegistry, RecursiveChunkingStrategy chunkingStrategy,
-            StorageService storageService, EmbeddingProvider embeddingProvider,
+    public ResourceIngestionService(
+            ResourceRepository resourceRepository,
+            ResourceParserRegistry parserRegistry,
+            StructureAwareChunkingStrategy chunkingStrategy,
+            StorageService storageService,
+            EmbeddingProvider embeddingProvider,
+            EmbeddingTextBuilder embeddingTextBuilder,
             ResourceIngestionTransactionService transactionService) {
         this.resourceRepository = resourceRepository;
         this.parserRegistry = parserRegistry;
         this.chunkingStrategy = chunkingStrategy;
         this.storageService = storageService;
         this.embeddingProvider = embeddingProvider;
+        this.embeddingTextBuilder = embeddingTextBuilder;
         this.transactionService = transactionService;
     }
 
@@ -70,35 +78,71 @@ public class ResourceIngestionService {
     public void process(Long resourceId) {
         if (resourceId == null) return;
 
-        // Step 1: Atomic claim UPLOADED -> PARSING via dedicated transaction service
+        // Step 1: Atomic claim UPLOADED -> PARSING
         boolean claimed = transactionService.claim(resourceId);
         if (!claimed) {
             return;
         }
 
+        executeIngestion(resourceId);
+    }
+
+    public void reindex(Long resourceId) {
+        if (resourceId == null) return;
+        boolean claimed = transactionService.claimForReindex(resourceId);
+        if (!claimed) {
+            return;
+        }
+        executeIngestion(resourceId);
+    }
+
+    private void executeIngestion(Long resourceId) {
         Resource resource = resourceRepository.findById(resourceId).orElse(null);
         if (resource == null) {
             return;
         }
 
         try {
-            // Step 2: Parse file (in memory / stream - OUTSIDE database transaction)
-            ParsedResourceContent parsed = parse(resource);
+            // Step 2: Parse document into structured blocks (OUTSIDE DB transaction)
+            ParsedDocument parsedDoc = parseDocument(resource);
 
-            // Step 3: Chunk content (in memory - OUTSIDE database transaction)
-            List<String> pieces = chunkingStrategy.chunk(parsed.content());
-            if (pieces.isEmpty()) {
+            // Step 3: Structure-aware hierarchical chunking (Parent & Child chunks)
+            List<HierarchicalChunk> chunks = chunkingStrategy.chunkDocument(parsedDoc);
+            if (chunks.isEmpty()) {
                 throw new IllegalArgumentException("No readable text was found in this resource.");
             }
 
-            // Step 4: External Gemini Embeddings (OUTSIDE database transaction)
-            List<float[]> embeddings = new ArrayList<>(pieces.size());
-            for (String piece : pieces) {
-                embeddings.add(embeddingProvider.embedDocument(piece));
+            // Step 4: Pre-load resource semantic metadata (collections, tags) in one short read query
+            SemanticMetadata metadata = transactionService.fetchSemanticMetadata(resourceId);
+
+            // Step 5: Construct rich embedding texts for all CHILD chunks
+            List<HierarchicalChunk> childChunks = chunks.stream()
+                    .filter(c -> c.level() == ChunkLevel.CHILD)
+                    .toList();
+
+            List<String> richTexts = new ArrayList<>(childChunks.size());
+            for (HierarchicalChunk child : childChunks) {
+                SemanticMetadata chunkMetadata = new SemanticMetadata(
+                        metadata.documentTitle(),
+                        metadata.collectionNames(),
+                        metadata.tagNames(),
+                        child.sectionTitle()
+                );
+                richTexts.add(embeddingTextBuilder.build(chunkMetadata, child.content()));
             }
 
-            // Step 5: Save chunks and mark READY via dedicated transaction service
-            transactionService.saveReady(resourceId, pieces, embeddings, parsed);
+            // Step 6: Batch Gemini Embeddings for child chunks (OUTSIDE DB transaction)
+            List<float[]> embeddings = embeddingProvider.embedDocuments(richTexts);
+
+            Map<Integer, float[]> childEmbeddingMap = new HashMap<>();
+            for (int i = 0; i < childChunks.size(); i++) {
+                if (i < embeddings.size()) {
+                    childEmbeddingMap.put(childChunks.get(i).index(), embeddings.get(i));
+                }
+            }
+
+            // Step 7: Persist hierarchical parent + child chunks and mark READY
+            transactionService.saveReadyHierarchical(resourceId, chunks, childEmbeddingMap);
 
         } catch (Exception exception) {
             log.error("Resource processing failed for id {}: {}", resourceId, exception.getMessage(), exception);
@@ -106,9 +150,9 @@ public class ResourceIngestionService {
         }
     }
 
-    private ParsedResourceContent parse(Resource resource) throws IOException {
+    private ParsedDocument parseDocument(Resource resource) throws IOException {
         try (InputStream input = storageService.open(resource.getStorageKey())) {
-            return parserRegistry.forType(resource.getResourceType()).parse(input);
+            return parserRegistry.forType(resource.getResourceType()).parseDocument(input);
         }
     }
 

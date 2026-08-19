@@ -1,7 +1,6 @@
 package com.groupsync.backend.knowledge.service;
 
 import java.util.*;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -9,22 +8,28 @@ import org.springframework.transaction.annotation.Transactional;
 import com.groupsync.backend.knowledge.dto.*;
 import com.groupsync.backend.knowledge.model.*;
 import com.groupsync.backend.knowledge.rag.*;
+import com.groupsync.backend.knowledge.rag.ParentChildContextExpander.ExpandedContext;
 import com.groupsync.backend.knowledge.repository.*;
 import com.groupsync.backend.shared.exception.NotFoundException;
-import com.groupsync.backend.user.model.UserAccount;
-import com.groupsync.backend.user.repository.UserAccountRepository;
 
+/**
+ * Orchestrates KnowledgeOS RAG v2 chat queries.
+ * Integrates multi-turn contextualization, KnowledgeQueryPlanner intent classification,
+ * Structured relational execution, Filtered Hybrid Retrieval, and Parent-Child context expansion.
+ */
 @Service
 public class KnowledgeChatService {
     private static final String INSUFFICIENT_CONTEXT = "I don't have enough evidence in the selected KnowledgeOS sources to answer that yet.";
-    /** Minimum fused relevance score (1 - distance). Hybrid RRF scores are lower than cosine similarity; 0.15 is calibrated to reject truly empty evidence. */
     private static final double MIN_RELEVANCE = 0.15d;
 
     private final KnowledgeChatTransactionService chatTransactionService;
     private final ChatSessionRepository sessionRepository;
     private final ChatMessageRepository messageRepository;
     private final CitationRepository citationRepository;
-    private final RetrievalStrategy retrievalStrategy;
+    private final HybridRetrievalStrategy retrievalStrategy;
+    private final KnowledgeQueryPlanner queryPlanner;
+    private final StructuredKnowledgeQueryService structuredQueryService;
+    private final ParentChildContextExpander parentChildExpander;
     private final LanguageModelClient languageModelClient;
 
     public KnowledgeChatService(
@@ -32,13 +37,19 @@ public class KnowledgeChatService {
             ChatSessionRepository sessionRepository,
             ChatMessageRepository messageRepository,
             CitationRepository citationRepository,
-            @Qualifier("hybridRetrieval") RetrievalStrategy retrievalStrategy,
+            @Qualifier("hybridRetrieval") HybridRetrievalStrategy retrievalStrategy,
+            KnowledgeQueryPlanner queryPlanner,
+            StructuredKnowledgeQueryService structuredQueryService,
+            ParentChildContextExpander parentChildExpander,
             LanguageModelClient languageModelClient) {
         this.chatTransactionService = chatTransactionService;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
         this.citationRepository = citationRepository;
         this.retrievalStrategy = retrievalStrategy;
+        this.queryPlanner = queryPlanner;
+        this.structuredQueryService = structuredQueryService;
+        this.parentChildExpander = parentChildExpander;
         this.languageModelClient = languageModelClient;
     }
 
@@ -47,30 +58,52 @@ public class KnowledgeChatService {
         KnowledgeChatTransactionService.ChatPreparation prep =
                 chatTransactionService.prepareConversation(ownerId, request);
 
-        // Formulate search query: enrich with recent topic context if this is a follow-up turn
-        String searchQuery = contextualizeSearchQuery(request.question().trim(), prep.previousMessages());
+        // Multi-turn conversational contextualization
+        String contextualQuestion = contextualizeSearchQuery(request.question().trim(), prep.previousMessages());
 
-        // Step 2: Retrieval & embedding execution happens OUTSIDE database transaction
-        List<RetrievedChunk> chunks = retrievalStrategy.retrieve(
+        // Step 2: Intelligent Query Planning (intent classification & schema filtering)
+        QueryPlan plan = queryPlanner.plan(
                 ownerId,
-                searchQuery,
+                contextualQuestion,
                 prep.scopeType(),
                 prep.thisResourceId(),
                 prep.selectedResourceIds(),
                 prep.collectionId()
         );
 
-        // After hybrid RRF, distance is 1 - rrfScore (lower = better). Reject when best match has distance > (1 - MIN_RELEVANCE).
-        if (chunks.isEmpty() || chunks.getFirst().distance() > 1.0 - MIN_RELEVANCE) {
+        // Step 3: Handle Structured Queries (COUNT, LIST) directly from PostgreSQL relational facts
+        if (plan.mode() == QueryMode.STRUCTURED) {
+            StructuredKnowledgeQueryService.StructuredResult result = structuredQueryService.execute(
+                    ownerId, plan, prep.scopeType(), prep.thisResourceId(), prep.selectedResourceIds(), prep.collectionId()
+            );
+            return chatTransactionService.persistAssistantResult(prep.sessionId(), result.textResponse(), List.of());
+        }
+
+        // Step 4: Filtered Hybrid Retrieval (pgvector + FTS + RRF) on child chunks
+        List<RetrievedChunk> candidateChildren = retrievalStrategy.retrieve(
+                ownerId,
+                plan.semanticQuery(),
+                prep.scopeType(),
+                prep.thisResourceId(),
+                prep.selectedResourceIds(),
+                prep.collectionId(),
+                plan.filters()
+        );
+
+        if (candidateChildren.isEmpty() || candidateChildren.getFirst().distance() > 1.0 - MIN_RELEVANCE) {
             return chatTransactionService.persistInsufficientContext(prep.sessionId());
         }
 
-        // Step 3: Build prompt and invoke Gemini LLM OUTSIDE database transaction
-        String groundedPrompt = GroundedPromptBuilder.build(request.question().trim(), chunks, prep.historyTurns());
+        // Step 5: Parent Context Expansion & Deduplication with strict context budgeting
+        ExpandedContext expanded = parentChildExpander.expand(candidateChildren);
+        List<RetrievedChunk> promptChunks = expanded.promptContextChunks().isEmpty() ? candidateChildren : expanded.promptContextChunks();
+
+        // Step 6: Grounded Prompt Generation & Gemini LLM synthesis
+        String groundedPrompt = GroundedPromptBuilder.build(request.question().trim(), promptChunks, prep.historyTurns());
         String answer = languageModelClient.answer(groundedPrompt);
 
-        // Step 4: Persist assistant message and citations in a short, isolated transaction
-        return chatTransactionService.persistAssistantResult(prep.sessionId(), answer, chunks);
+        // Step 7: Persist assistant message and verified citations
+        return chatTransactionService.persistAssistantResult(prep.sessionId(), answer, promptChunks);
     }
 
     private static final Pattern FOLLOW_UP_PATTERN = Pattern.compile(

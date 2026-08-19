@@ -19,14 +19,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.groupsync.backend.knowledge.dto.AskKnowledgeRequest;
 import com.groupsync.backend.knowledge.dto.AskKnowledgeResponse;
 import com.groupsync.backend.knowledge.model.*;
-import com.groupsync.backend.knowledge.rag.LanguageModelClient;
-import com.groupsync.backend.knowledge.rag.RetrievalScope;
-import com.groupsync.backend.knowledge.rag.RetrievalStrategy;
-import com.groupsync.backend.knowledge.rag.RetrievedChunk;
+import com.groupsync.backend.knowledge.rag.*;
+import com.groupsync.backend.knowledge.rag.ParentChildContextExpander.ExpandedContext;
 import com.groupsync.backend.knowledge.repository.*;
 import com.groupsync.backend.knowledge.service.KnowledgeChatService;
 import com.groupsync.backend.knowledge.service.KnowledgeChatTransactionService;
 import com.groupsync.backend.knowledge.service.KnowledgeWorkspaceService;
+import com.groupsync.backend.knowledge.service.StructuredKnowledgeQueryService;
 import com.groupsync.backend.user.model.UserAccount;
 import com.groupsync.backend.user.repository.UserAccountRepository;
 
@@ -39,7 +38,10 @@ class KnowledgeChatTransactionTest {
     @Mock private DocumentChunkRepository chunkRepository;
     @Mock private ResourceRepository resourceRepository;
     @Mock private UserAccountRepository userRepository;
-    @Mock private RetrievalStrategy retrievalStrategy;
+    @Mock private HybridRetrievalStrategy retrievalStrategy;
+    @Mock private KnowledgeQueryPlanner queryPlanner;
+    @Mock private StructuredKnowledgeQueryService structuredQueryService;
+    @Mock private ParentChildContextExpander parentChildExpander;
     @Mock private LanguageModelClient languageModelClient;
     @Mock private KnowledgeWorkspaceService workspaceService;
 
@@ -54,7 +56,8 @@ class KnowledgeChatTransactionTest {
         );
         chatService = new KnowledgeChatService(
                 chatTransactionService, sessionRepository, messageRepository,
-                citationRepository, retrievalStrategy, languageModelClient
+                citationRepository, retrievalStrategy, queryPlanner,
+                structuredQueryService, parentChildExpander, languageModelClient
         );
     }
 
@@ -72,10 +75,14 @@ class KnowledgeChatTransactionTest {
         when(sessionRepository.save(any(ChatSession.class))).thenReturn(session);
         when(messageRepository.save(any(ChatMessage.class))).thenAnswer(inv -> inv.getArgument(0));
 
+        when(queryPlanner.plan(anyLong(), anyString(), any(), any(), any(), any()))
+                .thenReturn(new QueryPlan(QueryMode.HYBRID, QueryOperation.SEARCH, "Why is my query failing?", KnowledgeQueryFilters.empty(), "test"));
+
         List<RetrievedChunk> retrieved = List.of(
                 new RetrievedChunk(1L, 10L, "Doc", 0, 1, "Sec 1", "Content 1", 0.05d)
         );
-        when(retrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), any(), any())).thenReturn(retrieved);
+        when(retrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), any(), any(), any())).thenReturn(retrieved);
+        when(parentChildExpander.expand(retrieved)).thenReturn(new ExpandedContext(retrieved, retrieved));
 
         // Simulate LLM throwing network exception or timeout
         when(languageModelClient.answer(anyString())).thenThrow(new IllegalStateException("Gemini API connection timeout"));
@@ -106,8 +113,11 @@ class KnowledgeChatTransactionTest {
         when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
         when(messageRepository.save(any(ChatMessage.class))).thenAnswer(inv -> inv.getArgument(0));
 
+        when(queryPlanner.plan(anyLong(), anyString(), any(), any(), any(), any()))
+                .thenReturn(new QueryPlan(QueryMode.HYBRID, QueryOperation.SEARCH, "Random question with no matches", KnowledgeQueryFilters.empty(), "test"));
+
         // Retrieval returns empty list
-        when(retrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), any(), any())).thenReturn(List.of());
+        when(retrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), any(), any(), any())).thenReturn(List.of());
 
         AskKnowledgeResponse response = chatService.ask(ownerId, request);
 

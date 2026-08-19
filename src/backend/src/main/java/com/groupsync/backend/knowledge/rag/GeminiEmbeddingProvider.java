@@ -1,5 +1,7 @@
 package com.groupsync.backend.knowledge.rag;
 
+import java.util.ArrayList;
+import java.util.List;
 import com.google.genai.Client;
 import com.google.genai.types.EmbedContentConfig;
 import com.google.genai.types.EmbedContentResponse;
@@ -31,6 +33,18 @@ public class GeminiEmbeddingProvider implements EmbeddingProvider {
     @Override
     public float[] embedQuery(String content) {
         return embed(content, "RETRIEVAL_QUERY");
+    }
+
+    @Override
+    public List<float[]> embedDocuments(List<String> texts) {
+        if (texts == null || texts.isEmpty()) {
+            return List.of();
+        }
+        List<float[]> results = new ArrayList<>(texts.size());
+        for (String text : texts) {
+            results.add(embedDocument(text));
+        }
+        return results;
     }
 
     private Client getClient() {

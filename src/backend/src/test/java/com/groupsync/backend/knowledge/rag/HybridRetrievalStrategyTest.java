@@ -103,9 +103,9 @@ class HybridRetrievalStrategyTest {
     void retrieve_whenSemanticFailsAndKeywordSucceeds_returnsKeywordResultsGracefully() {
         HybridRetrievalStrategy hybrid = new HybridRetrievalStrategy(mockSemantic, mockKeyword, properties);
 
-        when(mockSemantic.retrieve(any(), any(), any(), any(), any(), any(), anyInt()))
+        when(mockSemantic.retrieve(any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenThrow(new RuntimeException("pgvector connection timeout"));
-        when(mockKeyword.retrieve(any(), any(), any(), any(), any(), any(), anyInt()))
+        when(mockKeyword.retrieve(any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of(chunk(50, 1, "Keyword Doc", 0.1)));
 
         List<RetrievedChunk> result = hybrid.retrieve(1L, "test question", RetrievalScope.LIBRARY, null, null, null);
@@ -118,8 +118,8 @@ class HybridRetrievalStrategyTest {
     void retrieve_whenBothSucceedWithZeroCandidates_returnsEmptyList() {
         HybridRetrievalStrategy hybrid = new HybridRetrievalStrategy(mockSemantic, mockKeyword, properties);
 
-        when(mockSemantic.retrieve(any(), any(), any(), any(), any(), any(), anyInt())).thenReturn(List.of());
-        when(mockKeyword.retrieve(any(), any(), any(), any(), any(), any(), anyInt())).thenReturn(List.of());
+        when(mockSemantic.retrieve(any(), any(), any(), any(), any(), any(), any(), anyInt())).thenReturn(List.of());
+        when(mockKeyword.retrieve(any(), any(), any(), any(), any(), any(), any(), anyInt())).thenReturn(List.of());
 
         List<RetrievedChunk> result = hybrid.retrieve(1L, "no matches", RetrievalScope.LIBRARY, null, null, null);
 
@@ -130,9 +130,9 @@ class HybridRetrievalStrategyTest {
     void retrieve_whenBothBranchesFail_returnsEmptyListGracefully() {
         HybridRetrievalStrategy hybrid = new HybridRetrievalStrategy(mockSemantic, mockKeyword, properties);
 
-        when(mockSemantic.retrieve(any(), any(), any(), any(), any(), any(), anyInt()))
+        when(mockSemantic.retrieve(any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenThrow(new RuntimeException("pgvector error"));
-        when(mockKeyword.retrieve(any(), any(), any(), any(), any(), any(), anyInt()))
+        when(mockKeyword.retrieve(any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenThrow(new RuntimeException("FTS error"));
 
         List<RetrievedChunk> result = hybrid.retrieve(1L, "both failed", RetrievalScope.LIBRARY, null, null, null);

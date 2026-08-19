@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 /**
- * Hybrid retrieval using Reciprocal Rank Fusion (RRF).
+ * Hybrid retrieval using Reciprocal Rank Fusion (RRF) with metadata filtering support.
  */
 @Component("hybridRetrieval")
 public class HybridRetrievalStrategy implements RetrievalStrategy {
@@ -34,6 +34,13 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
     public List<RetrievedChunk> retrieve(Long ownerId, String question, RetrievalScope scope,
                                          Long resourceId, List<Long> selectedResourceIds,
                                          Long collectionId) {
+        return retrieve(ownerId, question, scope, resourceId, selectedResourceIds, collectionId,
+                KnowledgeQueryFilters.empty());
+    }
+
+    public List<RetrievedChunk> retrieve(Long ownerId, String question, RetrievalScope scope,
+                                         Long resourceId, List<Long> selectedResourceIds,
+                                         Long collectionId, KnowledgeQueryFilters filters) {
         int topK = properties.ragTopK();
         int candidateSize = Math.min(topK * properties.ragCandidateMultiplier(), properties.ragMaxCandidateSize());
 
@@ -41,7 +48,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
         List<RetrievedChunk> semanticCandidates;
         try {
             semanticCandidates = semantic.retrieve(ownerId, question, scope, resourceId,
-                    selectedResourceIds, collectionId, candidateSize);
+                    selectedResourceIds, collectionId, filters, candidateSize);
         } catch (RuntimeException ex) {
             semanticFailed = true;
             log.warn("[semantic_retrieval_failed] strategy=semantic scope={} resourceId={} exception={}: {}",
@@ -53,7 +60,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
         List<RetrievedChunk> keywordCandidates;
         try {
             keywordCandidates = keyword.retrieve(ownerId, question, scope, resourceId,
-                    selectedResourceIds, collectionId, candidateSize);
+                    selectedResourceIds, collectionId, filters, candidateSize);
         } catch (RuntimeException ex) {
             keywordFailed = true;
             log.warn("[keyword_retrieval_failed] strategy=keyword scope={} resourceId={} exception={}: {}",
@@ -78,20 +85,8 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
 
     /**
      * Fuses two ranked lists using Reciprocal Rank Fusion and returns the top {@code topK} chunks.
-     *
-     * <p>For each chunk, its RRF score is the sum of {@code 1 / (RRF_K + rank)} across all lists
-     * in which it appears. Chunks missing from a list contribute 0 for that list.
-     * A higher RRF score means a better overall rank; the returned list is sorted by score descending.
-     * The {@code distance} field of each returned chunk is set to {@code 1 - rrfScore} for
-     * consistency with the single-branch distance convention used downstream by citation mapping.
-     *
-     * @param semantic zero-indexed ranked list from the semantic branch (index 0 = rank 1).
-     * @param keyword  zero-indexed ranked list from the keyword branch (index 0 = rank 1).
-     * @param topK     maximum number of fused results to return.
-     * @return merged, deduplicated, RRF-scored candidates.
      */
     List<RetrievedChunk> fuse(List<RetrievedChunk> semantic, List<RetrievedChunk> keyword, int topK) {
-        // chunkId → accumulated RRF score and representative chunk
         Map<Long, double[]> scores = new LinkedHashMap<>();
         Map<Long, RetrievedChunk> representatives = new LinkedHashMap<>();
 
@@ -105,7 +100,6 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                     RetrievedChunk source = representatives.get(entry.getKey());
                     double rrfScore = entry.getValue()[0];
                     int rrfK = properties.ragRrfK();
-                    // Normalize score relative to theoretical maximum (rank 1 in both branches = 2.0 / (rrfK + 1))
                     double maxPossibleRrf = 2.0 / (rrfK + 1.0);
                     double normalizedScore = Math.min(1.0, rrfScore / maxPossibleRrf);
                     double normalizedDistance = Math.max(0.0, 1.0 - normalizedScore);

@@ -9,10 +9,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -22,10 +22,12 @@ import com.groupsync.backend.knowledge.dto.AskKnowledgeResponse;
 import com.groupsync.backend.knowledge.dto.CitationResponse;
 import com.groupsync.backend.knowledge.model.*;
 import com.groupsync.backend.knowledge.rag.*;
+import com.groupsync.backend.knowledge.rag.ParentChildContextExpander.ExpandedContext;
 import com.groupsync.backend.knowledge.repository.*;
 import com.groupsync.backend.knowledge.service.KnowledgeChatService;
 import com.groupsync.backend.knowledge.service.KnowledgeChatTransactionService;
 import com.groupsync.backend.knowledge.service.KnowledgeWorkspaceService;
+import com.groupsync.backend.knowledge.service.StructuredKnowledgeQueryService;
 import com.groupsync.backend.user.model.UserAccount;
 import com.groupsync.backend.user.repository.UserAccountRepository;
 
@@ -38,14 +40,17 @@ class KnowledgeChatCitationTest {
     @Mock private DocumentChunkRepository chunkRepository;
     @Mock private ResourceRepository resourceRepository;
     @Mock private UserAccountRepository userRepository;
-    @Mock private RetrievalStrategy retrievalStrategy;
+    @Mock private HybridRetrievalStrategy retrievalStrategy;
+    @Mock private KnowledgeQueryPlanner queryPlanner;
+    @Mock private StructuredKnowledgeQueryService structuredQueryService;
+    @Mock private ParentChildContextExpander parentChildExpander;
     @Mock private LanguageModelClient languageModelClient;
     @Mock private KnowledgeWorkspaceService workspaceService;
 
     private KnowledgeChatTransactionService chatTransactionService;
     private KnowledgeChatService chatService;
 
-    @org.junit.jupiter.api.BeforeEach
+    @BeforeEach
     void setUp() {
         chatTransactionService = new KnowledgeChatTransactionService(
                 sessionRepository, messageRepository, citationRepository,
@@ -53,7 +58,8 @@ class KnowledgeChatCitationTest {
         );
         chatService = new KnowledgeChatService(
                 chatTransactionService, sessionRepository, messageRepository,
-                citationRepository, retrievalStrategy, languageModelClient
+                citationRepository, retrievalStrategy, queryPlanner,
+                structuredQueryService, parentChildExpander, languageModelClient
         );
     }
 
@@ -76,6 +82,9 @@ class KnowledgeChatCitationTest {
             return msg;
         });
 
+        when(queryPlanner.plan(anyLong(), anyString(), any(), any(), any(), any()))
+                .thenReturn(new QueryPlan(QueryMode.HYBRID, QueryOperation.SEARCH, "Explain BCNF decomposition", KnowledgeQueryFilters.empty(), "test"));
+
         // Simulate 4 retrieved chunks
         List<RetrievedChunk> retrieved = List.of(
                 new RetrievedChunk(101L, 1L, "Database Systems", 0, 1, "Section 1", "Chunk 1 content on 1NF", 0.1d),
@@ -83,7 +92,8 @@ class KnowledgeChatCitationTest {
                 new RetrievedChunk(103L, 1L, "Database Systems", 2, 3, "Section 3", "Chunk 3 content on 3NF & BCNF", 0.15d),
                 new RetrievedChunk(104L, 1L, "Database Systems", 3, 4, "Section 4", "Chunk 4 content on SQL triggers", 0.18d)
         );
-        when(retrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), any(), any())).thenReturn(retrieved);
+        when(retrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), any(), any(), any())).thenReturn(retrieved);
+        when(parentChildExpander.expand(retrieved)).thenReturn(new ExpandedContext(retrieved, retrieved));
 
         // LLM output specifically cites only [1] and [3]
         String llmAnswer = "According to [1], normalization begins with 1NF. Further, [3] defines BCNF as every determinant being a superkey.";
@@ -144,10 +154,14 @@ class KnowledgeChatCitationTest {
         when(sessionRepository.findById(any())).thenReturn(Optional.of(session));
         when(messageRepository.save(any(ChatMessage.class))).thenAnswer(inv -> inv.getArgument(0));
 
+        when(queryPlanner.plan(anyLong(), anyString(), any(), any(), any(), any()))
+                .thenReturn(new QueryPlan(QueryMode.HYBRID, QueryOperation.SEARCH, "Summarize knowledge base", KnowledgeQueryFilters.empty(), "test"));
+
         List<RetrievedChunk> retrieved = List.of(
                 new RetrievedChunk(101L, 1L, "Guide", 0, 1, "Intro", "General intro content", 0.1d)
         );
-        when(retrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), any(), any())).thenReturn(retrieved);
+        when(retrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), any(), any(), any())).thenReturn(retrieved);
+        when(parentChildExpander.expand(retrieved)).thenReturn(new ExpandedContext(retrieved, retrieved));
 
         // LLM output provides general answer with NO [X] markers
         String llmAnswer = "This knowledge base covers software architecture, databases, and testing best practices.";

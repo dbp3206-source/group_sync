@@ -14,16 +14,23 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
-import com.groupsync.backend.knowledge.chunking.RecursiveChunkingStrategy;
+import com.groupsync.backend.knowledge.chunking.StructureAwareChunkingStrategy;
+import com.groupsync.backend.knowledge.chunking.StructureAwareChunkingStrategy.HierarchicalChunk;
+import com.groupsync.backend.knowledge.ingestion.BlockType;
+import com.groupsync.backend.knowledge.ingestion.ParsedBlock;
+import com.groupsync.backend.knowledge.ingestion.ParsedDocument;
 import com.groupsync.backend.knowledge.ingestion.ParsedResourceContent;
 import com.groupsync.backend.knowledge.ingestion.ResourceParser;
 import com.groupsync.backend.knowledge.ingestion.ResourceParserRegistry;
-import com.groupsync.backend.knowledge.model.DocumentChunk;
+import com.groupsync.backend.knowledge.model.ChunkLevel;
 import com.groupsync.backend.knowledge.model.Resource;
 import com.groupsync.backend.knowledge.model.ResourceProcessingStatus;
 import com.groupsync.backend.knowledge.model.ResourceType;
 import com.groupsync.backend.knowledge.rag.EmbeddingProvider;
+import com.groupsync.backend.knowledge.rag.EmbeddingTextBuilder;
+import com.groupsync.backend.knowledge.rag.EmbeddingTextBuilder.SemanticMetadata;
 import com.groupsync.backend.knowledge.rag.GeminiProperties;
 import com.groupsync.backend.knowledge.repository.DocumentChunkRepository;
 import com.groupsync.backend.knowledge.repository.ResourceRepository;
@@ -39,11 +46,13 @@ class ResourceIngestionConcurrencyTest {
     @Mock private ResourceRepository resourceRepository;
     @Mock private DocumentChunkRepository chunkRepository;
     @Mock private ResourceParserRegistry parserRegistry;
-    @Mock private RecursiveChunkingStrategy chunkingStrategy;
+    @Mock private StructureAwareChunkingStrategy chunkingStrategy;
     @Mock private StorageService storageService;
     @Mock private EmbeddingProvider embeddingProvider;
+    @Mock private EmbeddingTextBuilder embeddingTextBuilder;
     @Mock private GeminiProperties geminiProperties;
     @Mock private AutoOrganizationService autoOrganizationService;
+    @Mock private NamedParameterJdbcTemplate jdbcTemplate;
     @Mock private ResourceIngestionTransactionService transactionService;
 
     @InjectMocks private ResourceIngestionService ingestionService;
@@ -51,7 +60,7 @@ class ResourceIngestionConcurrencyTest {
     @Test
     void transactionServiceClaimReturnsTrueOnFirstAttemptAndFalseOnSubsequentAttempt() {
         ResourceIngestionTransactionService txService = new ResourceIngestionTransactionService(
-                resourceRepository, chunkRepository, geminiProperties, autoOrganizationService);
+                resourceRepository, chunkRepository, geminiProperties, autoOrganizationService, jdbcTemplate);
 
         Long resourceId = 100L;
 
@@ -82,9 +91,17 @@ class ResourceIngestionConcurrencyTest {
         when(storageService.open("200/guide.md")).thenReturn(new ByteArrayInputStream("# Title\nContent".getBytes()));
         ResourceParser mockParser = mock(ResourceParser.class);
         when(parserRegistry.forType(ResourceType.MARKDOWN)).thenReturn(mockParser);
-        when(mockParser.parse(any())).thenReturn(new ParsedResourceContent("Extracted content text", null, "Title"));
-        when(chunkingStrategy.chunk("Extracted content text")).thenReturn(List.of("Chunk 1", "Chunk 2"));
-        when(embeddingProvider.embedDocument(anyString())).thenReturn(new float[768]);
+        ParsedDocument doc = new ParsedDocument("Title", "Content", List.of(new ParsedBlock(BlockType.PARAGRAPH, "Title", "Content", 1, 0)));
+        when(mockParser.parseDocument(any())).thenReturn(doc);
+
+        List<HierarchicalChunk> chunks = List.of(
+                new HierarchicalChunk(0, ChunkLevel.PARENT, null, 1, "Title", "Content"),
+                new HierarchicalChunk(1, ChunkLevel.CHILD, 0, 1, "Title", "Content")
+        );
+        when(chunkingStrategy.chunkDocument(doc)).thenReturn(chunks);
+        when(transactionService.fetchSemanticMetadata(resourceId)).thenReturn(new SemanticMetadata("Concurrent Guide", List.of(), List.of(), null));
+        when(embeddingTextBuilder.build(any(), anyString())).thenReturn("Rich content");
+        when(embeddingProvider.embedDocuments(anyList())).thenReturn(List.of(new float[768]));
 
         // Attempt 1
         ingestionService.process(resourceId);
@@ -94,14 +111,14 @@ class ResourceIngestionConcurrencyTest {
         // Verification: parse, chunk, embed, and saveReady were called EXACTLY ONCE
         verify(transactionService, times(2)).claim(resourceId);
         verify(storageService, times(1)).open(anyString());
-        verify(embeddingProvider, times(2)).embedDocument(anyString()); // 2 chunks, 1 time each
-        verify(transactionService, times(1)).saveReady(eq(resourceId), anyList(), anyList(), any());
+        verify(embeddingProvider, times(1)).embedDocuments(anyList());
+        verify(transactionService, times(1)).saveReadyHierarchical(eq(resourceId), anyList(), anyMap());
     }
 
     @Test
     void saveReadyDeletesExistingChunksFirstToPreventDuplicateChunks() {
         ResourceIngestionTransactionService txService = new ResourceIngestionTransactionService(
-                resourceRepository, chunkRepository, geminiProperties, autoOrganizationService);
+                resourceRepository, chunkRepository, geminiProperties, autoOrganizationService, jdbcTemplate);
 
         Long resourceId = 300L;
         UserAccount owner = new UserAccount("user@example.com", "hash", "User");
