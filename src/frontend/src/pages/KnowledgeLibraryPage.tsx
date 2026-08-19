@@ -26,6 +26,7 @@ import {
   type KnowledgeTag,
   type Resource,
 } from '../api/knowledge'
+import { getApiErrorMessage } from '../api/errors'
 import KnowledgeGraphView from '../components/KnowledgeGraphView'
 
 export default function KnowledgeLibraryPage() {
@@ -82,7 +83,7 @@ export default function KnowledgeLibraryPage() {
           setTotalItems(response.totalItems)
           setHasNext(response.hasNext)
         })
-        .catch(() => setError('Your library could not be loaded.'))
+        .catch(err => setError(getApiErrorMessage(err, 'Your library could not be loaded.')))
     },
     [],
   )
@@ -135,8 +136,8 @@ export default function KnowledgeLibraryPage() {
       setContent('')
       setOpen(false)
       await load(activeQueryRef.current, tagIdRef.current, collectionIdRef.current, 0, sortRef.current, false)
-    } catch {
-      setError('The note could not be saved.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'The note could not be saved.'))
     }
   }
 
@@ -147,8 +148,8 @@ export default function KnowledgeLibraryPage() {
     try {
       await uploadResource(file)
       await load(activeQueryRef.current, tagIdRef.current, collectionIdRef.current, 0, sortRef.current, false)
-    } catch {
-      setError('The resource could not be imported. Please verify file format and size.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'The resource could not be imported. Please verify file format and size.'))
     } finally {
       setBusy(false)
     }
@@ -161,16 +162,16 @@ export default function KnowledgeLibraryPage() {
       setCollections(values => [created, ...values])
       setCollectionName('')
       setCollectionOpen(false)
-    } catch {
-      setError('The collection could not be created.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'The collection could not be created.'))
     }
   }
 
   async function assign(collection: number, resource: number) {
     try {
       await assignResourceToCollection(collection, resource)
-    } catch {
-      setError('The resource could not be added to that collection.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'The resource could not be added to that collection.'))
     }
   }
 

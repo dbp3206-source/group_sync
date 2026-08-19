@@ -45,6 +45,7 @@ import {
   type StudyTopicDetail,
   type SubmitQuizAnswersResponse,
 } from '../api/knowledge'
+import { getApiErrorMessage } from '../api/errors'
 
 export default function KnowledgeFocusPage() {
   const [topics, setTopics] = useState<StudyTopic[]>([])
@@ -312,8 +313,8 @@ export default function KnowledgeFocusPage() {
       setTopicDetail(updated)
       const resList = await getResources()
       setAllResources(resList.items)
-    } catch {
-      setError('Không thể nạp tệp tài liệu.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể nạp tệp tài liệu.'))
     } finally {
       setUploadBusy(false)
     }
@@ -1136,8 +1137,8 @@ export default function KnowledgeFocusPage() {
                               setSelectedResourceIds(prev => [...prev, created.id])
                               const list = await getResources()
                               setAllResources(list.items)
-                            } catch {
-                              setError('Không thể nạp tệp tài liệu.')
+                            } catch (err) {
+                              setError(getApiErrorMessage(err, 'Không thể nạp tệp tài liệu.'))
                             } finally {
                               setUploadBusy(false)
                             }
