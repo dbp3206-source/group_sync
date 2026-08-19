@@ -291,7 +291,7 @@ erDiagram
 
 ---
 
-## 7. Lịch sử Tiến hóa Database qua 13 Bản Flyway Migration (V1–V13)
+## 7. Lịch sử Tiến hóa Database qua 15 Bản Flyway Migration (V1–V15)
 
 Dự án áp dụng công cụ quản lý phiên bản cơ sở dữ liệu **Flyway** để đảm bảo tính nhất quán tuyệt đối giữa môi trường Local và Cloud Production:
 
@@ -306,26 +306,34 @@ Dự án áp dụng công cụ quản lý phiên bản cơ sở dữ liệu **Fl
 - `V11__persistent_chat_and_citations.sql`: Tạo các bảng hội thoại bền vững: `chat_sessions`, `chat_messages`, `citations`.
 - `V12__lexical_fts_index.sql`: Bổ sung cột `tsv tsvector GENERATED ALWAYS AS (to_tsvector('simple', content))` và tạo chỉ mục đảo GIN phục vụ tìm kiếm từ khóa chính xác.
 - `V13__storage_blobs.sql`: Tạo bảng `storage_blobs` chứa dữ liệu nhị phân `BYTEA`, đảm bảo tính độc lập và bền vững của tệp tin.
+- `V14__learning_studio_foundation.sql`: Tạo các bảng Active Recall Quiz và Topic Deepdive Studio.
+- `V15__rag_v2_parent_child_and_metadata.sql`: Bổ sung `parent_chunk_id`, `chunk_level` (`PARENT`/`CHILD`), `chunking_version` phục vụ phân cấp Parent-Child và metadata filtering.
 
 ---
 
-## 8. Kỹ thuật Tìm kiếm Lai Hybrid RAG & Google Gemini AI
+## 8. Kỹ thuật RAG v2 (Intent-Aware, Structure-Aware & Parent-Child) & Google Gemini AI
 
 ```mermaid
 graph TD
-    Query[Câu hỏi của Người dùng] --> Embed[Gemini 768-dim Vector]
-    Query --> FTS[to_tsquery 'simple']
+    Query[Câu hỏi của Người dùng] --> Planner[KnowledgeQueryPlanner]
+    Planner --> Validator[QueryPlanValidator]
+    Validator --> PlanRouter{QueryMode}
 
-    Embed --> SemBranch["Nhánh Ngữ Nghĩa - Semantic<br>(pgvector Cosine <=> HNSW)"]
-    FTS --> LexBranch["Nhánh Từ Khóa - Lexical<br>(PostgreSQL FTS GIN Index)"]
+    PlanRouter -->|STRUCTURED| StructQuery[StructuredKnowledgeQueryService<br>PostgreSQL Relational Facts]
+    PlanRouter -->|HYBRID / FILTERED_HYBRID| RetFilter[Metadata Filters<br>SQL WHERE before vector search]
 
-    SemBranch -->|Top 10 Chunks| RRF["Hợp Nhất Xếp Hạng Tương Hỗ (RRF)<br>Score = sum(1 / (60 + rank))"]
-    LexBranch -->|Top 10 Chunks| RRF
+    RetFilter --> SemBranch["Nhánh Ngữ Nghĩa - Semantic<br>(pgvector Cosine <=> HNSW on CHILD chunks)"]
+    RetFilter --> LexBranch["Nhánh Từ Khóa - Lexical<br>(PostgreSQL FTS on CHILD chunks)"]
 
-    RRF --> TopEvidence[Top Đoạn Bằng Chứng Tốt Nhất]
-    TopEvidence --> PromptBuilder[GroundedPromptBuilder]
+    SemBranch --> RRF["Hợp Nhất Xếp Hạng Tương Hỗ (RRF)<br>Score = sum(1 / (60 + rank))"]
+    LexBranch --> RRF
+
+    RRF --> RankedChildren[Top Child Chunks]
+    RankedChildren --> ParentExpander[ParentChildContextExpander<br>Mở rộng Parent + Dedup + Budget]
+    ParentExpander --> PromptBuilder[GroundedPromptBuilder]
     PromptBuilder --> GeminiLLM[Google Gemini 3.5 Flash Lite]
-    GeminiLLM --> ChatOutput[Câu trả lời Chuẩn xác + Trích dẫn]
+    GeminiLLM --> ChatOutput[Câu trả lời Chuẩn xác + Trích dẫn + Trace]
+    StructQuery --> ChatOutput
 ```
 
 ### 8.1 Thuật toán Hợp nhất Xếp hạng Tương hỗ (Reciprocal Rank Fusion - RRF)
@@ -336,7 +344,7 @@ Khi nhận câu hỏi từ người dùng, hệ thống kích hoạt đồng th�
 Điểm số RRF tổng hợp của từng đoạn văn $d$ được tính theo công thức chuẩn:
 $$\text{Score}_{\text{RRF}}(d) = \sum_{m \in \{\text{semantic}, \text{lexical}\}} \frac{1}{60 + \text{rank}_m(d)}$$
 
-Sau đó, hệ thống chọn ra các đoạn văn có điểm $\text{Score}_{\text{RRF}}$ cao nhất để đưa vào ngữ cảnh cho mô hình ngôn ngữ lớn (LLM).
+Sau đó, hệ thống chọn ra các đoạn văn child chunks có điểm $\text{Score}_{\text{RRF}}$ cao nhất để mở rộng sang Parent Chunk và tối ưu ngân sách ngữ cảnh cho mô hình ngôn ngữ lớn (LLM).
 
 ### 8.2 Bốn Phạm vi Truy xuất Tri thức (Retrieval Scopes)
 1. `THIS_RESOURCE`: Chỉ truy xuất trên các chunk thuộc đúng `resource_id` đang mở.
