@@ -3,8 +3,10 @@ package com.groupsync.backend.knowledge.service;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -15,6 +17,7 @@ import com.groupsync.backend.knowledge.ingestion.ParsedResourceContent;
 import com.groupsync.backend.knowledge.ingestion.ResourceParserRegistry;
 import com.groupsync.backend.knowledge.ingestion.ResourceProcessingRequestedEvent;
 import com.groupsync.backend.knowledge.model.*;
+import com.groupsync.backend.knowledge.rag.GeminiProperties;
 import com.groupsync.backend.knowledge.repository.CitationRepository;
 import com.groupsync.backend.knowledge.repository.DocumentChunkRepository;
 import com.groupsync.backend.knowledge.repository.ResourceRepository;
@@ -36,20 +39,9 @@ public class ResourceService {
     private final CitationRepository citationRepository;
     private final DocumentChunkRepository chunkRepository;
     private final ResourceParserRegistry parserRegistry;
-    private final com.groupsync.backend.knowledge.rag.GeminiProperties geminiProperties;
+    private final GeminiProperties geminiProperties;
 
-    public ResourceService(
-            @Value("${knowledge.upload.max-size:25MB}") org.springframework.util.unit.DataSize maxUploadSize,
-            ResourceRepository resourceRepository,
-            UserAccountRepository userRepository,
-            StorageService storageService,
-            ApplicationEventPublisher events,
-            CitationRepository citationRepository,
-            DocumentChunkRepository chunkRepository,
-            ResourceParserRegistry parserRegistry) {
-        this(maxUploadSize, resourceRepository, userRepository, storageService, events, citationRepository, chunkRepository, parserRegistry, null);
-    }
-
+    @Autowired
     public ResourceService(
             @Value("${knowledge.upload.max-size:25MB}") org.springframework.util.unit.DataSize maxUploadSize,
             ResourceRepository resourceRepository,
@@ -59,7 +51,7 @@ public class ResourceService {
             CitationRepository citationRepository,
             DocumentChunkRepository chunkRepository,
             ResourceParserRegistry parserRegistry,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) com.groupsync.backend.knowledge.rag.GeminiProperties geminiProperties) {
+            GeminiProperties geminiProperties) {
         this.maxUploadBytes = maxUploadSize != null ? maxUploadSize.toBytes() : 25L * 1024 * 1024;
         this.resourceRepository = resourceRepository;
         this.userRepository = userRepository;
@@ -68,7 +60,19 @@ public class ResourceService {
         this.citationRepository = citationRepository;
         this.chunkRepository = chunkRepository;
         this.parserRegistry = parserRegistry;
-        this.geminiProperties = geminiProperties;
+        this.geminiProperties = Objects.requireNonNull(geminiProperties, "geminiProperties must not be null");
+    }
+
+    public ResourceService(
+            org.springframework.util.unit.DataSize maxUploadSize,
+            ResourceRepository resourceRepository,
+            UserAccountRepository userRepository,
+            StorageService storageService,
+            ApplicationEventPublisher events,
+            CitationRepository citationRepository,
+            DocumentChunkRepository chunkRepository,
+            ResourceParserRegistry parserRegistry) {
+        this(maxUploadSize, resourceRepository, userRepository, storageService, events, citationRepository, chunkRepository, parserRegistry, new GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000));
     }
 
     public long getMaxUploadBytes() {
@@ -236,7 +240,7 @@ public class ResourceService {
         }
 
         boolean isV2 = maxVersion >= 2;
-        int batchSize = (geminiProperties != null) ? geminiProperties.embeddingBatchSize() : 16;
+        int batchSize = geminiProperties.embeddingBatchSize();
         int embeddingBatchCount = isV2 ? (childCount > 0 ? (int) Math.ceil((double) childCount / batchSize) : 0) : 0;
         boolean semanticMetadataIncluded = isV2;
 

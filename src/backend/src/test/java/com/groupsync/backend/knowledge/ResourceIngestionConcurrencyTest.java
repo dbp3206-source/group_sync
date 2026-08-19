@@ -102,6 +102,7 @@ class ResourceIngestionConcurrencyTest {
         when(transactionService.fetchSemanticMetadata(resourceId)).thenReturn(new SemanticMetadata("Concurrent Guide", List.of(), List.of(), null));
         when(embeddingTextBuilder.build(any(), anyString())).thenReturn("Rich content");
         when(embeddingProvider.embedDocuments(anyList())).thenReturn(List.of(new float[768]));
+        when(geminiProperties.embeddingDimensions()).thenReturn(768);
 
         // Attempt 1
         ingestionService.process(resourceId);

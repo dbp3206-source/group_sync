@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import com.groupsync.backend.knowledge.model.ResourceProcessingStatus;
 import com.groupsync.backend.knowledge.rag.EmbeddingProvider;
 import com.groupsync.backend.knowledge.rag.EmbeddingTextBuilder;
 import com.groupsync.backend.knowledge.rag.EmbeddingTextBuilder.SemanticMetadata;
+import com.groupsync.backend.knowledge.rag.GeminiProperties;
 import com.groupsync.backend.knowledge.repository.ResourceRepository;
 import com.groupsync.backend.knowledge.storage.StorageService;
 
@@ -39,8 +41,9 @@ public class ResourceIngestionService {
     private final EmbeddingProvider embeddingProvider;
     private final EmbeddingTextBuilder embeddingTextBuilder;
     private final ResourceIngestionTransactionService transactionService;
-    private final com.groupsync.backend.knowledge.rag.GeminiProperties geminiProperties;
+    private final GeminiProperties geminiProperties;
 
+    @Autowired
     public ResourceIngestionService(
             ResourceRepository resourceRepository,
             ResourceParserRegistry parserRegistry,
@@ -48,8 +51,16 @@ public class ResourceIngestionService {
             StorageService storageService,
             EmbeddingProvider embeddingProvider,
             EmbeddingTextBuilder embeddingTextBuilder,
-            ResourceIngestionTransactionService transactionService) {
-        this(resourceRepository, parserRegistry, chunkingStrategy, storageService, embeddingProvider, embeddingTextBuilder, transactionService, null);
+            ResourceIngestionTransactionService transactionService,
+            GeminiProperties geminiProperties) {
+        this.resourceRepository = resourceRepository;
+        this.parserRegistry = parserRegistry;
+        this.chunkingStrategy = chunkingStrategy;
+        this.storageService = storageService;
+        this.embeddingProvider = embeddingProvider;
+        this.embeddingTextBuilder = embeddingTextBuilder;
+        this.transactionService = transactionService;
+        this.geminiProperties = Objects.requireNonNull(geminiProperties, "geminiProperties must not be null");
     }
 
     public ResourceIngestionService(
@@ -59,16 +70,8 @@ public class ResourceIngestionService {
             StorageService storageService,
             EmbeddingProvider embeddingProvider,
             EmbeddingTextBuilder embeddingTextBuilder,
-            ResourceIngestionTransactionService transactionService,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) com.groupsync.backend.knowledge.rag.GeminiProperties geminiProperties) {
-        this.resourceRepository = resourceRepository;
-        this.parserRegistry = parserRegistry;
-        this.chunkingStrategy = chunkingStrategy;
-        this.storageService = storageService;
-        this.embeddingProvider = embeddingProvider;
-        this.embeddingTextBuilder = embeddingTextBuilder;
-        this.transactionService = transactionService;
-        this.geminiProperties = geminiProperties;
+            ResourceIngestionTransactionService transactionService) {
+        this(resourceRepository, parserRegistry, chunkingStrategy, storageService, embeddingProvider, embeddingTextBuilder, transactionService, new GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000));
     }
 
     @Async
@@ -153,8 +156,7 @@ public class ResourceIngestionService {
                 throw new IllegalStateException("Embedding count mismatch: expected " + childChunks.size() + " embeddings but received " + received);
             }
 
-            int expectedDimensions = (geminiProperties != null && geminiProperties.embeddingDimensions() > 0)
-                    ? geminiProperties.embeddingDimensions() : 768;
+            int expectedDimensions = geminiProperties.embeddingDimensions();
             Map<Integer, float[]> childEmbeddingMap = new HashMap<>();
             for (int i = 0; i < childChunks.size(); i++) {
                 float[] emb = embeddings.get(i);

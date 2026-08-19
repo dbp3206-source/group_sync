@@ -49,9 +49,10 @@ public class KnowledgeChatService {
             LanguageModelClient languageModelClient) {
         this(chatTransactionService, sessionRepository, messageRepository, citationRepository,
                 retrievalStrategy, null, queryPlanner, structuredQueryService, parentChildExpander,
-                languageModelClient, null);
+                languageModelClient, new GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000));
     }
 
+    @Autowired
     public KnowledgeChatService(
             KnowledgeChatTransactionService chatTransactionService,
             ChatSessionRepository sessionRepository,
@@ -63,7 +64,7 @@ public class KnowledgeChatService {
             StructuredKnowledgeQueryService structuredQueryService,
             ParentChildContextExpander parentChildExpander,
             LanguageModelClient languageModelClient,
-            @Autowired(required = false) GeminiProperties geminiProperties) {
+            GeminiProperties geminiProperties) {
         this.chatTransactionService = chatTransactionService;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
@@ -74,7 +75,7 @@ public class KnowledgeChatService {
         this.structuredQueryService = structuredQueryService;
         this.parentChildExpander = parentChildExpander;
         this.languageModelClient = languageModelClient;
-        this.geminiProperties = geminiProperties;
+        this.geminiProperties = Objects.requireNonNull(geminiProperties, "geminiProperties must not be null");
     }
 
     public AskKnowledgeResponse ask(Long ownerId, AskKnowledgeRequest request) {
@@ -209,7 +210,7 @@ public class KnowledgeChatService {
         // Step 7: Persist assistant message and verified citations
         AskKnowledgeResponse saved = chatTransactionService.persistAssistantResult(prep.sessionId(), answer, promptChunks);
 
-        String modelName = geminiProperties != null ? geminiProperties.chatModel() : "gemini-3.5-flash-lite";
+        String modelName = geminiProperties.chatModel();
         GenerationTrace generationTrace = new GenerationTrace(
                 modelName,
                 promptChunks.size(),
