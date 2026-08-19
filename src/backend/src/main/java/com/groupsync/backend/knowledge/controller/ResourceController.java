@@ -108,6 +108,13 @@ public class ResourceController {
         return ResponseEntity.ok(resourceService.extractedText(user.getId(), resourceId));
     }
 
+    @GetMapping("/{resourceId}/rag-trace")
+    public ResponseEntity<ResourceIngestionTraceDto> ingestionTrace(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long resourceId) {
+        return ResponseEntity.ok(resourceService.getIngestionTrace(user.getId(), resourceId));
+    }
+
     @PostMapping("/auto-organize-all")
     public ResponseEntity<java.util.Map<String, Object>> autoOrganizeAll(@AuthenticationPrincipal AuthenticatedUser user) {
         autoOrganizationService.autoOrganizeAll(user.getId());

@@ -22,6 +22,7 @@ import com.groupsync.backend.knowledge.dto.AskKnowledgeResponse;
 import com.groupsync.backend.knowledge.dto.CitationResponse;
 import com.groupsync.backend.knowledge.model.*;
 import com.groupsync.backend.knowledge.rag.*;
+import com.groupsync.backend.knowledge.rag.HybridRetrievalStrategy.HybridExecutionDetails;
 import com.groupsync.backend.knowledge.rag.ParentChildContextExpander.ExpandedContext;
 import com.groupsync.backend.knowledge.repository.*;
 import com.groupsync.backend.knowledge.service.KnowledgeChatService;
@@ -92,7 +93,8 @@ class KnowledgeChatCitationTest {
                 new RetrievedChunk(103L, 1L, "Database Systems", 2, 3, "Section 3", "Chunk 3 content on 3NF & BCNF", 0.15d),
                 new RetrievedChunk(104L, 1L, "Database Systems", 3, 4, "Section 4", "Chunk 4 content on SQL triggers", 0.18d)
         );
-        when(retrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), any(), any(), any())).thenReturn(retrieved);
+        when(retrievalStrategy.retrieveWithTrace(anyLong(), anyString(), any(), any(), any(), any(), any()))
+                .thenReturn(new HybridExecutionDetails(retrieved, 4, 4, 8, 60));
         when(parentChildExpander.expand(retrieved)).thenReturn(new ExpandedContext(retrieved, retrieved));
 
         // LLM output specifically cites only [1] and [3]
@@ -160,7 +162,8 @@ class KnowledgeChatCitationTest {
         List<RetrievedChunk> retrieved = List.of(
                 new RetrievedChunk(101L, 1L, "Guide", 0, 1, "Intro", "General intro content", 0.1d)
         );
-        when(retrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), any(), any(), any())).thenReturn(retrieved);
+        when(retrievalStrategy.retrieveWithTrace(anyLong(), anyString(), any(), any(), any(), any(), any()))
+                .thenReturn(new HybridExecutionDetails(retrieved, 1, 1, 2, 60));
         when(parentChildExpander.expand(retrieved)).thenReturn(new ExpandedContext(retrieved, retrieved));
 
         // LLM output provides general answer with NO [X] markers

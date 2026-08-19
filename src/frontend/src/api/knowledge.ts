@@ -3,8 +3,83 @@ import { apiClient } from './client'
 export type Resource = { id: number; title: string; description: string | null; resourceType: string; processingStatus: string; favorite: boolean; priority: number; originalFilename?: string | null; sizeBytes?: number | null; createdAt: string }
 export type FocusNext = { resourceId: number; title: string; resourceType: string; priority: number; favorite: boolean; progressPercent: number; reason: string }
 export type InsightOverview = { totalResources: number; readyResources: number; inProgressResources: number; completedResources: number; composition: { resourceType: string; count: number }[] }
+export type PlannerTrace = {
+  mode: string
+  operation: string
+  semanticQuery: string
+  explanation: string
+}
+
+export type FilterTrace = {
+  scope: string
+  resourceType: string | null
+  favorite: boolean | null
+  collectionCount: number | null
+  tagCount: number | null
+  eligibleResourceCount: number | null
+  createdAfter: string | null
+  createdBefore: string | null
+}
+
+export type RetrievalTrace = {
+  semanticCandidates: number
+  lexicalCandidates: number
+  totalCandidates: number
+}
+
+export type FusionTrace = {
+  inputCandidates: number
+  selectedChildren: number
+  rrfK: number
+}
+
+export type ParentChildTrace = {
+  childChunksRetrieved: number
+  uniqueParentsFound: number
+  duplicateParentsDeduplicated: number
+}
+
+export type ContextBudgetTrace = {
+  parentsUsed: number
+  charactersUsed: number
+  maxCharactersBudget: number
+}
+
+export type GenerationTrace = {
+  model: string
+  promptChunksCount: number
+  verifiedCitationsCount: number
+}
+
+export type RagExecutionTrace = {
+  mode: string
+  operation: string
+  planner?: PlannerTrace
+  filter?: FilterTrace
+  retrieval?: RetrievalTrace
+  fusion?: FusionTrace
+  parentChild?: ParentChildTrace
+  contextBudget?: ContextBudgetTrace
+  generation?: GenerationTrace
+  durationMs: number
+}
+
+export type ResourceIngestionTrace = {
+  resourceId: number
+  resourceTitle: string
+  resourceType: string
+  processingStatus: string
+  chunkingVersion: number
+  parentChunkCount: number
+  childChunkCount: number
+  embeddingBatchCount: number
+  embeddingModel: string
+  embeddingDimensions: number
+  semanticMetadataIncluded: boolean
+}
+
 export type Citation = { chunkId: number; resourceId: number; resourceTitle: string; pageNumber: number | null; section: string | null; citationOrder: number; relevanceScore: number; evidenceExcerpt: string }
-export type AskResponse = { sessionId: number; answer: string; grounded: boolean; citations: Citation[] }
+export type AskResponse = { sessionId: number; answer: string; grounded: boolean; citations: Citation[]; trace?: RagExecutionTrace }
 export type AskInput = { sessionId?: number; question: string; scope: 'THIS_RESOURCE' | 'SELECTED_RESOURCES' | 'COLLECTION' | 'LIBRARY'; resourceId?: number; resourceIds?: number[]; collectionId?: number; sessionTitle?: string }
 export type KnowledgeCollection = { id: number; name: string; description: string | null; createdAt?: string; updatedAt?: string }
 export type KnowledgeTag = { id: number; name: string; createdAt?: string }
@@ -50,6 +125,7 @@ export async function deleteResource(id:number) { await apiClient.delete(`/resou
 export async function updateResourceFavorite(id:number, favorite:boolean) { return (await apiClient.patch<Resource>(`/resources/${id}`, { favorite })).data }
 export async function autoOrganizeAll() { return (await apiClient.post<{ message: string }>('/resources/auto-organize-all')).data }
 export async function autoOrganizeResource(id: number) { return (await apiClient.post<{ message: string }>(`/resources/${id}/auto-organize`)).data }
+export async function getResourceIngestionTrace(id: number) { return (await apiClient.get<ResourceIngestionTrace>(`/resources/${id}/rag-trace`)).data }
 
 // ==========================================
 // Focus Topic Deepdive Learning Studio Types & API

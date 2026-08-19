@@ -22,6 +22,7 @@ import {
   getResource,
   getResourceActivity,
   getResourceContent,
+  getResourceIngestionTrace,
   getResourceNotes,
   getResources,
   getTags,
@@ -31,6 +32,7 @@ import {
   type RelatedResource,
   type Resource,
   type ResourceActivity,
+  type ResourceIngestionTrace,
   type ResourceNote,
 } from '../api/knowledge'
 import KnowledgeGraphView from '../components/KnowledgeGraphView'
@@ -44,6 +46,7 @@ export default function ResourceWorkspacePage() {
   // Core metadata state
   const [resource, setResource] = useState<Resource | null>(null)
   const [activity, setActivity] = useState<ResourceActivity | null>(null)
+  const [ingestionTrace, setIngestionTrace] = useState<ResourceIngestionTrace | null>(null)
   const [error, setError] = useState('')
 
   // Active tab
@@ -74,7 +77,7 @@ export default function ResourceWorkspacePage() {
   const [deleting, setDeleting] = useState(false)
   const [progressVal, setProgressVal] = useState<number | null>(null)
 
-  // Step 1: Initial load fetches ONLY resource metadata & activity
+  // Step 1: Initial load fetches resource metadata, activity & ingestion trace
   useEffect(() => {
     let active = true
     setError('')
@@ -86,11 +89,13 @@ export default function ResourceWorkspacePage() {
     Promise.all([
       getResource(resourceId),
       getResourceActivity(resourceId),
+      getResourceIngestionTrace(resourceId).catch(() => null),
     ])
-      .then(([item, act]) => {
+      .then(([item, act, trace]) => {
         if (!active) return
         setResource(item)
         setActivity(act)
+        if (trace) setIngestionTrace(trace)
       })
       .catch(() => {
         if (!active) return
@@ -334,6 +339,40 @@ export default function ResourceWorkspacePage() {
                 ))}
               </dl>
             </div>
+
+            {ingestionTrace && (
+              <div className="kos-overview-card" style={{ gridColumn: '1 / -1', background: 'var(--kos-subtle)' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <BrainCircuit size={16} /> RAG Ingestion & Index Trace (Explainability)
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
+                  <div>
+                    <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Structure-aware Chunking</small>
+                    <strong style={{ fontSize: '0.9rem' }}>
+                      {ingestionTrace.parentChunkCount} Parents (~1500 chars) · {ingestionTrace.childChunkCount} Children (~500 chars)
+                    </strong>
+                  </div>
+                  <div>
+                    <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Vector Embeddings</small>
+                    <strong style={{ fontSize: '0.9rem' }}>
+                      {ingestionTrace.embeddingModel} ({ingestionTrace.embeddingDimensions}d) · {ingestionTrace.embeddingBatchCount} Batches
+                    </strong>
+                  </div>
+                  <div>
+                    <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Chunking Engine Version</small>
+                    <strong style={{ fontSize: '0.9rem' }}>
+                      v{ingestionTrace.chunkingVersion} (Hierarchical Parent–Child)
+                    </strong>
+                  </div>
+                  <div>
+                    <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Semantic Metadata Preloaded</small>
+                    <strong style={{ fontSize: '0.9rem', color: 'var(--kos-green)' }}>
+                      {ingestionTrace.semanticMetadataIncluded ? '✓ Tags & Collections Embedded' : 'Standard Text'}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

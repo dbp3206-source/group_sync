@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 /**
- * Hybrid retrieval using Reciprocal Rank Fusion (RRF) with metadata filtering support.
+ * Hybrid retrieval using Reciprocal Rank Fusion (RRF) with metadata filtering and execution trace support.
  */
 @Component("hybridRetrieval")
 public class HybridRetrievalStrategy implements RetrievalStrategy {
@@ -30,6 +30,14 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
         this.properties = properties;
     }
 
+    public record HybridExecutionDetails(
+            List<RetrievedChunk> fusedChunks,
+            int semanticCandidateCount,
+            int keywordCandidateCount,
+            int totalInputCandidates,
+            int rrfK
+    ) {}
+
     @Override
     public List<RetrievedChunk> retrieve(Long ownerId, String question, RetrievalScope scope,
                                          Long resourceId, List<Long> selectedResourceIds,
@@ -41,6 +49,12 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
     public List<RetrievedChunk> retrieve(Long ownerId, String question, RetrievalScope scope,
                                          Long resourceId, List<Long> selectedResourceIds,
                                          Long collectionId, KnowledgeQueryFilters filters) {
+        return retrieveWithTrace(ownerId, question, scope, resourceId, selectedResourceIds, collectionId, filters).fusedChunks();
+    }
+
+    public HybridExecutionDetails retrieveWithTrace(Long ownerId, String question, RetrievalScope scope,
+                                                    Long resourceId, List<Long> selectedResourceIds,
+                                                    Long collectionId, KnowledgeQueryFilters filters) {
         int topK = properties.ragTopK();
         int candidateSize = Math.min(topK * properties.ragCandidateMultiplier(), properties.ragMaxCandidateSize());
 
@@ -70,17 +84,24 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
 
         if (semanticFailed && keywordFailed) {
             log.warn("[hybrid_retrieval_failed] Both retrieval branches threw exceptions for query.");
-            return List.of();
+            return new HybridExecutionDetails(List.of(), 0, 0, 0, properties.ragRrfK());
         } else if (semanticFailed) {
             log.warn("[hybrid_retrieval_degraded] Semantic branch failed; degraded to keyword-only retrieval (keywordCount={}).", keywordCandidates.size());
         } else if (keywordFailed) {
             log.warn("[hybrid_retrieval_degraded] Keyword branch failed; degraded to semantic-only retrieval (semanticCount={}).", semanticCandidates.size());
         } else if (semanticCandidates.isEmpty() && keywordCandidates.isEmpty()) {
             log.info("[hybrid_no_candidates] Neither semantic nor keyword retrieval returned candidates for query.");
-            return List.of();
+            return new HybridExecutionDetails(List.of(), 0, 0, 0, properties.ragRrfK());
         }
 
-        return fuse(semanticCandidates, keywordCandidates, topK);
+        List<RetrievedChunk> fused = fuse(semanticCandidates, keywordCandidates, topK);
+        return new HybridExecutionDetails(
+                fused,
+                semanticCandidates.size(),
+                keywordCandidates.size(),
+                semanticCandidates.size() + keywordCandidates.size(),
+                properties.ragRrfK()
+        );
     }
 
     /**

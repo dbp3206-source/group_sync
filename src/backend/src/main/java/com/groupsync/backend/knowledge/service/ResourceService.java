@@ -201,6 +201,43 @@ public class ResourceService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public ResourceIngestionTraceDto getIngestionTrace(Long ownerId, Long resourceId) {
+        Resource resource = find(ownerId, resourceId);
+        List<DocumentChunk> chunks = chunkRepository.findByResourceIdOrderByChunkIndex(resourceId);
+
+        int parentCount = 0;
+        int childCount = 0;
+        int maxVersion = 1;
+        for (DocumentChunk chunk : chunks) {
+            if (chunk.getChunkLevel() == ChunkLevel.PARENT) {
+                parentCount++;
+            } else {
+                childCount++;
+            }
+            if (chunk.getChunkingVersion() > maxVersion) {
+                maxVersion = chunk.getChunkingVersion();
+            }
+        }
+
+        int batchSize = 16;
+        int embeddingBatchCount = childCount > 0 ? (int) Math.ceil((double) childCount / batchSize) : 0;
+
+        return new ResourceIngestionTraceDto(
+                resource.getId(),
+                resource.getTitle(),
+                resource.getResourceType().name(),
+                resource.getProcessingStatus().name(),
+                maxVersion,
+                parentCount,
+                childCount,
+                embeddingBatchCount,
+                "gemini-embedding-001",
+                768,
+                true
+        );
+    }
+
     private Resource find(Long ownerId, Long resourceId) {
         return resourceRepository.findByIdAndOwnerId(resourceId, ownerId)
                 .orElseThrow(() -> new NotFoundException("Resource not found."));

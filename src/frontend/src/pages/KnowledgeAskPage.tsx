@@ -2,6 +2,8 @@ import {
   Activity,
   BrainCircuit,
   Check,
+  ChevronDown,
+  ChevronUp,
   Compass,
   Copy,
   Loader2,
@@ -23,57 +25,12 @@ import {
   type ChatDetail,
   type ChatSession,
   type KnowledgeCollection,
+  type RagExecutionTrace,
   type Resource,
 } from '../api/knowledge'
 import MarkdownView from '../components/MarkdownView'
 
 type Scope = 'THIS_RESOURCE' | 'SELECTED_RESOURCES' | 'COLLECTION' | 'LIBRARY'
-
-interface ReasoningStep {
-  id: string
-  title: string
-  detail: string
-  badge: string
-}
-
-const DEFAULT_STEPS: ReasoningStep[] = [
-  {
-    id: 'parse',
-    title: 'Phân tích truy vấn & Chuẩn hóa',
-    detail: 'Bóc tách token kỹ thuật, lọc stopwords và nhận diện ngôn ngữ câu hỏi.',
-    badge: 'NLP & Tokenizer',
-  },
-  {
-    id: 'semantic',
-    title: 'Truy xuất Ngữ nghĩa pgvector',
-    detail: 'Tạo embedding 768 chiều và tìm kiếm Cosine trên chỉ mục HNSW.',
-    badge: 'pgvector / HNSW',
-  },
-  {
-    id: 'lexical',
-    title: 'Truy xuất Từ khóa FTS',
-    detail: 'Khớp chính xác mã số, thuật ngữ kỹ thuật qua tsvector và chỉ mục GIN.',
-    badge: 'PostgreSQL GIN',
-  },
-  {
-    id: 'rrf',
-    title: 'Hợp nhất Xếp hạng RRF (k=60)',
-    detail: 'Tổng hợp điểm số 2 nhánh bằng Reciprocal Rank Fusion, lọc ứng viên tối ưu.',
-    badge: 'RRF Fusion',
-  },
-  {
-    id: 'grounding',
-    title: 'Đóng gói Ngữ cảnh Grounding',
-    detail: 'Bọc chứng cứ vào thẻ XML <evidence> thụ động, kích hoạt chỉ thị chống ảo giác.',
-    badge: 'Anti-Hallucination',
-  },
-  {
-    id: 'synthesis',
-    title: 'Sinh Phản hồi & Trích dẫn',
-    detail: 'Mô hình Gemini tổng hợp câu trả lời và gắn nhãn trích dẫn đối chứng [1], [2].',
-    badge: 'Gemini 3.5 Flash Lite',
-  },
-]
 
 const SMART_PROMPT_PILLS = [
   {
@@ -125,6 +82,8 @@ export default function KnowledgeAskPage() {
   const [copiedId, setCopiedId] = useState<number | null>(null)
   const [highlightedCitation, setHighlightedCitation] = useState<number | null>(null)
   const [zenMode, setZenMode] = useState(false)
+  const [latestTrace, setLatestTrace] = useState<RagExecutionTrace | null>(null)
+  const [showTraceJson, setShowTraceJson] = useState(false)
   const timerRef = useRef<number | null>(null)
 
   const load = () =>
@@ -203,6 +162,9 @@ export default function KnowledgeAskPage() {
         resourceIds: scope === 'SELECTED_RESOURCES' ? selected : undefined,
         collectionId: scope === 'COLLECTION' ? collectionId : undefined,
       })
+      if (response.trace) {
+        setLatestTrace(response.trace)
+      }
       setQuestion('')
       stopRequestTimer()
       await open(response.sessionId)
@@ -220,6 +182,7 @@ export default function KnowledgeAskPage() {
     setQuestion('')
     setError('')
     setElapsedSec('0.0')
+    setLatestTrace(null)
   }
 
   function handleSelectPromptPill(pillPrompt: string) {
@@ -274,7 +237,7 @@ export default function KnowledgeAskPage() {
       </div>
 
       <div className="kos-ask-layout">
-        {/* Left Column: 3 Distinct Dedicated Boxes (hidden in Zen mode) */}
+        {/* Left Column: 3 Dedicated Cards */}
         {!zenMode && (
           <aside className="kos-ask-sidebar">
             {/* BOX 1: New Conversation Action Card */}
@@ -284,7 +247,7 @@ export default function KnowledgeAskPage() {
               </button>
             </div>
 
-            {/* BOX 2: Recent Conversations Card with Dedicated Scrolling */}
+            {/* BOX 2: Recent Conversations Card */}
             <div className="kos-ask-box kos-recent-box">
               <div className="kos-box-header">
                 <div className="kos-box-title">
@@ -316,46 +279,270 @@ export default function KnowledgeAskPage() {
               </div>
             </div>
 
-            {/* BOX 3: Static RAG Pipeline Architecture Card with Dedicated Scrolling */}
+            {/* BOX 3: Truthful RAG Execution Trace Card */}
             <div className="kos-ask-box kos-reasoning-box">
               <div className="kos-box-header">
                 <div className="kos-box-title">
                   <Activity size={16} className="kos-box-icon kos-pulse-icon" />
-                  <span>Kiến trúc Xử lý RAG (Pipeline Architecture)</span>
+                  <span>RAG Execution Trace</span>
                 </div>
                 <span className={`kos-status-pill ${loading ? 'is-running' : 'is-idle'}`}>
                   {loading ? (
                     <>
                       <Loader2 size={11} className="kos-spin-fast" /> {elapsedSec}s
                     </>
+                  ) : latestTrace ? (
+                    `${latestTrace.durationMs}ms`
                   ) : (
-                    'Active Flow'
+                    'RAG v2 Ready'
                   )}
                 </span>
               </div>
 
               <div className="kos-reasoning-scroll-content">
-                <div className="kos-reasoning-timeline">
-                  {DEFAULT_STEPS.map((step, idx) => (
-                    <div
-                      key={step.id}
-                      className="kos-reasoning-step is-done"
-                    >
+                {latestTrace ? (
+                  <div className="kos-reasoning-timeline">
+                    {/* Stage 1: Query Planner */}
+                    <div className="kos-reasoning-step is-done">
                       <div className="kos-step-indicator">
-                        <span className="kos-step-dot">{idx + 1}</span>
-                        {idx < DEFAULT_STEPS.length - 1 && <span className="kos-step-line" />}
+                        <span className="kos-step-dot">1</span>
+                        <span className="kos-step-line" />
                       </div>
                       <div className="kos-step-content">
                         <div className="kos-step-header">
-                          <span className="kos-step-title">{step.title}</span>
-                          <span className="kos-step-badge">{step.badge}</span>
+                          <span className="kos-step-title">Query Planner</span>
+                          <span className="kos-step-badge">{latestTrace.mode}</span>
                         </div>
-                        <p className="kos-step-desc">{step.detail}</p>
+                        <p className="kos-step-desc">
+                          Operation: {latestTrace.operation}
+                          {latestTrace.planner?.semanticQuery ? ` • Query: "${latestTrace.planner.semanticQuery}"` : ''}
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
+
+                    {/* STRUCTURED PATH */}
+                    {latestTrace.mode === 'STRUCTURED' ? (
+                      <>
+                        <div className="kos-reasoning-step is-done">
+                          <div className="kos-step-indicator">
+                            <span className="kos-step-dot">2</span>
+                            <span className="kos-step-line" />
+                          </div>
+                          <div className="kos-step-content">
+                            <div className="kos-step-header">
+                              <span className="kos-step-title">Metadata Scope</span>
+                              <span className="kos-step-badge">{latestTrace.filter?.scope || 'LIBRARY'}</span>
+                            </div>
+                            <p className="kos-step-desc">
+                              {latestTrace.filter?.resourceType ? `Type: ${latestTrace.filter.resourceType} • ` : ''}
+                              {latestTrace.filter?.favorite !== null && latestTrace.filter?.favorite !== undefined ? `Favorite: ${latestTrace.filter.favorite} • ` : ''}
+                              Relational metadata filters evaluated.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="kos-reasoning-step is-done">
+                          <div className="kos-step-indicator">
+                            <span className="kos-step-dot">3</span>
+                          </div>
+                          <div className="kos-step-content">
+                            <div className="kos-step-header">
+                              <span className="kos-step-title">PostgreSQL Facts Query</span>
+                              <span className="kos-step-badge">Direct SQL</span>
+                            </div>
+                            <p className="kos-step-desc">
+                              Count/List computed directly from PostgreSQL tables without vector retrieval or hallucinations.
+                            </p>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      /* HYBRID / FILTERED_HYBRID PATH */
+                      <>
+                        {/* Stage 2: Metadata Filter (if present or scope) */}
+                        <div className="kos-reasoning-step is-done">
+                          <div className="kos-step-indicator">
+                            <span className="kos-step-dot">2</span>
+                            <span className="kos-step-line" />
+                          </div>
+                          <div className="kos-step-content">
+                            <div className="kos-step-header">
+                              <span className="kos-step-title">Metadata Filters</span>
+                              <span className="kos-step-badge">{latestTrace.filter?.scope || 'LIBRARY'}</span>
+                            </div>
+                            <p className="kos-step-desc">
+                              {latestTrace.filter?.resourceType ? `Type: ${latestTrace.filter.resourceType} • ` : ''}
+                              {latestTrace.filter?.collectionCount ? `${latestTrace.filter.collectionCount} collection(s) • ` : ''}
+                              Applied in SQL WHERE before vector distance calculation.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Stage 3: Retrieval Branches */}
+                        <div className="kos-reasoning-step is-done">
+                          <div className="kos-step-indicator">
+                            <span className="kos-step-dot">3</span>
+                            <span className="kos-step-line" />
+                          </div>
+                          <div className="kos-step-content">
+                            <div className="kos-step-header">
+                              <span className="kos-step-title">Hybrid Retrieval</span>
+                              <span className="kos-step-badge">pgvector + FTS</span>
+                            </div>
+                            <p className="kos-step-desc">
+                              Semantic candidates: {latestTrace.retrieval?.semanticCandidates || 0} • Lexical candidates: {latestTrace.retrieval?.lexicalCandidates || 0}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Stage 4: RRF Fusion */}
+                        <div className="kos-reasoning-step is-done">
+                          <div className="kos-step-indicator">
+                            <span className="kos-step-dot">4</span>
+                            <span className="kos-step-line" />
+                          </div>
+                          <div className="kos-step-content">
+                            <div className="kos-step-header">
+                              <span className="kos-step-title">RRF Fusion (k={latestTrace.fusion?.rrfK || 60})</span>
+                              <span className="kos-step-badge">{latestTrace.fusion?.selectedChildren || 0} child chunks</span>
+                            </div>
+                            <p className="kos-step-desc">
+                              Fused {latestTrace.fusion?.inputCandidates || 0} total candidates into top {latestTrace.fusion?.selectedChildren || 0} precision child chunks.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Stage 5: Parent Expansion */}
+                        <div className="kos-reasoning-step is-done">
+                          <div className="kos-step-indicator">
+                            <span className="kos-step-dot">5</span>
+                            <span className="kos-step-line" />
+                          </div>
+                          <div className="kos-step-content">
+                            <div className="kos-step-header">
+                              <span className="kos-step-title">Parent Expansion & Dedup</span>
+                              <span className="kos-step-badge">{latestTrace.parentChild?.uniqueParentsFound || 0} parents</span>
+                            </div>
+                            <p className="kos-step-desc">
+                              Expanded {latestTrace.parentChild?.childChunksRetrieved || 0} children → {latestTrace.parentChild?.uniqueParentsFound || 0} unique parents ({latestTrace.parentChild?.duplicateParentsDeduplicated || 0} duplicate parents deduplicated).
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Stage 6: Context Budget */}
+                        <div className="kos-reasoning-step is-done">
+                          <div className="kos-step-indicator">
+                            <span className="kos-step-dot">6</span>
+                            <span className="kos-step-line" />
+                          </div>
+                          <div className="kos-step-content">
+                            <div className="kos-step-header">
+                              <span className="kos-step-title">Context Budget</span>
+                              <span className="kos-step-badge">{latestTrace.contextBudget?.charactersUsed || 0}/{latestTrace.contextBudget?.maxCharactersBudget || 6000} chars</span>
+                            </div>
+                            <p className="kos-step-desc">
+                              {latestTrace.contextBudget?.parentsUsed || 0} parent contexts budgeted into grounded prompt.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Stage 7: Grounded Generation */}
+                        <div className="kos-reasoning-step is-done">
+                          <div className="kos-step-indicator">
+                            <span className="kos-step-dot">7</span>
+                          </div>
+                          <div className="kos-step-content">
+                            <div className="kos-step-header">
+                              <span className="kos-step-title">Generation & Citations</span>
+                              <span className="kos-step-badge">{latestTrace.generation?.model || 'gemini-3.5-flash-lite'}</span>
+                            </div>
+                            <p className="kos-step-desc">
+                              Synthesized with {latestTrace.generation?.verifiedCitationsCount || 0} verified source citations.
+                            </p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="kos-reasoning-timeline">
+                    <div className="kos-reasoning-step is-done">
+                      <div className="kos-step-indicator">
+                        <span className="kos-step-dot">1</span>
+                        <span className="kos-step-line" />
+                      </div>
+                      <div className="kos-step-content">
+                        <div className="kos-step-header">
+                          <span className="kos-step-title">KnowledgeQueryPlanner</span>
+                          <span className="kos-step-badge">Intent Aware</span>
+                        </div>
+                        <p className="kos-step-desc">Phân loại Structured / Semantic / Filtered Hybrid trước khi truy xuất.</p>
+                      </div>
+                    </div>
+                    <div className="kos-reasoning-step is-done">
+                      <div className="kos-step-indicator">
+                        <span className="kos-step-dot">2</span>
+                        <span className="kos-step-line" />
+                      </div>
+                      <div className="kos-step-content">
+                        <div className="kos-step-header">
+                          <span className="kos-step-title">Filtered Hybrid Retrieval</span>
+                          <span className="kos-step-badge">pgvector + FTS</span>
+                        </div>
+                        <p className="kos-step-desc">Lọc metadata SQL trước khi cosine vector search và PostgreSQL FTS.</p>
+                      </div>
+                    </div>
+                    <div className="kos-reasoning-step is-done">
+                      <div className="kos-step-indicator">
+                        <span className="kos-step-dot">3</span>
+                      </div>
+                      <div className="kos-step-content">
+                        <div className="kos-step-header">
+                          <span className="kos-step-title">Parent-Child Context Expansion</span>
+                          <span className="kos-step-badge">Hierarchical</span>
+                        </div>
+                        <p className="kos-step-desc">Tìm kiếm trên child chunks chính xác cao, mở rộng lên parent chunk và tối ưu ngân sách.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {latestTrace && (
+                <div style={{ padding: '0.5rem 0.75rem', borderTop: '1px solid var(--kos-border, #333)' }}>
+                  <button
+                    type="button"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--kos-accent, #60a5fa)',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                    }}
+                    onClick={() => setShowTraceJson(v => !v)}
+                  >
+                    {showTraceJson ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    {showTraceJson ? 'Ẩn chi tiết kỹ thuật' : 'Xem JSON Trace kỹ thuật'}
+                  </button>
+                  {showTraceJson && (
+                    <pre
+                      style={{
+                        fontSize: '0.65rem',
+                        marginTop: '0.5rem',
+                        maxHeight: '120px',
+                        overflowY: 'auto',
+                        background: 'rgba(0,0,0,0.3)',
+                        padding: '0.5rem',
+                        borderRadius: '4px',
+                      }}
+                    >
+                      {JSON.stringify(latestTrace, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              )}
 
               <div className="kos-box-footer">
                 <BrainCircuit size={13} />

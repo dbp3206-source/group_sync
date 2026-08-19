@@ -20,6 +20,7 @@ import com.groupsync.backend.knowledge.dto.AskKnowledgeRequest;
 import com.groupsync.backend.knowledge.dto.AskKnowledgeResponse;
 import com.groupsync.backend.knowledge.model.*;
 import com.groupsync.backend.knowledge.rag.*;
+import com.groupsync.backend.knowledge.rag.HybridRetrievalStrategy.HybridExecutionDetails;
 import com.groupsync.backend.knowledge.rag.ParentChildContextExpander.ExpandedContext;
 import com.groupsync.backend.knowledge.repository.*;
 import com.groupsync.backend.knowledge.service.KnowledgeChatService;
@@ -81,7 +82,8 @@ class KnowledgeChatTransactionTest {
         List<RetrievedChunk> retrieved = List.of(
                 new RetrievedChunk(1L, 10L, "Doc", 0, 1, "Sec 1", "Content 1", 0.05d)
         );
-        when(retrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), any(), any(), any())).thenReturn(retrieved);
+        when(retrievalStrategy.retrieveWithTrace(anyLong(), anyString(), any(), any(), any(), any(), any()))
+                .thenReturn(new HybridExecutionDetails(retrieved, 1, 1, 2, 60));
         when(parentChildExpander.expand(retrieved)).thenReturn(new ExpandedContext(retrieved, retrieved));
 
         // Simulate LLM throwing network exception or timeout
@@ -117,7 +119,8 @@ class KnowledgeChatTransactionTest {
                 .thenReturn(new QueryPlan(QueryMode.HYBRID, QueryOperation.SEARCH, "Random question with no matches", KnowledgeQueryFilters.empty(), "test"));
 
         // Retrieval returns empty list
-        when(retrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(retrievalStrategy.retrieveWithTrace(anyLong(), anyString(), any(), any(), any(), any(), any()))
+                .thenReturn(new HybridExecutionDetails(List.of(), 0, 0, 0, 60));
 
         AskKnowledgeResponse response = chatService.ask(ownerId, request);
 

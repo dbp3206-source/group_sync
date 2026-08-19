@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.groupsync.backend.knowledge.dto.*;
 import com.groupsync.backend.knowledge.model.*;
 import com.groupsync.backend.knowledge.rag.*;
+import com.groupsync.backend.knowledge.rag.HybridRetrievalStrategy.HybridExecutionDetails;
 import com.groupsync.backend.knowledge.rag.ParentChildContextExpander.ExpandedContext;
 import com.groupsync.backend.knowledge.repository.*;
 import com.groupsync.backend.shared.exception.NotFoundException;
@@ -15,7 +16,8 @@ import com.groupsync.backend.shared.exception.NotFoundException;
 /**
  * Orchestrates KnowledgeOS RAG v2 chat queries.
  * Integrates multi-turn contextualization, KnowledgeQueryPlanner intent classification,
- * Structured relational execution, Filtered Hybrid Retrieval, and Parent-Child context expansion.
+ * Structured relational execution, Filtered Hybrid Retrieval, Parent-Child context expansion,
+ * and deterministic system-level execution tracing.
  */
 @Service
 public class KnowledgeChatService {
@@ -54,6 +56,8 @@ public class KnowledgeChatService {
     }
 
     public AskKnowledgeResponse ask(Long ownerId, AskKnowledgeRequest request) {
+        long startMs = System.currentTimeMillis();
+
         // Step 1: Prepare session and save user message in a short, isolated transaction
         KnowledgeChatTransactionService.ChatPreparation prep =
                 chatTransactionService.prepareConversation(ownerId, request);
@@ -71,16 +75,37 @@ public class KnowledgeChatService {
                 prep.collectionId()
         );
 
+        PlannerTrace plannerTrace = new PlannerTrace(
+                plan.mode(),
+                plan.operation(),
+                plan.semanticQuery(),
+                plan.explanation()
+        );
+
+        FilterTrace filterTrace = new FilterTrace(
+                prep.scopeType(),
+                plan.filters() != null && plan.filters().resourceType() != null ? plan.filters().resourceType().name() : null,
+                plan.filters() != null ? plan.filters().favorite() : null,
+                plan.filters() != null && plan.filters().collectionIds() != null ? plan.filters().collectionIds().size() : null,
+                plan.filters() != null && plan.filters().tagIds() != null ? plan.filters().tagIds().size() : null,
+                plan.filters() != null && plan.filters().resourceIds() != null ? plan.filters().resourceIds().size() : null,
+                plan.filters() != null && plan.filters().createdAfter() != null ? plan.filters().createdAfter().toString() : null,
+                plan.filters() != null && plan.filters().createdBefore() != null ? plan.filters().createdBefore().toString() : null
+        );
+
         // Step 3: Handle Structured Queries (COUNT, LIST) directly from PostgreSQL relational facts
         if (plan.mode() == QueryMode.STRUCTURED) {
             StructuredKnowledgeQueryService.StructuredResult result = structuredQueryService.execute(
                     ownerId, plan, prep.scopeType(), prep.thisResourceId(), prep.selectedResourceIds(), prep.collectionId()
             );
-            return chatTransactionService.persistAssistantResult(prep.sessionId(), result.textResponse(), List.of());
+            AskKnowledgeResponse saved = chatTransactionService.persistAssistantResult(prep.sessionId(), result.textResponse(), List.of());
+            long durationMs = System.currentTimeMillis() - startMs;
+            RagExecutionTrace trace = RagExecutionTrace.forStructured(plannerTrace, filterTrace, durationMs);
+            return new AskKnowledgeResponse(saved.sessionId(), saved.answer(), saved.grounded(), saved.citations(), trace);
         }
 
         // Step 4: Filtered Hybrid Retrieval (pgvector + FTS + RRF) on child chunks
-        List<RetrievedChunk> candidateChildren = retrievalStrategy.retrieve(
+        HybridExecutionDetails hybridDetails = retrievalStrategy.retrieveWithTrace(
                 ownerId,
                 plan.semanticQuery(),
                 prep.scopeType(),
@@ -89,21 +114,69 @@ public class KnowledgeChatService {
                 prep.collectionId(),
                 plan.filters()
         );
+        List<RetrievedChunk> candidateChildren = hybridDetails.fusedChunks();
+
+        RetrievalTrace retrievalTrace = new RetrievalTrace(
+                hybridDetails.semanticCandidateCount(),
+                hybridDetails.keywordCandidateCount(),
+                hybridDetails.totalInputCandidates()
+        );
+
+        FusionTrace fusionTrace = new FusionTrace(
+                hybridDetails.totalInputCandidates(),
+                candidateChildren.size(),
+                hybridDetails.rrfK()
+        );
 
         if (candidateChildren.isEmpty() || candidateChildren.getFirst().distance() > 1.0 - MIN_RELEVANCE) {
-            return chatTransactionService.persistInsufficientContext(prep.sessionId());
+            AskKnowledgeResponse saved = chatTransactionService.persistInsufficientContext(prep.sessionId());
+            long durationMs = System.currentTimeMillis() - startMs;
+            RagExecutionTrace trace = new RagExecutionTrace(
+                    plan.mode(), plan.operation(), plannerTrace, filterTrace, retrievalTrace, fusionTrace,
+                    new ParentChildTrace(0, 0, 0),
+                    new ContextBudgetTrace(0, 0, parentChildExpander.getMaxContextChars()),
+                    new GenerationTrace("gemini-3.5-flash-lite", 0, 0),
+                    durationMs
+            );
+            return new AskKnowledgeResponse(saved.sessionId(), saved.answer(), saved.grounded(), saved.citations(), trace);
         }
 
         // Step 5: Parent Context Expansion & Deduplication with strict context budgeting
         ExpandedContext expanded = parentChildExpander.expand(candidateChildren);
         List<RetrievedChunk> promptChunks = expanded.promptContextChunks().isEmpty() ? candidateChildren : expanded.promptContextChunks();
 
+        ParentChildTrace parentChildTrace = new ParentChildTrace(
+                candidateChildren.size(),
+                expanded.uniqueParentsFound(),
+                expanded.duplicateParentsDeduplicated()
+        );
+
+        ContextBudgetTrace contextBudgetTrace = new ContextBudgetTrace(
+                expanded.uniqueParentsFound(),
+                expanded.charactersUsed(),
+                parentChildExpander.getMaxContextChars()
+        );
+
         // Step 6: Grounded Prompt Generation & Gemini LLM synthesis
         String groundedPrompt = GroundedPromptBuilder.build(request.question().trim(), promptChunks, prep.historyTurns());
         String answer = languageModelClient.answer(groundedPrompt);
 
         // Step 7: Persist assistant message and verified citations
-        return chatTransactionService.persistAssistantResult(prep.sessionId(), answer, promptChunks);
+        AskKnowledgeResponse saved = chatTransactionService.persistAssistantResult(prep.sessionId(), answer, promptChunks);
+
+        GenerationTrace generationTrace = new GenerationTrace(
+                "gemini-3.5-flash-lite",
+                promptChunks.size(),
+                saved.citations().size()
+        );
+
+        long durationMs = System.currentTimeMillis() - startMs;
+        RagExecutionTrace trace = new RagExecutionTrace(
+                plan.mode(), plan.operation(), plannerTrace, filterTrace, retrievalTrace, fusionTrace,
+                parentChildTrace, contextBudgetTrace, generationTrace, durationMs
+        );
+
+        return new AskKnowledgeResponse(saved.sessionId(), saved.answer(), saved.grounded(), saved.citations(), trace);
     }
 
     private static final Pattern FOLLOW_UP_PATTERN = Pattern.compile(

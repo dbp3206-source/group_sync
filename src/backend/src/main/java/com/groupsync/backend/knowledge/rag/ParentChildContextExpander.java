@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 /**
  * Expands top-ranked Child chunks to their enclosing Parent chunks for LLM context grounding.
  * Enforces ranking-first expansion, parent deduplication, and strict character/count context budgeting.
- * Preserves child chunk evidence for precise, verified citations.
+ * Preserves child chunk evidence for precise, verified citations and exposes execution trace metrics.
  */
 @Component
 public class ParentChildContextExpander {
@@ -27,14 +27,30 @@ public class ParentChildContextExpander {
         this.maxContextChars = maxContextChars > 0 ? maxContextChars : 6000;
     }
 
+    public int getMaxParents() {
+        return maxParents;
+    }
+
+    public int getMaxContextChars() {
+        return maxContextChars;
+    }
+
     public record ExpandedContext(
             List<RetrievedChunk> promptContextChunks,
-            List<RetrievedChunk> citationEvidenceChunks
-    ) {}
+            List<RetrievedChunk> citationEvidenceChunks,
+            int uniqueParentsFound,
+            int duplicateParentsDeduplicated,
+            int charactersUsed
+    ) {
+        public ExpandedContext(List<RetrievedChunk> promptContextChunks, List<RetrievedChunk> citationEvidenceChunks) {
+            this(promptContextChunks, citationEvidenceChunks, promptContextChunks.size(), 0,
+                    promptContextChunks.stream().mapToInt(c -> c.content() != null ? c.content().length() : 0).sum());
+        }
+    }
 
     public ExpandedContext expand(List<RetrievedChunk> rankedChildren) {
         if (rankedChildren == null || rankedChildren.isEmpty()) {
-            return new ExpandedContext(List.of(), List.of());
+            return new ExpandedContext(List.of(), List.of(), 0, 0, 0);
         }
 
         // Collect child IDs to lookup parent relationships in one single query
@@ -72,6 +88,7 @@ public class ParentChildContextExpander {
         List<RetrievedChunk> promptChunks = new ArrayList<>();
         List<RetrievedChunk> citationEvidence = new ArrayList<>();
         int currentChars = 0;
+        int duplicatesDeduplicated = 0;
 
         for (RetrievedChunk child : rankedChildren) {
             citationEvidence.add(child);
@@ -80,6 +97,7 @@ public class ParentChildContextExpander {
             RetrievedChunk targetForPrompt = parent != null ? parent : child;
 
             if (seenParentIds.contains(targetForPrompt.chunkId())) {
+                duplicatesDeduplicated++;
                 continue; // Deduplicate: already added this parent block to prompt
             }
 
@@ -102,6 +120,6 @@ public class ParentChildContextExpander {
             currentChars += chunkLength;
         }
 
-        return new ExpandedContext(promptChunks, citationEvidence);
+        return new ExpandedContext(promptChunks, citationEvidence, seenParentIds.size(), duplicatesDeduplicated, currentChars);
     }
 }
