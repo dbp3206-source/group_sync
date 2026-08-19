@@ -48,7 +48,8 @@ class ResourceDeleteWithCitationsTest {
         resourceService = new ResourceService(
                 org.springframework.util.unit.DataSize.ofMegabytes(25),
                 resourceRepository, userRepository, storageService,
-                events, citationRepository, chunkRepository, parserRegistry
+                events, citationRepository, chunkRepository, parserRegistry,
+                new com.groupsync.backend.knowledge.rag.GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000)
         );
     }
 

@@ -35,6 +35,11 @@ export default function KnowledgeLibraryPage() {
   const [activeQuery, setActiveQuery] = useState('')
   const [tagId, setTagId] = useState<number | undefined>()
   const [collectionId, setCollectionId] = useState<number | undefined>()
+  const [sort, setSort] = useState<string>('updated_desc')
+  const [page, setPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [hasNext, setHasNext] = useState(false)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [open, setOpen] = useState(false)
@@ -48,15 +53,36 @@ export default function KnowledgeLibraryPage() {
   const activeQueryRef = useRef(activeQuery)
   const tagIdRef = useRef(tagId)
   const collectionIdRef = useRef(collectionId)
+  const sortRef = useRef(sort)
   activeQueryRef.current = activeQuery
   tagIdRef.current = tagId
   collectionIdRef.current = collectionId
+  sortRef.current = sort
 
   const load = useCallback(
-    (q = activeQueryRef.current, nextTag = tagIdRef.current, nextCollection = collectionIdRef.current) =>
-      getResources(q, nextTag, nextCollection)
-        .then(setResources)
-        .catch(() => setError('Your library could not be loaded.')),
+    (
+      q = activeQueryRef.current,
+      nextTag = tagIdRef.current,
+      nextCollection = collectionIdRef.current,
+      nextPage = 0,
+      nextSort = sortRef.current,
+      append = false
+    ) => {
+      setError('')
+      return getResources(q, nextTag, nextCollection, nextPage, 24, nextSort)
+        .then(response => {
+          if (append) {
+            setResources(prev => [...prev, ...response.items])
+          } else {
+            setResources(response.items)
+          }
+          setPage(response.page)
+          setTotalPages(response.totalPages)
+          setTotalItems(response.totalItems)
+          setHasNext(response.hasNext)
+        })
+        .catch(() => setError('Your library could not be loaded.'))
+    },
     [],
   )
 
@@ -66,7 +92,7 @@ export default function KnowledgeLibraryPage() {
     const interval = setInterval(() => {
       setResources(current => {
         const hasInFlight = current.some(r => PROCESSING.has(r.processingStatus))
-        if (hasInFlight) load()
+        if (hasInFlight) load(activeQueryRef.current, tagIdRef.current, collectionIdRef.current, 0, sortRef.current, false)
         else clearInterval(interval)
         return current
       })
@@ -208,7 +234,7 @@ export default function KnowledgeLibraryPage() {
             onChange={e => {
               const next = e.target.value ? Number(e.target.value) : undefined
               setCollectionId(next)
-              load(activeQuery, tagId, next)
+              load(activeQuery, tagId, next, 0, sort, false)
             }}
           >
             <option value="">All collections</option>
@@ -219,6 +245,22 @@ export default function KnowledgeLibraryPage() {
             ))}
           </select>
         </label>
+        <label className="kos-filter">
+          <select
+            aria-label="Sort resources"
+            value={sort}
+            onChange={e => {
+              const nextSort = e.target.value
+              setSort(nextSort)
+              load(activeQuery, tagId, collectionId, 0, nextSort, false)
+            }}
+          >
+            <option value="updated_desc">Recently updated</option>
+            <option value="created_desc">Recently created</option>
+            <option value="title_asc">Title (A–Z)</option>
+            <option value="title_desc">Title (Z–A)</option>
+          </select>
+        </label>
         <button
           type="button"
           className="kos-button"
@@ -227,7 +269,7 @@ export default function KnowledgeLibraryPage() {
             setBusy(true)
             try {
               await autoOrganizeAll()
-              await Promise.all([load(), getCollections().then(setCollections), getTags().then(setTags)])
+              await Promise.all([load(activeQuery, tagId, collectionId, 0, sort, false), getCollections().then(setCollections), getTags().then(setTags)])
             } finally {
               setBusy(false)
             }
@@ -263,11 +305,18 @@ export default function KnowledgeLibraryPage() {
         </div>
 
         <span className="kos-library-counter">
-          {resources.length} resources · {collections.length} collections · {tags.length} tags
+          {totalItems} resources (page {page + 1}/{totalPages}) · {collections.length} collections · {tags.length} tags
         </span>
       </div>
 
-      {error && <p className="kos-error">{error}</p>}
+      {error && (
+        <div className="kos-error" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span>{error}</span>
+          <button type="button" className="kos-button kos-button--ghost" onClick={() => load()}>
+            Thử lại
+          </button>
+        </div>
+      )}
 
       {resources.length ? (
         viewMode === 'GRAPH' ? (
@@ -277,42 +326,58 @@ export default function KnowledgeLibraryPage() {
             tags={tags}
           />
         ) : (
-          <div className="kos-resource-grid">
-            {resources.map((resource, index) => (
-              <article className="kos-resource" key={resource.id}>
-                <Link to={`/library/${resource.id}`}>
-                  <div className={`kos-resource-cover kos-resource-cover--${index % 4}`}>
-                    <FileText size={26} />
-                  </div>
-                  <p>{resource.resourceType}</p>
-                  <h2>{resource.title}</h2>
-                  <small>
-                    {resource.processingStatus === 'READY'
-                      ? 'Ready to ask'
-                      : resource.processingStatus.toLowerCase()}
-                  </small>
-                </Link>
-                {collections.length > 0 && (
-                  <label className="kos-collection-select">
-                    Add to collection
-                    <select
-                      defaultValue=""
-                      onChange={e => {
-                        if (e.target.value) assign(Number(e.target.value), resource.id)
-                      }}
-                    >
-                      <option value="">Choose…</option>
-                      {collections.map(collection => (
-                        <option key={collection.id} value={collection.id}>
-                          {collection.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-              </article>
-            ))}
-          </div>
+          <>
+            <div className="kos-resource-grid">
+              {resources.map((resource, index) => (
+                <article className="kos-resource" key={resource.id}>
+                  <Link to={`/library/${resource.id}`}>
+                    <div className={`kos-resource-cover kos-resource-cover--${index % 4}`}>
+                      <FileText size={26} />
+                    </div>
+                    <p>{resource.resourceType}</p>
+                    <h2>{resource.title}</h2>
+                    <small>
+                      {resource.processingStatus === 'READY'
+                        ? 'Ready to ask'
+                        : resource.processingStatus.toLowerCase()}
+                    </small>
+                  </Link>
+                  {collections.length > 0 && (
+                    <label className="kos-collection-select">
+                      Add to collection
+                      <select
+                        defaultValue=""
+                        onChange={e => {
+                          if (e.target.value) assign(Number(e.target.value), resource.id)
+                        }}
+                      >
+                        <option value="">Choose…</option>
+                        {collections.map(collection => (
+                          <option key={collection.id} value={collection.id}>
+                            {collection.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </article>
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            {hasNext && (
+              <div style={{ display: 'flex', justifyContent: 'center', margin: '2rem 0' }}>
+                <button
+                  type="button"
+                  className="kos-button kos-button--quiet"
+                  disabled={busy}
+                  onClick={() => load(activeQuery, tagId, collectionId, page + 1, sort, true)}
+                >
+                  Tải thêm tài liệu ({resources.length} / {totalItems})
+                </button>
+              </div>
+            )}
+          </>
         )
       ) : (
         <div className="kos-empty">

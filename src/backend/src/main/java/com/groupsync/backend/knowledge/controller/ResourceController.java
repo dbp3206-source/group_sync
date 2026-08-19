@@ -44,12 +44,15 @@ public class ResourceController {
     }
 
     @GetMapping
-    public List<ResourceResponse> list(
+    public PagedResponse<ResourceResponse> list(
             @AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Long tagId,
-            @RequestParam(required = false) Long collectionId) {
-        return resourceService.list(user.getId(), q, tagId, collectionId);
+            @RequestParam(required = false) Long collectionId,
+            @RequestParam(required = false) String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "24") int size) {
+        return resourceService.listPaged(user.getId(), q, tagId, collectionId, page, size, sort);
     }
 
     @GetMapping("/{resourceId}")
@@ -116,16 +119,16 @@ public class ResourceController {
     }
 
     @PostMapping("/auto-organize-all")
-    public ResponseEntity<java.util.Map<String, Object>> autoOrganizeAll(@AuthenticationPrincipal AuthenticatedUser user) {
+    public ResponseEntity<MessageResponse> autoOrganizeAll(@AuthenticationPrincipal AuthenticatedUser user) {
         autoOrganizationService.autoOrganizeAll(user.getId());
-        return ResponseEntity.ok(java.util.Map.of("message", "All resources organized into relevant collections and tags."));
+        return ResponseEntity.ok(new MessageResponse("All resources organized into relevant collections and tags."));
     }
 
     @PostMapping("/{resourceId}/auto-organize")
-    public ResponseEntity<java.util.Map<String, Object>> autoOrganize(
+    public ResponseEntity<MessageResponse> autoOrganize(
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable Long resourceId) {
         autoOrganizationService.autoOrganize(user.getId(), resourceId);
-        return ResponseEntity.ok(java.util.Map.of("message", "Resource organized into relevant collections and tags."));
+        return ResponseEntity.ok(new MessageResponse("Resource organized into relevant collections and tags."));
     }
 }

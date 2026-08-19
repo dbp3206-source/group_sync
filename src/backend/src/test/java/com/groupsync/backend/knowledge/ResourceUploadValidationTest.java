@@ -45,7 +45,8 @@ class ResourceUploadValidationTest {
         DataSize configuredSize = DataSize.ofMegabytes(10);
         resourceService = new ResourceService(
                 configuredSize, resourceRepository, userRepository,
-                storageService, events, citationRepository, chunkRepository, parserRegistry
+                storageService, events, citationRepository, chunkRepository, parserRegistry,
+                new com.groupsync.backend.knowledge.rag.GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000)
         );
     }
 

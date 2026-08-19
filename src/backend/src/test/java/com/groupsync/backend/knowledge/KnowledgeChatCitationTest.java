@@ -59,8 +59,9 @@ class KnowledgeChatCitationTest {
         );
         chatService = new KnowledgeChatService(
                 chatTransactionService, sessionRepository, messageRepository,
-                citationRepository, retrievalStrategy, queryPlanner,
-                structuredQueryService, parentChildExpander, languageModelClient
+                citationRepository, retrievalStrategy, null, queryPlanner,
+                structuredQueryService, parentChildExpander, languageModelClient,
+                new com.groupsync.backend.knowledge.rag.GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000)
         );
     }
 
@@ -131,13 +132,11 @@ class KnowledgeChatCitationTest {
         when(messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)).thenReturn(List.of(savedAssistantMsg));
         when(citationRepository.findByMessageIdOrderByCitationOrderAsc(999L)).thenReturn(savedCitations);
 
-        Map<String, Object> loadedSession = chatService.session(ownerId, sessionId);
+        com.groupsync.backend.knowledge.dto.ChatSessionDetailResponse loadedSession = chatService.session(ownerId, sessionId);
         assertNotNull(loadedSession);
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> messages = (List<Map<String, Object>>) loadedSession.get("messages");
+        List<com.groupsync.backend.knowledge.dto.ChatMessageDto> messages = loadedSession.messages();
         assertEquals(1, messages.size());
-        @SuppressWarnings("unchecked")
-        List<CitationResponse> reloadedCitations = (List<CitationResponse>) messages.get(0).get("citations");
+        List<CitationResponse> reloadedCitations = messages.get(0).citations();
         assertEquals(2, reloadedCitations.size());
         assertEquals(1, reloadedCitations.get(0).citationOrder(), "Reloaded citation 1 order must match [1]");
         assertEquals(3, reloadedCitations.get(1).citationOrder(), "Reloaded citation 2 order must match [3]");

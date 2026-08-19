@@ -32,4 +32,30 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
             """, nativeQuery = true)
     List<Resource> search(@Param("ownerId") Long ownerId, @Param("query") String query,
             @Param("tagId") Long tagId, @Param("collectionId") Long collectionId);
+
+    @Query(value = """
+            select distinct r.* from resources r
+            left join resource_tags rt on rt.resource_id = r.id
+            left join resource_collections rc on rc.resource_id = r.id
+            where r.owner_id = :ownerId
+              and (:query is null or :query = '' or lower(r.title) like lower(concat('%', :query, '%')))
+              and (:tagId is null or rt.tag_id = :tagId)
+              and (:collectionId is null or rc.collection_id = :collectionId)
+            """,
+            countQuery = """
+            select count(distinct r.id) from resources r
+            left join resource_tags rt on rt.resource_id = r.id
+            left join resource_collections rc on rc.resource_id = r.id
+            where r.owner_id = :ownerId
+              and (:query is null or :query = '' or lower(r.title) like lower(concat('%', :query, '%')))
+              and (:tagId is null or rt.tag_id = :tagId)
+              and (:collectionId is null or rc.collection_id = :collectionId)
+            """,
+            nativeQuery = true)
+    org.springframework.data.domain.Page<Resource> searchPaged(
+            @Param("ownerId") Long ownerId,
+            @Param("query") String query,
+            @Param("tagId") Long tagId,
+            @Param("collectionId") Long collectionId,
+            org.springframework.data.domain.Pageable pageable);
 }

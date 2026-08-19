@@ -1,5 +1,14 @@
 import { apiClient } from './client'
 
+export type PagedResponse<T> = {
+  items: T[]
+  page: number
+  size: number
+  totalItems: number
+  totalPages: number
+  hasNext: boolean
+}
+
 export type Resource = { id: number; title: string; description: string | null; resourceType: string; processingStatus: string; favorite: boolean; priority: number; originalFilename?: string | null; sizeBytes?: number | null; createdAt: string }
 export type FocusNext = { resourceId: number; title: string; resourceType: string; priority: number; favorite: boolean; progressPercent: number; reason: string }
 export type InsightOverview = { totalResources: number; readyResources: number; inProgressResources: number; completedResources: number; composition: { resourceType: string; count: number }[] }
@@ -93,7 +102,9 @@ export type OrganizationCollectionSuggestion = { name: string; existingCollectio
 export type OrganizationRelatedSuggestion = { resourceId: number; title: string; reason: string; similarity: number }
 export type OrganizationSuggestions = { resourceId: number; suggestedTags: OrganizationTagSuggestion[]; suggestedCollections: OrganizationCollectionSuggestion[]; suggestedRelatedResources: OrganizationRelatedSuggestion[] }
 
-export async function getResources(q?: string, tagId?: number, collectionId?: number) { return (await apiClient.get<Resource[]>('/resources', { params: { ...(q ? { q } : {}), ...(tagId ? { tagId } : {}), ...(collectionId ? { collectionId } : {}) } })).data }
+export async function getResources(q?: string, tagId?: number, collectionId?: number, page = 0, size = 24, sort = 'updated_desc') {
+  return (await apiClient.get<PagedResponse<Resource>>('/resources', { params: { ...(q ? { q } : {}), ...(tagId ? { tagId } : {}), ...(collectionId ? { collectionId } : {}), page, size, sort } })).data
+}
 export async function getResource(id: number) { return (await apiClient.get<Resource>(`/resources/${id}`)).data }
 export async function getResourceContent(id: number) { return (await apiClient.get<string>(`/resources/${id}/text`, { responseType: 'text' })).data }
 export async function getFocusNext() { return (await apiClient.get<FocusNext | null>('/focus/next')).data }

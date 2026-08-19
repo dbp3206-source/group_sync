@@ -131,7 +131,7 @@ export default function ResourceWorkspacePage() {
     } else if (tab === 'Activity' && !graphDataLoaded) {
       setGraphDataLoaded(true)
       Promise.all([
-        getResources().catch(() => []),
+        getResources().then(r => r.items).catch(() => []),
         getCollections().catch(() => []),
         getTags().catch(() => []),
       ]).then(([allR, cols, t]) => {

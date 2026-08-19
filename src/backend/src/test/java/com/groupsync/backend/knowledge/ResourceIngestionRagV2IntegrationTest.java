@@ -56,7 +56,8 @@ class ResourceIngestionRagV2IntegrationTest {
     void setUp() {
         ingestionService = new ResourceIngestionService(
                 resourceRepository, parserRegistry, chunkingStrategy,
-                storageService, embeddingProvider, embeddingTextBuilder, transactionService
+                storageService, embeddingProvider, embeddingTextBuilder, transactionService,
+                new com.groupsync.backend.knowledge.rag.GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000)
         );
 
         owner = new UserAccount("author@knowledgeos.io", "hash", "Author");

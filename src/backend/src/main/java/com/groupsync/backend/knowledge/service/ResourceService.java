@@ -63,18 +63,6 @@ public class ResourceService {
         this.geminiProperties = Objects.requireNonNull(geminiProperties, "geminiProperties must not be null");
     }
 
-    public ResourceService(
-            org.springframework.util.unit.DataSize maxUploadSize,
-            ResourceRepository resourceRepository,
-            UserAccountRepository userRepository,
-            StorageService storageService,
-            ApplicationEventPublisher events,
-            CitationRepository citationRepository,
-            DocumentChunkRepository chunkRepository,
-            ResourceParserRegistry parserRegistry) {
-        this(maxUploadSize, resourceRepository, userRepository, storageService, events, citationRepository, chunkRepository, parserRegistry, new GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000));
-    }
-
     public long getMaxUploadBytes() {
         return maxUploadBytes;
     }
@@ -88,20 +76,23 @@ public class ResourceService {
             long maxMb = maxUploadBytes / (1024 * 1024);
             throw new BadRequestException("Resources must be " + maxMb + " MB or smaller.");
         }
-        ResourceType type = resolveType(file.getOriginalFilename(), file.getContentType());
+        String filename = file.getOriginalFilename() == null ? "resource" : file.getOriginalFilename().trim();
+        String title = title(requestedTitle, filename);
+        String mimeType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
+        ResourceType resourceType = resolveType(filename, mimeType);
         try {
-            StorageService.StoredFile stored = storageService.store(ownerId, file.getOriginalFilename(), file.getInputStream());
+            StorageService.StoredFile stored = storageService.store(ownerId, filename, file.getInputStream());
             if (resourceRepository.findByOwnerIdAndChecksumSha256(ownerId, stored.checksumSha256()).isPresent()) {
                 storageService.delete(stored.key());
-                throw new ConflictException("This resource is already in your library.");
+                throw new com.groupsync.backend.shared.exception.ConflictException("This resource is already in your library.");
             }
             Resource resource = new Resource(
                     owner(ownerId),
-                    title(requestedTitle, file.getOriginalFilename()),
+                    title,
                     normalize(description),
-                    type,
-                    file.getOriginalFilename(),
-                    file.getContentType(),
+                    resourceType,
+                    filename,
+                    mimeType,
                     stored.sizeBytes(),
                     stored.key(),
                     stored.checksumSha256()
@@ -142,6 +133,40 @@ public class ResourceService {
     public List<ResourceResponse> list(Long ownerId, String query, Long tagId, Long collectionId) {
         List<Resource> resources = resourceRepository.search(ownerId, query == null || query.isBlank() ? null : query.trim(), tagId, collectionId);
         return resources.stream().map(ResourceResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<ResourceResponse> listPaged(Long ownerId, String query, Long tagId, Long collectionId, int page, int size, String sort) {
+        int boundedPage = Math.max(0, page);
+        int boundedSize = Math.min(Math.max(1, size), 100);
+
+        org.springframework.data.domain.Sort sortOrder = switch (sort != null ? sort.trim().toLowerCase() : "updated_desc") {
+            case "created_desc", "createdat_desc", "createdat,desc" -> org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt");
+            case "created_asc", "createdat_asc", "createdat,asc" -> org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "createdAt");
+            case "title_asc", "title,asc" -> org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "title");
+            case "title_desc", "title,desc" -> org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "title");
+            case "priority_desc", "priority,desc" -> org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "priority");
+            default -> org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "updatedAt");
+        };
+
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(boundedPage, boundedSize, sortOrder);
+        org.springframework.data.domain.Page<Resource> result = resourceRepository.searchPaged(
+                ownerId,
+                query == null || query.isBlank() ? null : query.trim(),
+                tagId,
+                collectionId,
+                pageable
+        );
+
+        List<ResourceResponse> items = result.getContent().stream().map(ResourceResponse::from).toList();
+        return new PagedResponse<>(
+                items,
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages(),
+                result.hasNext()
+        );
     }
 
     @Transactional(readOnly = true)

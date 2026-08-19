@@ -63,17 +63,6 @@ public class ResourceIngestionService {
         this.geminiProperties = Objects.requireNonNull(geminiProperties, "geminiProperties must not be null");
     }
 
-    public ResourceIngestionService(
-            ResourceRepository resourceRepository,
-            ResourceParserRegistry parserRegistry,
-            StructureAwareChunkingStrategy chunkingStrategy,
-            StorageService storageService,
-            EmbeddingProvider embeddingProvider,
-            EmbeddingTextBuilder embeddingTextBuilder,
-            ResourceIngestionTransactionService transactionService) {
-        this(resourceRepository, parserRegistry, chunkingStrategy, storageService, embeddingProvider, embeddingTextBuilder, transactionService, new GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000));
-    }
-
     @Async
     @TransactionalEventListener
     public void processAfterUpload(ResourceProcessingRequestedEvent event) {

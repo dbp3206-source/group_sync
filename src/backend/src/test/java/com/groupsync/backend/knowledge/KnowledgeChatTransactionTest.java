@@ -57,8 +57,9 @@ class KnowledgeChatTransactionTest {
         );
         chatService = new KnowledgeChatService(
                 chatTransactionService, sessionRepository, messageRepository,
-                citationRepository, retrievalStrategy, queryPlanner,
-                structuredQueryService, parentChildExpander, languageModelClient
+                citationRepository, retrievalStrategy, null, queryPlanner,
+                structuredQueryService, parentChildExpander, languageModelClient,
+                new com.groupsync.backend.knowledge.rag.GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000)
         );
     }
 

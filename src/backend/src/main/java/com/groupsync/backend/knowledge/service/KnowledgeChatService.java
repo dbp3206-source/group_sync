@@ -37,21 +37,6 @@ public class KnowledgeChatService {
     private final LanguageModelClient languageModelClient;
     private final GeminiProperties geminiProperties;
 
-    public KnowledgeChatService(
-            KnowledgeChatTransactionService chatTransactionService,
-            ChatSessionRepository sessionRepository,
-            ChatMessageRepository messageRepository,
-            CitationRepository citationRepository,
-            HybridRetrievalStrategy retrievalStrategy,
-            KnowledgeQueryPlanner queryPlanner,
-            StructuredKnowledgeQueryService structuredQueryService,
-            ParentChildContextExpander parentChildExpander,
-            LanguageModelClient languageModelClient) {
-        this(chatTransactionService, sessionRepository, messageRepository, citationRepository,
-                retrievalStrategy, null, queryPlanner, structuredQueryService, parentChildExpander,
-                languageModelClient, new GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000));
-    }
-
     @Autowired
     public KnowledgeChatService(
             KnowledgeChatTransactionService chatTransactionService,
@@ -260,20 +245,50 @@ public class KnowledgeChatService {
     }
 
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> sessions(Long ownerId) {
-        return sessionRepository.findByOwnerIdOrderByUpdatedAtDesc(ownerId).stream().map(session -> Map.<String, Object>of(
-                "id", session.getId(), "title", session.getTitle(), "scope", session.getScopeType().name(),
-                "collectionId", session.getCollectionId() == null ? 0L : session.getCollectionId(), "updatedAt", session.getUpdatedAt())).toList();
+    public List<ChatSessionSummaryResponse> sessions(Long ownerId) {
+        return sessionRepository.findByOwnerIdOrderByUpdatedAtDesc(ownerId).stream().map(session ->
+                new ChatSessionSummaryResponse(
+                        session.getId(),
+                        session.getTitle(),
+                        session.getScopeType().name(),
+                        session.getCollectionId() == null ? 0L : session.getCollectionId(),
+                        session.getUpdatedAt()
+                )
+        ).toList();
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> session(Long ownerId, Long sessionId) {
-        ChatSession session = sessionRepository.findByIdAndOwnerId(sessionId, ownerId).orElseThrow(() -> new NotFoundException("Chat session not found."));
-        List<Map<String, Object>> messages = messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId).stream().map(message -> {
-            List<CitationResponse> citations = citationRepository.findByMessageIdOrderByCitationOrderAsc(message.getId()).stream().map(citation -> new CitationResponse(
-                    citation.getChunk().getId(), citation.getChunk().getResource().getId(), citation.getChunk().getResource().getTitle(), citation.getChunk().getPageNumber(), citation.getChunk().getSection(), citation.getCitationOrder(), citation.getRelevanceScore(), citation.getEvidenceExcerpt())).toList();
-            return Map.<String, Object>of("id", message.getId(), "role", message.getRole().name(), "content", message.getContent(), "createdAt", message.getCreatedAt(), "citations", citations);
+    public ChatSessionDetailResponse session(Long ownerId, Long sessionId) {
+        ChatSession session = sessionRepository.findByIdAndOwnerId(sessionId, ownerId)
+                .orElseThrow(() -> new NotFoundException("Chat session not found."));
+        List<ChatMessageDto> messages = messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId).stream().map(message -> {
+            List<CitationResponse> citations = citationRepository.findByMessageIdOrderByCitationOrderAsc(message.getId()).stream().map(citation ->
+                    new CitationResponse(
+                            citation.getChunk().getId(),
+                            citation.getChunk().getResource().getId(),
+                            citation.getChunk().getResource().getTitle(),
+                            citation.getChunk().getPageNumber(),
+                            citation.getChunk().getSection(),
+                            citation.getCitationOrder(),
+                            citation.getRelevanceScore(),
+                            citation.getEvidenceExcerpt()
+                    )
+            ).toList();
+            return new ChatMessageDto(
+                    message.getId(),
+                    message.getRole().name(),
+                    message.getContent(),
+                    message.getCreatedAt(),
+                    citations
+            );
         }).toList();
-        return Map.of("id", session.getId(), "title", session.getTitle(), "scope", session.getScopeType().name(), "collectionId", session.getCollectionId() == null ? 0L : session.getCollectionId(), "resourceIds", session.getResources().stream().map(Resource::getId).toList(), "messages", messages);
+        return new ChatSessionDetailResponse(
+                session.getId(),
+                session.getTitle(),
+                session.getScopeType().name(),
+                session.getCollectionId() == null ? 0L : session.getCollectionId(),
+                session.getResources().stream().map(Resource::getId).toList(),
+                messages
+        );
     }
 }

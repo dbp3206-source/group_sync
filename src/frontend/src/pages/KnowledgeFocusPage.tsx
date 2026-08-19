@@ -90,7 +90,7 @@ export default function KnowledgeFocusPage() {
         getReviewQueue().catch(() => []),
       ])
       setTopics(tList)
-      setAllResources(resList)
+      setAllResources(resList.items)
       setReviewQueue(qList)
 
       if (tList.length > 0) {
@@ -311,7 +311,7 @@ export default function KnowledgeFocusPage() {
       const updated = await addTopicSource(selectedTopicId, created.id)
       setTopicDetail(updated)
       const resList = await getResources()
-      setAllResources(resList)
+      setAllResources(resList.items)
     } catch {
       setError('Không thể nạp tệp tài liệu.')
     } finally {
@@ -1130,7 +1130,7 @@ export default function KnowledgeFocusPage() {
                               const created = await uploadResource(file)
                               setSelectedResourceIds(prev => [...prev, created.id])
                               const list = await getResources()
-                              setAllResources(list)
+                              setAllResources(list.items)
                             } catch {
                               setError('Không thể nạp tệp tài liệu.')
                             } finally {

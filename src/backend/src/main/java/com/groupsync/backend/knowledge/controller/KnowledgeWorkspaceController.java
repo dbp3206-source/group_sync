@@ -2,6 +2,7 @@ package com.groupsync.backend.knowledge.controller;
 
 import java.util.List;
 import java.util.Map;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -31,13 +32,13 @@ public class KnowledgeWorkspaceController {
     }
 
     @PostMapping("/api/tags")
-    public TagResponse createTag(@AuthenticationPrincipal AuthenticatedUser user, @RequestBody Map<String, String> body) {
-        return workspace.createTag(user.getId(), body.get("name"));
+    public TagResponse createTag(@AuthenticationPrincipal AuthenticatedUser user, @Valid @RequestBody CreateTagRequest request) {
+        return workspace.createTag(user.getId(), request.name());
     }
 
     @PatchMapping("/api/tags/{id}")
-    public TagResponse updateTag(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id, @RequestBody Map<String, String> body) {
-        return workspace.updateTag(user.getId(), id, body.get("name"));
+    public TagResponse updateTag(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id, @Valid @RequestBody UpdateTagRequest request) {
+        return workspace.updateTag(user.getId(), id, request.name());
     }
 
     @DeleteMapping("/api/tags/{id}")
@@ -47,13 +48,13 @@ public class KnowledgeWorkspaceController {
     }
 
     @PostMapping("/api/collections")
-    public CollectionResponse createCollection(@AuthenticationPrincipal AuthenticatedUser user, @RequestBody Map<String, String> body) {
-        return workspace.createCollection(user.getId(), body.get("name"), body.get("description"));
+    public CollectionResponse createCollection(@AuthenticationPrincipal AuthenticatedUser user, @Valid @RequestBody CreateCollectionRequest request) {
+        return workspace.createCollection(user.getId(), request.name(), request.description());
     }
 
     @PatchMapping("/api/collections/{id}")
-    public CollectionResponse updateCollection(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id, @RequestBody Map<String, String> body) {
-        return workspace.updateCollection(user.getId(), id, body.get("name"), body.get("description"));
+    public CollectionResponse updateCollection(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id, @Valid @RequestBody UpdateCollectionRequest request) {
+        return workspace.updateCollection(user.getId(), id, request.name(), request.description());
     }
 
     @DeleteMapping("/api/collections/{id}")
@@ -102,13 +103,13 @@ public class KnowledgeWorkspaceController {
     }
 
     @PostMapping("/api/resources/{resourceId}/notes")
-    public ResourceNoteResponse createNote(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId, @RequestBody Map<String, String> body) {
-        return workspace.createNote(user.getId(), resourceId, body.get("content"));
+    public ResourceNoteResponse createNote(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId, @Valid @RequestBody CreateNoteRequest request) {
+        return workspace.createNote(user.getId(), resourceId, request.content());
     }
 
     @PatchMapping("/api/resources/{resourceId}/notes/{noteId}")
-    public ResourceNoteResponse updateNote(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId, @PathVariable Long noteId, @RequestBody Map<String, String> body) {
-        return workspace.updateNote(user.getId(), resourceId, noteId, body.get("content"));
+    public ResourceNoteResponse updateNote(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId, @PathVariable Long noteId, @Valid @RequestBody CreateNoteRequest request) {
+        return workspace.updateNote(user.getId(), resourceId, noteId, request.content());
     }
 
     @DeleteMapping("/api/resources/{resourceId}/notes/{noteId}")
@@ -128,8 +129,8 @@ public class KnowledgeWorkspaceController {
     }
 
     @PutMapping("/api/resources/{resourceId}/progress")
-    public ResourceActivityResponse progress(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId, @RequestBody Map<String, Integer> body) {
-        return workspace.updateProgress(user.getId(), resourceId, body.getOrDefault("progressPercent", 0));
+    public ResourceActivityResponse progress(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId, @Valid @RequestBody UpdateProgressRequest request) {
+        return workspace.updateProgress(user.getId(), resourceId, request.progressPercent());
     }
 
     @GetMapping("/api/resources/{resourceId}/organization/suggestions")
