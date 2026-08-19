@@ -30,9 +30,9 @@ import com.groupsync.backend.knowledge.storage.StorageService;
 import com.groupsync.backend.user.model.UserAccount;
 
 /**
- * Execution-path integration test verifying KnowledgeOS RAG v2 Ingestion orchestration.
+ * Execution-path orchestration tests verifying KnowledgeOS RAG v2 Ingestion flow.
  * Proves that StructureAwareChunkingStrategy, EmbeddingTextBuilder, embedDocuments batching,
- * and Parent-Child persistence are executed on the real ingestion path.
+ * and Parent-Child persistence are executed on the real ingestion path with complete vector validation.
  */
 @ExtendWith(MockitoExtension.class)
 class ResourceIngestionRagV2IntegrationTest {
@@ -132,25 +132,103 @@ class ResourceIngestionRagV2IntegrationTest {
     }
 
     @Test
-    void process_embeddingBatchFailure_marksResourceFailedWithoutCorruptReadyState() throws Exception {
+    void process_tooFewVectors_marksResourceFailed() throws Exception {
         when(transactionService.claim(resourceId)).thenReturn(true);
         when(resourceRepository.findById(resourceId)).thenReturn(Optional.of(testResource));
-        when(storageService.open("42/architecture.md")).thenReturn(new ByteArrayInputStream("Test text".getBytes(StandardCharsets.UTF_8)));
+        when(storageService.open("42/architecture.md")).thenReturn(new ByteArrayInputStream("Text".getBytes(StandardCharsets.UTF_8)));
         when(parserRegistry.forType(ResourceType.MARKDOWN)).thenReturn(resourceParser);
 
-        ParsedDocument parsedDoc = new ParsedDocument("Doc", "Test", List.of(new ParsedBlock(BlockType.PARAGRAPH, "Intro", "Test", 1, 0)));
+        ParsedDocument parsedDoc = new ParsedDocument("Doc", "Text", List.of(new ParsedBlock(BlockType.PARAGRAPH, "H", "Text", 1, 0)));
         when(resourceParser.parseDocument(any(InputStream.class))).thenReturn(parsedDoc);
 
-        HierarchicalChunk child = new HierarchicalChunk(0, ChunkLevel.CHILD, null, 1, "Intro", "Test");
+        // 2 child chunks
+        HierarchicalChunk child1 = new HierarchicalChunk(0, ChunkLevel.CHILD, null, 1, "H", "C1");
+        HierarchicalChunk child2 = new HierarchicalChunk(1, ChunkLevel.CHILD, null, 1, "H", "C2");
+        when(chunkingStrategy.chunkDocument(parsedDoc)).thenReturn(List.of(child1, child2));
+        when(transactionService.fetchSemanticMetadata(resourceId)).thenReturn(new SemanticMetadata("Doc", List.of(), List.of(), null));
+        when(embeddingTextBuilder.build(any(), anyString())).thenReturn("Rich text");
+
+        // Provider returns only 1 vector
+        when(embeddingProvider.embedDocuments(anyList())).thenReturn(List.of(new float[768]));
+
+        ingestionService.process(resourceId);
+
+        verify(transactionService, times(1)).markFailed(eq(resourceId), contains("Embedding count mismatch"));
+        verify(transactionService, never()).saveReadyHierarchical(anyLong(), anyList(), anyMap());
+    }
+
+    @Test
+    void process_tooManyVectors_marksResourceFailed() throws Exception {
+        when(transactionService.claim(resourceId)).thenReturn(true);
+        when(resourceRepository.findById(resourceId)).thenReturn(Optional.of(testResource));
+        when(storageService.open("42/architecture.md")).thenReturn(new ByteArrayInputStream("Text".getBytes(StandardCharsets.UTF_8)));
+        when(parserRegistry.forType(ResourceType.MARKDOWN)).thenReturn(resourceParser);
+
+        ParsedDocument parsedDoc = new ParsedDocument("Doc", "Text", List.of(new ParsedBlock(BlockType.PARAGRAPH, "H", "Text", 1, 0)));
+        when(resourceParser.parseDocument(any(InputStream.class))).thenReturn(parsedDoc);
+
+        // 1 child chunk
+        HierarchicalChunk child = new HierarchicalChunk(0, ChunkLevel.CHILD, null, 1, "H", "C1");
         when(chunkingStrategy.chunkDocument(parsedDoc)).thenReturn(List.of(child));
         when(transactionService.fetchSemanticMetadata(resourceId)).thenReturn(new SemanticMetadata("Doc", List.of(), List.of(), null));
         when(embeddingTextBuilder.build(any(), anyString())).thenReturn("Rich text");
 
-        when(embeddingProvider.embedDocuments(anyList())).thenThrow(new IllegalStateException("Gemini embedding quota exhausted (429)"));
+        // Provider returns 2 vectors
+        when(embeddingProvider.embedDocuments(anyList())).thenReturn(List.of(new float[768], new float[768]));
 
         ingestionService.process(resourceId);
 
-        verify(transactionService, times(1)).markFailed(eq(resourceId), contains("Gemini embedding quota exhausted (429)"));
+        verify(transactionService, times(1)).markFailed(eq(resourceId), contains("Embedding count mismatch"));
+        verify(transactionService, never()).saveReadyHierarchical(anyLong(), anyList(), anyMap());
+    }
+
+    @Test
+    void process_nullVectorInResults_marksResourceFailed() throws Exception {
+        when(transactionService.claim(resourceId)).thenReturn(true);
+        when(resourceRepository.findById(resourceId)).thenReturn(Optional.of(testResource));
+        when(storageService.open("42/architecture.md")).thenReturn(new ByteArrayInputStream("Text".getBytes(StandardCharsets.UTF_8)));
+        when(parserRegistry.forType(ResourceType.MARKDOWN)).thenReturn(resourceParser);
+
+        ParsedDocument parsedDoc = new ParsedDocument("Doc", "Text", List.of(new ParsedBlock(BlockType.PARAGRAPH, "H", "Text", 1, 0)));
+        when(resourceParser.parseDocument(any(InputStream.class))).thenReturn(parsedDoc);
+
+        HierarchicalChunk child = new HierarchicalChunk(0, ChunkLevel.CHILD, null, 1, "H", "C1");
+        when(chunkingStrategy.chunkDocument(parsedDoc)).thenReturn(List.of(child));
+        when(transactionService.fetchSemanticMetadata(resourceId)).thenReturn(new SemanticMetadata("Doc", List.of(), List.of(), null));
+        when(embeddingTextBuilder.build(any(), anyString())).thenReturn("Rich text");
+
+        // Provider returns a list containing null
+        List<float[]> embeddingsWithNull = new ArrayList<>();
+        embeddingsWithNull.add(null);
+        when(embeddingProvider.embedDocuments(anyList())).thenReturn(embeddingsWithNull);
+
+        ingestionService.process(resourceId);
+
+        verify(transactionService, times(1)).markFailed(eq(resourceId), contains("null"));
+        verify(transactionService, never()).saveReadyHierarchical(anyLong(), anyList(), anyMap());
+    }
+
+    @Test
+    void process_wrongVectorDimension_marksResourceFailed() throws Exception {
+        when(transactionService.claim(resourceId)).thenReturn(true);
+        when(resourceRepository.findById(resourceId)).thenReturn(Optional.of(testResource));
+        when(storageService.open("42/architecture.md")).thenReturn(new ByteArrayInputStream("Text".getBytes(StandardCharsets.UTF_8)));
+        when(parserRegistry.forType(ResourceType.MARKDOWN)).thenReturn(resourceParser);
+
+        ParsedDocument parsedDoc = new ParsedDocument("Doc", "Text", List.of(new ParsedBlock(BlockType.PARAGRAPH, "H", "Text", 1, 0)));
+        when(resourceParser.parseDocument(any(InputStream.class))).thenReturn(parsedDoc);
+
+        HierarchicalChunk child = new HierarchicalChunk(0, ChunkLevel.CHILD, null, 1, "H", "C1");
+        when(chunkingStrategy.chunkDocument(parsedDoc)).thenReturn(List.of(child));
+        when(transactionService.fetchSemanticMetadata(resourceId)).thenReturn(new SemanticMetadata("Doc", List.of(), List.of(), null));
+        when(embeddingTextBuilder.build(any(), anyString())).thenReturn("Rich text");
+
+        // Provider returns 512-dim vector instead of 768
+        when(embeddingProvider.embedDocuments(anyList())).thenReturn(List.of(new float[512]));
+
+        ingestionService.process(resourceId);
+
+        verify(transactionService, times(1)).markFailed(eq(resourceId), contains("invalid dimension"));
         verify(transactionService, never()).saveReadyHierarchical(anyLong(), anyList(), anyMap());
     }
 

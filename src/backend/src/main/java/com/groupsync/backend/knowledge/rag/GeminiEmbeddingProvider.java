@@ -3,6 +3,7 @@ package com.groupsync.backend.knowledge.rag;
 import java.util.ArrayList;
 import java.util.List;
 import com.google.genai.Client;
+import com.google.genai.types.ContentEmbedding;
 import com.google.genai.types.EmbedContentConfig;
 import com.google.genai.types.EmbedContentResponse;
 import org.slf4j.Logger;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 public class GeminiEmbeddingProvider implements EmbeddingProvider {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiEmbeddingProvider.class);
+    private static final int BATCH_SIZE = 16;
     private static final int MAX_RETRIES = 2;
     private static final long INITIAL_BACKOFF_MS = 500L;
 
@@ -36,15 +38,44 @@ public class GeminiEmbeddingProvider implements EmbeddingProvider {
     }
 
     @Override
-    public List<float[]> embedDocuments(List<String> texts) {
+    public BatchResult embedDocumentsWithBatchResult(List<String> texts) {
         if (texts == null || texts.isEmpty()) {
-            return List.of();
+            return new BatchResult(List.of(), 0, 0);
         }
-        List<float[]> results = new ArrayList<>(texts.size());
-        for (String text : texts) {
-            results.add(embedDocument(text));
+        Client client = getClient();
+        EmbedContentConfig config = EmbedContentConfig.builder()
+                .outputDimensionality(properties.embeddingDimensions())
+                .taskType("RETRIEVAL_DOCUMENT")
+                .build();
+
+        List<float[]> allResults = new ArrayList<>(texts.size());
+        int providerRequestCount = 0;
+
+        for (int i = 0; i < texts.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, texts.size());
+            List<String> batch = texts.subList(i, end);
+
+            EmbedContentResponse response = executeWithRetry(() ->
+                    client.models.embedContent(properties.embeddingModel(), batch, config)
+            );
+            providerRequestCount++;
+
+            List<ContentEmbedding> embeddings = response.embeddings().orElseThrow(
+                    () -> new IllegalStateException("Gemini did not return any embeddings for batch."));
+
+            if (embeddings.size() != batch.size()) {
+                throw new IllegalStateException("Gemini returned " + embeddings.size() + " embeddings for a batch of " + batch.size() + " texts.");
+            }
+
+            for (ContentEmbedding ce : embeddings) {
+                List<Float> values = ce.values().orElseThrow(
+                        () -> new IllegalStateException("Gemini returned embedding with missing values."));
+                float[] normalized = EmbeddingVectorNormalizer.normalize(values, properties.embeddingDimensions());
+                allResults.add(normalized);
+            }
         }
-        return results;
+
+        return new BatchResult(allResults, providerRequestCount, texts.size());
     }
 
     private Client getClient() {
@@ -113,14 +144,10 @@ public class GeminiEmbeddingProvider implements EmbeddingProvider {
         }
     }
 
-    private boolean isTransientError(Throwable ex) {
-        if (ex == null) return false;
+    private boolean isTransientError(Exception ex) {
         String msg = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
-        if (msg.contains("429") || msg.contains("quota") || msg.contains("resource_exhausted")
-                || msg.contains("502") || msg.contains("503") || msg.contains("504")
-                || msg.contains("timeout") || msg.contains("timed out") || msg.contains("connection reset")) {
-            return true;
-        }
-        return isTransientError(ex.getCause());
+        return msg.contains("429") || msg.contains("quota") || msg.contains("rate")
+                || msg.contains("timeout") || msg.contains("503") || msg.contains("unavailable")
+                || msg.contains("connection reset") || msg.contains("temporary");
     }
 }

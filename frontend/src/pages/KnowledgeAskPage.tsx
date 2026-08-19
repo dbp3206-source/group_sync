@@ -323,26 +323,28 @@ export default function KnowledgeAskPage() {
                     {/* STRUCTURED PATH */}
                     {latestTrace.mode === 'STRUCTURED' ? (
                       <>
-                        <div className="kos-reasoning-step is-done">
-                          <div className="kos-step-indicator">
-                            <span className="kos-step-dot">2</span>
-                            <span className="kos-step-line" />
-                          </div>
-                          <div className="kos-step-content">
-                            <div className="kos-step-header">
-                              <span className="kos-step-title">Metadata Scope</span>
-                              <span className="kos-step-badge">{latestTrace.filter?.scope || 'LIBRARY'}</span>
+                        {latestTrace.filter && (
+                          <div className="kos-reasoning-step is-done">
+                            <div className="kos-step-indicator">
+                              <span className="kos-step-dot">2</span>
+                              <span className="kos-step-line" />
                             </div>
-                            <p className="kos-step-desc">
-                              {latestTrace.filter?.resourceType ? `Type: ${latestTrace.filter.resourceType} • ` : ''}
-                              {latestTrace.filter?.favorite !== null && latestTrace.filter?.favorite !== undefined ? `Favorite: ${latestTrace.filter.favorite} • ` : ''}
-                              Relational metadata filters evaluated.
-                            </p>
+                            <div className="kos-step-content">
+                              <div className="kos-step-header">
+                                <span className="kos-step-title">Metadata Scope</span>
+                                <span className="kos-step-badge">{latestTrace.filter.scope || 'LIBRARY'}</span>
+                              </div>
+                              <p className="kos-step-desc">
+                                {latestTrace.filter.resourceType ? `Type: ${latestTrace.filter.resourceType} • ` : ''}
+                                {latestTrace.filter.favorite !== null && latestTrace.filter.favorite !== undefined ? `Favorite: ${latestTrace.filter.favorite} • ` : ''}
+                                Relational metadata evaluated.
+                              </p>
+                            </div>
                           </div>
-                        </div>
+                        )}
                         <div className="kos-reasoning-step is-done">
                           <div className="kos-step-indicator">
-                            <span className="kos-step-dot">3</span>
+                            <span className="kos-step-dot">{latestTrace.filter ? 3 : 2}</span>
                           </div>
                           <div className="kos-step-content">
                             <div className="kos-step-header">
@@ -356,110 +358,128 @@ export default function KnowledgeAskPage() {
                         </div>
                       </>
                     ) : (
-                      /* HYBRID / FILTERED_HYBRID PATH */
+                      /* SEMANTIC / HYBRID / FILTERED_HYBRID PATH */
                       <>
-                        {/* Stage 2: Metadata Filter (if present or scope) */}
-                        <div className="kos-reasoning-step is-done">
-                          <div className="kos-step-indicator">
-                            <span className="kos-step-dot">2</span>
-                            <span className="kos-step-line" />
-                          </div>
-                          <div className="kos-step-content">
-                            <div className="kos-step-header">
-                              <span className="kos-step-title">Metadata Filters</span>
-                              <span className="kos-step-badge">{latestTrace.filter?.scope || 'LIBRARY'}</span>
+                        {/* Filter Stage (if present) */}
+                        {latestTrace.filter && (
+                          <div className="kos-reasoning-step is-done">
+                            <div className="kos-step-indicator">
+                              <span className="kos-step-dot">2</span>
+                              <span className="kos-step-line" />
                             </div>
-                            <p className="kos-step-desc">
-                              {latestTrace.filter?.resourceType ? `Type: ${latestTrace.filter.resourceType} • ` : ''}
-                              {latestTrace.filter?.collectionCount ? `${latestTrace.filter.collectionCount} collection(s) • ` : ''}
-                              Applied in SQL WHERE before vector distance calculation.
-                            </p>
+                            <div className="kos-step-content">
+                              <div className="kos-step-header">
+                                <span className="kos-step-title">Metadata Filters</span>
+                                <span className="kos-step-badge">{latestTrace.filter.scope || 'LIBRARY'}</span>
+                              </div>
+                              <p className="kos-step-desc">
+                                {latestTrace.filter.resourceType ? `Type: ${latestTrace.filter.resourceType} • ` : ''}
+                                {latestTrace.filter.collectionCount ? `${latestTrace.filter.collectionCount} collection(s) • ` : ''}
+                                {latestTrace.filter.tagCount ? `${latestTrace.filter.tagCount} tag(s) • ` : ''}
+                                Applied in SQL WHERE before vector distance calculation.
+                              </p>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
-                        {/* Stage 3: Retrieval Branches */}
-                        <div className="kos-reasoning-step is-done">
-                          <div className="kos-step-indicator">
-                            <span className="kos-step-dot">3</span>
-                            <span className="kos-step-line" />
-                          </div>
-                          <div className="kos-step-content">
-                            <div className="kos-step-header">
-                              <span className="kos-step-title">Hybrid Retrieval</span>
-                              <span className="kos-step-badge">pgvector + FTS</span>
+                        {/* Retrieval Stage */}
+                        {latestTrace.retrieval && (
+                          <div className="kos-reasoning-step is-done">
+                            <div className="kos-step-indicator">
+                              <span className="kos-step-dot">{latestTrace.filter ? 3 : 2}</span>
+                              {(latestTrace.fusion || latestTrace.parentChild || latestTrace.generation) && <span className="kos-step-line" />}
                             </div>
-                            <p className="kos-step-desc">
-                              Semantic candidates: {latestTrace.retrieval?.semanticCandidates || 0} • Lexical candidates: {latestTrace.retrieval?.lexicalCandidates || 0}
-                            </p>
+                            <div className="kos-step-content">
+                              <div className="kos-step-header">
+                                <span className="kos-step-title">
+                                  {latestTrace.mode === 'SEMANTIC' ? 'Semantic Retrieval' : 'Hybrid Retrieval'}
+                                </span>
+                                <span className="kos-step-badge">
+                                  {latestTrace.mode === 'SEMANTIC' ? 'pgvector Cosine' : 'pgvector + FTS'}
+                                </span>
+                              </div>
+                              <p className="kos-step-desc">
+                                Semantic candidates: {latestTrace.retrieval.semanticCandidates}
+                                {latestTrace.mode !== 'SEMANTIC' ? ` • Lexical candidates: ${latestTrace.retrieval.lexicalCandidates}` : ''}
+                              </p>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
-                        {/* Stage 4: RRF Fusion */}
-                        <div className="kos-reasoning-step is-done">
-                          <div className="kos-step-indicator">
-                            <span className="kos-step-dot">4</span>
-                            <span className="kos-step-line" />
-                          </div>
-                          <div className="kos-step-content">
-                            <div className="kos-step-header">
-                              <span className="kos-step-title">RRF Fusion (k={latestTrace.fusion?.rrfK || 60})</span>
-                              <span className="kos-step-badge">{latestTrace.fusion?.selectedChildren || 0} child chunks</span>
+                        {/* Fusion Stage (Only if executed) */}
+                        {latestTrace.fusion && (
+                          <div className="kos-reasoning-step is-done">
+                            <div className="kos-step-indicator">
+                              <span className="kos-step-dot">•</span>
+                              {(latestTrace.parentChild || latestTrace.generation) && <span className="kos-step-line" />}
                             </div>
-                            <p className="kos-step-desc">
-                              Fused {latestTrace.fusion?.inputCandidates || 0} total candidates into top {latestTrace.fusion?.selectedChildren || 0} precision child chunks.
-                            </p>
+                            <div className="kos-step-content">
+                              <div className="kos-step-header">
+                                <span className="kos-step-title">RRF Fusion (k={latestTrace.fusion.rrfK})</span>
+                                <span className="kos-step-badge">{latestTrace.fusion.selectedChildren} child chunks</span>
+                              </div>
+                              <p className="kos-step-desc">
+                                Fused {latestTrace.fusion.inputCandidates} total candidates into top {latestTrace.fusion.selectedChildren} precision child chunks.
+                              </p>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
-                        {/* Stage 5: Parent Expansion */}
-                        <div className="kos-reasoning-step is-done">
-                          <div className="kos-step-indicator">
-                            <span className="kos-step-dot">5</span>
-                            <span className="kos-step-line" />
-                          </div>
-                          <div className="kos-step-content">
-                            <div className="kos-step-header">
-                              <span className="kos-step-title">Parent Expansion & Dedup</span>
-                              <span className="kos-step-badge">{latestTrace.parentChild?.uniqueParentsFound || 0} parents</span>
+                        {/* Parent Expansion Stage (Only if executed) */}
+                        {latestTrace.parentChild && (
+                          <div className="kos-reasoning-step is-done">
+                            <div className="kos-step-indicator">
+                              <span className="kos-step-dot">•</span>
+                              {(latestTrace.contextBudget || latestTrace.generation) && <span className="kos-step-line" />}
                             </div>
-                            <p className="kos-step-desc">
-                              Expanded {latestTrace.parentChild?.childChunksRetrieved || 0} children → {latestTrace.parentChild?.uniqueParentsFound || 0} unique parents ({latestTrace.parentChild?.duplicateParentsDeduplicated || 0} duplicate parents deduplicated).
-                            </p>
+                            <div className="kos-step-content">
+                              <div className="kos-step-header">
+                                <span className="kos-step-title">Parent Expansion & Dedup</span>
+                                <span className="kos-step-badge">{latestTrace.parentChild.uniqueParentsFound} parents</span>
+                              </div>
+                              <p className="kos-step-desc">
+                                Expanded {latestTrace.parentChild.childChunksRetrieved} children → {latestTrace.parentChild.uniqueParentsFound} unique parents ({latestTrace.parentChild.duplicateParentsDeduplicated} duplicate parents deduplicated).
+                              </p>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
-                        {/* Stage 6: Context Budget */}
-                        <div className="kos-reasoning-step is-done">
-                          <div className="kos-step-indicator">
-                            <span className="kos-step-dot">6</span>
-                            <span className="kos-step-line" />
-                          </div>
-                          <div className="kos-step-content">
-                            <div className="kos-step-header">
-                              <span className="kos-step-title">Context Budget</span>
-                              <span className="kos-step-badge">{latestTrace.contextBudget?.charactersUsed || 0}/{latestTrace.contextBudget?.maxCharactersBudget || 6000} chars</span>
+                        {/* Context Budget Stage (Only if executed) */}
+                        {latestTrace.contextBudget && (
+                          <div className="kos-reasoning-step is-done">
+                            <div className="kos-step-indicator">
+                              <span className="kos-step-dot">•</span>
+                              {latestTrace.generation && <span className="kos-step-line" />}
                             </div>
-                            <p className="kos-step-desc">
-                              {latestTrace.contextBudget?.parentsUsed || 0} parent contexts budgeted into grounded prompt.
-                            </p>
+                            <div className="kos-step-content">
+                              <div className="kos-step-header">
+                                <span className="kos-step-title">Context Budget</span>
+                                <span className="kos-step-badge">{latestTrace.contextBudget.charactersUsed}/{latestTrace.contextBudget.maxCharactersBudget} chars</span>
+                              </div>
+                              <p className="kos-step-desc">
+                                {latestTrace.contextBudget.parentsUsed} parent contexts budgeted into grounded prompt.
+                              </p>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
-                        {/* Stage 7: Grounded Generation */}
-                        <div className="kos-reasoning-step is-done">
-                          <div className="kos-step-indicator">
-                            <span className="kos-step-dot">7</span>
-                          </div>
-                          <div className="kos-step-content">
-                            <div className="kos-step-header">
-                              <span className="kos-step-title">Generation & Citations</span>
-                              <span className="kos-step-badge">{latestTrace.generation?.model || 'gemini-3.5-flash-lite'}</span>
+                        {/* Grounded Generation Stage (Only if executed) */}
+                        {latestTrace.generation && (
+                          <div className="kos-reasoning-step is-done">
+                            <div className="kos-step-indicator">
+                              <span className="kos-step-dot">•</span>
                             </div>
-                            <p className="kos-step-desc">
-                              Synthesized with {latestTrace.generation?.verifiedCitationsCount || 0} verified source citations.
-                            </p>
+                            <div className="kos-step-content">
+                              <div className="kos-step-header">
+                                <span className="kos-step-title">Generation & Citations</span>
+                                <span className="kos-step-badge">{latestTrace.generation.model}</span>
+                              </div>
+                              <p className="kos-step-desc">
+                                Synthesized with {latestTrace.generation.verifiedCitationsCount} verified source citations.
+                              </p>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </>
                     )}
                   </div>

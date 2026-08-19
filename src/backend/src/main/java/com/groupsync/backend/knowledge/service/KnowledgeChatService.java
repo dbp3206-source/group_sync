@@ -2,6 +2,7 @@ package com.groupsync.backend.knowledge.service;
 
 import java.util.*;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,8 +17,8 @@ import com.groupsync.backend.shared.exception.NotFoundException;
 /**
  * Orchestrates KnowledgeOS RAG v2 chat queries.
  * Integrates multi-turn contextualization, KnowledgeQueryPlanner intent classification,
- * Structured relational execution, Filtered Hybrid Retrieval, Parent-Child context expansion,
- * and deterministic system-level execution tracing.
+ * Structured relational execution, Semantic pgvector retrieval, Filtered Hybrid Retrieval,
+ * Parent-Child context expansion, and deterministic system-level execution tracing.
  */
 @Service
 public class KnowledgeChatService {
@@ -29,10 +30,27 @@ public class KnowledgeChatService {
     private final ChatMessageRepository messageRepository;
     private final CitationRepository citationRepository;
     private final HybridRetrievalStrategy retrievalStrategy;
+    private final SemanticRetrievalStrategy semanticRetrievalStrategy;
     private final KnowledgeQueryPlanner queryPlanner;
     private final StructuredKnowledgeQueryService structuredQueryService;
     private final ParentChildContextExpander parentChildExpander;
     private final LanguageModelClient languageModelClient;
+    private final GeminiProperties geminiProperties;
+
+    public KnowledgeChatService(
+            KnowledgeChatTransactionService chatTransactionService,
+            ChatSessionRepository sessionRepository,
+            ChatMessageRepository messageRepository,
+            CitationRepository citationRepository,
+            HybridRetrievalStrategy retrievalStrategy,
+            KnowledgeQueryPlanner queryPlanner,
+            StructuredKnowledgeQueryService structuredQueryService,
+            ParentChildContextExpander parentChildExpander,
+            LanguageModelClient languageModelClient) {
+        this(chatTransactionService, sessionRepository, messageRepository, citationRepository,
+                retrievalStrategy, null, queryPlanner, structuredQueryService, parentChildExpander,
+                languageModelClient, null);
+    }
 
     public KnowledgeChatService(
             KnowledgeChatTransactionService chatTransactionService,
@@ -40,19 +58,23 @@ public class KnowledgeChatService {
             ChatMessageRepository messageRepository,
             CitationRepository citationRepository,
             @Qualifier("hybridRetrieval") HybridRetrievalStrategy retrievalStrategy,
+            @Qualifier("semanticRetrieval") SemanticRetrievalStrategy semanticRetrievalStrategy,
             KnowledgeQueryPlanner queryPlanner,
             StructuredKnowledgeQueryService structuredQueryService,
             ParentChildContextExpander parentChildExpander,
-            LanguageModelClient languageModelClient) {
+            LanguageModelClient languageModelClient,
+            @Autowired(required = false) GeminiProperties geminiProperties) {
         this.chatTransactionService = chatTransactionService;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
         this.citationRepository = citationRepository;
         this.retrievalStrategy = retrievalStrategy;
+        this.semanticRetrievalStrategy = semanticRetrievalStrategy;
         this.queryPlanner = queryPlanner;
         this.structuredQueryService = structuredQueryService;
         this.parentChildExpander = parentChildExpander;
         this.languageModelClient = languageModelClient;
+        this.geminiProperties = geminiProperties;
     }
 
     public AskKnowledgeResponse ask(Long ownerId, AskKnowledgeRequest request) {
@@ -104,38 +126,61 @@ public class KnowledgeChatService {
             return new AskKnowledgeResponse(saved.sessionId(), saved.answer(), saved.grounded(), saved.citations(), trace);
         }
 
-        // Step 4: Filtered Hybrid Retrieval (pgvector + FTS + RRF) on child chunks
-        HybridExecutionDetails hybridDetails = retrievalStrategy.retrieveWithTrace(
-                ownerId,
-                plan.semanticQuery(),
-                prep.scopeType(),
-                prep.thisResourceId(),
-                prep.selectedResourceIds(),
-                prep.collectionId(),
-                plan.filters()
-        );
-        List<RetrievedChunk> candidateChildren = hybridDetails.fusedChunks();
+        // Step 4: Retrieval based on QueryMode
+        List<RetrievedChunk> candidateChildren;
+        RetrievalTrace retrievalTrace;
+        FusionTrace fusionTrace;
 
-        RetrievalTrace retrievalTrace = new RetrievalTrace(
-                hybridDetails.semanticCandidateCount(),
-                hybridDetails.keywordCandidateCount(),
-                hybridDetails.totalInputCandidates()
-        );
-
-        FusionTrace fusionTrace = new FusionTrace(
-                hybridDetails.totalInputCandidates(),
-                candidateChildren.size(),
-                hybridDetails.rrfK()
-        );
+        if (plan.mode() == QueryMode.SEMANTIC) {
+            // Pure semantic retrieval branch (pgvector only, no FTS, no RRF)
+            candidateChildren = semanticRetrievalStrategy.retrieve(
+                    ownerId,
+                    plan.semanticQuery(),
+                    prep.scopeType(),
+                    prep.thisResourceId(),
+                    prep.selectedResourceIds(),
+                    prep.collectionId(),
+                    plan.filters(),
+                    6
+            );
+            retrievalTrace = new RetrievalTrace(
+                    candidateChildren.size(),
+                    0,
+                    candidateChildren.size()
+            );
+            fusionTrace = null;
+        } else {
+            // Filtered Hybrid Retrieval (pgvector + FTS + RRF)
+            HybridExecutionDetails hybridDetails = retrievalStrategy.retrieveWithTrace(
+                    ownerId,
+                    plan.semanticQuery(),
+                    prep.scopeType(),
+                    prep.thisResourceId(),
+                    prep.selectedResourceIds(),
+                    prep.collectionId(),
+                    plan.filters()
+            );
+            candidateChildren = hybridDetails.fusedChunks();
+            retrievalTrace = new RetrievalTrace(
+                    hybridDetails.semanticCandidateCount(),
+                    hybridDetails.keywordCandidateCount(),
+                    hybridDetails.totalInputCandidates()
+            );
+            fusionTrace = new FusionTrace(
+                    hybridDetails.totalInputCandidates(),
+                    candidateChildren.size(),
+                    hybridDetails.rrfK()
+            );
+        }
 
         if (candidateChildren.isEmpty() || candidateChildren.getFirst().distance() > 1.0 - MIN_RELEVANCE) {
             AskKnowledgeResponse saved = chatTransactionService.persistInsufficientContext(prep.sessionId());
             long durationMs = System.currentTimeMillis() - startMs;
             RagExecutionTrace trace = new RagExecutionTrace(
                     plan.mode(), plan.operation(), plannerTrace, filterTrace, retrievalTrace, fusionTrace,
-                    new ParentChildTrace(0, 0, 0),
-                    new ContextBudgetTrace(0, 0, parentChildExpander.getMaxContextChars()),
-                    new GenerationTrace("gemini-3.5-flash-lite", 0, 0),
+                    null,
+                    null,
+                    null,
                     durationMs
             );
             return new AskKnowledgeResponse(saved.sessionId(), saved.answer(), saved.grounded(), saved.citations(), trace);
@@ -164,8 +209,9 @@ public class KnowledgeChatService {
         // Step 7: Persist assistant message and verified citations
         AskKnowledgeResponse saved = chatTransactionService.persistAssistantResult(prep.sessionId(), answer, promptChunks);
 
+        String modelName = geminiProperties != null ? geminiProperties.chatModel() : "gemini-3.5-flash-lite";
         GenerationTrace generationTrace = new GenerationTrace(
-                "gemini-3.5-flash-lite",
+                modelName,
                 promptChunks.size(),
                 saved.citations().size()
         );
@@ -214,7 +260,7 @@ public class KnowledgeChatService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> sessions(Long ownerId) {
-        return sessionRepository.findByOwnerIdOrderByUpdatedAtDesc(ownerId).stream().map(session -> Map.<String,Object>of(
+        return sessionRepository.findByOwnerIdOrderByUpdatedAtDesc(ownerId).stream().map(session -> Map.<String, Object>of(
                 "id", session.getId(), "title", session.getTitle(), "scope", session.getScopeType().name(),
                 "collectionId", session.getCollectionId() == null ? 0L : session.getCollectionId(), "updatedAt", session.getUpdatedAt())).toList();
     }
@@ -222,11 +268,11 @@ public class KnowledgeChatService {
     @Transactional(readOnly = true)
     public Map<String, Object> session(Long ownerId, Long sessionId) {
         ChatSession session = sessionRepository.findByIdAndOwnerId(sessionId, ownerId).orElseThrow(() -> new NotFoundException("Chat session not found."));
-        List<Map<String,Object>> messages = messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId).stream().map(message -> {
+        List<Map<String, Object>> messages = messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId).stream().map(message -> {
             List<CitationResponse> citations = citationRepository.findByMessageIdOrderByCitationOrderAsc(message.getId()).stream().map(citation -> new CitationResponse(
-                citation.getChunk().getId(), citation.getChunk().getResource().getId(), citation.getChunk().getResource().getTitle(), citation.getChunk().getPageNumber(), citation.getChunk().getSection(), citation.getCitationOrder(), citation.getRelevanceScore(), citation.getEvidenceExcerpt())).toList();
-            return Map.<String,Object>of("id", message.getId(), "role", message.getRole().name(), "content", message.getContent(), "createdAt", message.getCreatedAt(), "citations", citations);
+                    citation.getChunk().getId(), citation.getChunk().getResource().getId(), citation.getChunk().getResource().getTitle(), citation.getChunk().getPageNumber(), citation.getChunk().getSection(), citation.getCitationOrder(), citation.getRelevanceScore(), citation.getEvidenceExcerpt())).toList();
+            return Map.<String, Object>of("id", message.getId(), "role", message.getRole().name(), "content", message.getContent(), "createdAt", message.getCreatedAt(), "citations", citations);
         }).toList();
-        return Map.of("id",session.getId(),"title",session.getTitle(),"scope",session.getScopeType().name(),"collectionId",session.getCollectionId()==null?0L:session.getCollectionId(),"resourceIds",session.getResources().stream().map(Resource::getId).toList(),"messages",messages);
+        return Map.of("id", session.getId(), "title", session.getTitle(), "scope", session.getScopeType().name(), "collectionId", session.getCollectionId() == null ? 0L : session.getCollectionId(), "resourceIds", session.getResources().stream().map(Resource::getId).toList(), "messages", messages);
     }
 }

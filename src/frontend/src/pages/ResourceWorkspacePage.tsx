@@ -349,25 +349,30 @@ export default function ResourceWorkspacePage() {
                   <div>
                     <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Structure-aware Chunking</small>
                     <strong style={{ fontSize: '0.9rem' }}>
-                      {ingestionTrace.parentChunkCount} Parents (~1500 chars) · {ingestionTrace.childChunkCount} Children (~500 chars)
+                      {ingestionTrace.chunkingVersion >= 2 ? (
+                        `${ingestionTrace.parentChunkCount} Parents (~1500 chars) · ${ingestionTrace.childChunkCount} Children (~500 chars)`
+                      ) : (
+                        `${ingestionTrace.childChunkCount} Chunks (Legacy Flat Index)`
+                      )}
                     </strong>
                   </div>
                   <div>
                     <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Vector Embeddings</small>
                     <strong style={{ fontSize: '0.9rem' }}>
-                      {ingestionTrace.embeddingModel} ({ingestionTrace.embeddingDimensions}d) · {ingestionTrace.embeddingBatchCount} Batches
+                      {ingestionTrace.embeddingModel} ({ingestionTrace.embeddingDimensions}d)
+                      {ingestionTrace.chunkingVersion >= 2 && ingestionTrace.embeddingBatchCount > 0 ? ` · ${ingestionTrace.embeddingBatchCount} Batches` : ''}
                     </strong>
                   </div>
                   <div>
                     <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Chunking Engine Version</small>
                     <strong style={{ fontSize: '0.9rem' }}>
-                      v{ingestionTrace.chunkingVersion} (Hierarchical Parent–Child)
+                      v{ingestionTrace.chunkingVersion} {ingestionTrace.chunkingVersion >= 2 ? '(Hierarchical Parent–Child)' : '(Legacy Flat Chunking)'}
                     </strong>
                   </div>
                   <div>
                     <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Semantic Metadata Preloaded</small>
-                    <strong style={{ fontSize: '0.9rem', color: 'var(--kos-green)' }}>
-                      {ingestionTrace.semanticMetadataIncluded ? '✓ Tags & Collections Embedded' : 'Standard Text'}
+                    <strong style={{ fontSize: '0.9rem', color: ingestionTrace.semanticMetadataIncluded ? 'var(--kos-green)' : 'var(--kos-muted)' }}>
+                      {ingestionTrace.semanticMetadataIncluded ? '✓ Tags & Collections Embedded' : 'Not available for legacy index'}
                     </strong>
                   </div>
                 </div>

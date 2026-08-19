@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
  * Validates untrusted QueryPlans produced by LLM planning.
  * Enforces ownership of all referenced entity IDs, validates enum boundaries,
  * and guarantees that planner filters never escape or widen the user-selected RetrievalScope.
+ * Explicit invalid or disjoint constraints produce impossible filters (0 candidates), never falling back to full library.
  */
 @Component
 public class QueryPlanValidator {
@@ -34,14 +35,16 @@ public class QueryPlanValidator {
 
         KnowledgeQueryFilters rawFilters = rawPlan.filters() != null ? rawPlan.filters() : KnowledgeQueryFilters.empty();
 
+        boolean[] impossible = new boolean[]{ false };
+
         // Validate and scope-constrain resource IDs
-        Set<Long> sanitizedResourceIds = sanitizeResourceIds(ownerId, rawFilters.resourceIds(), scope, thisResourceId, selectedResourceIds);
+        Set<Long> sanitizedResourceIds = sanitizeResourceIds(ownerId, rawFilters.resourceIds(), scope, thisResourceId, selectedResourceIds, impossible);
 
         // Validate and scope-constrain collection IDs
-        Set<Long> sanitizedCollectionIds = sanitizeCollectionIds(ownerId, rawFilters.collectionIds(), scope, collectionId);
+        Set<Long> sanitizedCollectionIds = sanitizeCollectionIds(ownerId, rawFilters.collectionIds(), scope, collectionId, impossible);
 
         // Validate tag IDs
-        Set<Long> sanitizedTagIds = sanitizeTagIds(ownerId, rawFilters.tagIds());
+        Set<Long> sanitizedTagIds = sanitizeTagIds(ownerId, rawFilters.tagIds(), impossible);
 
         KnowledgeQueryFilters sanitizedFilters = new KnowledgeQueryFilters(
                 sanitizedResourceIds,
@@ -50,10 +53,11 @@ public class QueryPlanValidator {
                 rawFilters.resourceType(),
                 rawFilters.favorite(),
                 rawFilters.createdAfter(),
-                rawFilters.createdBefore()
+                rawFilters.createdBefore(),
+                impossible[0]
         );
 
-        // If mode was FILTERED_HYBRID but no filters remain, convert to HYBRID
+        // If mode was FILTERED_HYBRID but no filters remain and not impossible, convert to HYBRID
         if (mode == QueryMode.FILTERED_HYBRID && sanitizedFilters.isEmpty()) {
             mode = QueryMode.HYBRID;
         }
@@ -62,8 +66,12 @@ public class QueryPlanValidator {
     }
 
     private Set<Long> sanitizeResourceIds(Long ownerId, Set<Long> requested, RetrievalScope scope,
-                                          Long thisResourceId, List<Long> selectedResourceIds) {
+                                          Long thisResourceId, List<Long> selectedResourceIds, boolean[] impossible) {
         if (scope == RetrievalScope.THIS_RESOURCE && thisResourceId != null) {
+            if (requested != null && !requested.isEmpty() && !requested.contains(thisResourceId)) {
+                impossible[0] = true;
+                return Set.of(-1L);
+            }
             return Set.of(thisResourceId);
         }
 
@@ -73,7 +81,11 @@ public class QueryPlanValidator {
             }
             Set<Long> intersection = new HashSet<>(requested);
             intersection.retainAll(selectedResourceIds);
-            return intersection.isEmpty() ? new HashSet<>(selectedResourceIds) : intersection;
+            if (intersection.isEmpty()) {
+                impossible[0] = true;
+                return Set.of(-1L);
+            }
+            return intersection;
         }
 
         if (requested == null || requested.isEmpty()) {
@@ -88,11 +100,20 @@ public class QueryPlanValidator {
                 params,
                 (rs, rowNum) -> rs.getLong("id")
         );
-        return valid.isEmpty() ? null : new HashSet<>(valid);
+        if (valid.isEmpty()) {
+            impossible[0] = true;
+            return Set.of(-1L);
+        }
+        return new HashSet<>(valid);
     }
 
-    private Set<Long> sanitizeCollectionIds(Long ownerId, Set<Long> requested, RetrievalScope scope, Long scopedCollectionId) {
+    private Set<Long> sanitizeCollectionIds(Long ownerId, Set<Long> requested, RetrievalScope scope,
+                                            Long scopedCollectionId, boolean[] impossible) {
         if (scope == RetrievalScope.COLLECTION && scopedCollectionId != null) {
+            if (requested != null && !requested.isEmpty() && !requested.contains(scopedCollectionId)) {
+                impossible[0] = true;
+                return Set.of(-1L);
+            }
             return Set.of(scopedCollectionId);
         }
 
@@ -108,10 +129,14 @@ public class QueryPlanValidator {
                 params,
                 (rs, rowNum) -> rs.getLong("id")
         );
-        return valid.isEmpty() ? null : new HashSet<>(valid);
+        if (valid.isEmpty()) {
+            impossible[0] = true;
+            return Set.of(-1L);
+        }
+        return new HashSet<>(valid);
     }
 
-    private Set<Long> sanitizeTagIds(Long ownerId, Set<Long> requested) {
+    private Set<Long> sanitizeTagIds(Long ownerId, Set<Long> requested, boolean[] impossible) {
         if (requested == null || requested.isEmpty()) {
             return null;
         }
@@ -124,6 +149,10 @@ public class QueryPlanValidator {
                 params,
                 (rs, rowNum) -> rs.getLong("id")
         );
-        return valid.isEmpty() ? null : new HashSet<>(valid);
+        if (valid.isEmpty()) {
+            impossible[0] = true;
+            return Set.of(-1L);
+        }
+        return new HashSet<>(valid);
     }
 }

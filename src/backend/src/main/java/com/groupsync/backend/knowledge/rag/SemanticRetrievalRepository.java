@@ -22,6 +22,9 @@ public class SemanticRetrievalRepository {
     public List<RetrievedChunk> findNearest(Long ownerId, float[] embedding, RetrievalScope scope,
             Long resourceId, List<Long> selectedResourceIds, Long collectionId,
             KnowledgeQueryFilters filters, int limit) {
+        if (filters != null && filters.impossible()) {
+            return List.of();
+        }
         StringBuilder sql = new StringBuilder("""
                 SELECT dc.id, dc.resource_id, r.title, dc.chunk_index, dc.page_number, dc.section, dc.content,
                        dc.embedding <=> CAST(:embedding AS vector) AS distance

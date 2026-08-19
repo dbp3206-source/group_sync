@@ -37,6 +37,9 @@ public class KeywordRetrievalStrategy implements RetrievalStrategy {
     public List<RetrievedChunk> retrieve(Long ownerId, String question, RetrievalScope scope,
                                          Long resourceId, List<Long> selectedResourceIds,
                                          Long collectionId, KnowledgeQueryFilters filters, int limit) {
+        if (filters != null && filters.impossible()) {
+            return List.of();
+        }
         if (question == null || question.isBlank()) {
             throw new IllegalArgumentException("A question is required.");
         }

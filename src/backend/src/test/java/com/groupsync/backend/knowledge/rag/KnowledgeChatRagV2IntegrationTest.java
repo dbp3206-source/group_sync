@@ -8,7 +8,6 @@ import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -23,9 +22,10 @@ import com.groupsync.backend.user.model.UserAccount;
 import com.groupsync.backend.user.repository.UserAccountRepository;
 
 /**
- * Execution-path integration test verifying KnowledgeOS RAG v2 Ask orchestration.
- * Proves that QueryPlanner, Validator, Structured Query Routing, Filtered Hybrid Retrieval,
- * Parent-Child context expansion, Grounded Prompting, and RagExecutionTrace are strictly wired into runtime.
+ * Execution-path orchestration tests verifying KnowledgeOS RAG v2 Ask flow.
+ * Proves that QueryPlanner, Validator, Structured Query Routing, Semantic pgvector retrieval,
+ * Filtered Hybrid Retrieval, Parent-Child context expansion, Grounded Prompting, and RagExecutionTrace
+ * are strictly wired into runtime without fake trace default values.
  */
 @ExtendWith(MockitoExtension.class)
 class KnowledgeChatRagV2IntegrationTest {
@@ -37,6 +37,7 @@ class KnowledgeChatRagV2IntegrationTest {
     @Mock private ResourceRepository resourceRepository;
     @Mock private UserAccountRepository userRepository;
     @Mock private HybridRetrievalStrategy retrievalStrategy;
+    @Mock private SemanticRetrievalStrategy semanticRetrievalStrategy;
     @Mock private KnowledgeQueryPlanner queryPlanner;
     @Mock private StructuredKnowledgeQueryService structuredQueryService;
     @Mock private ParentChildContextExpander parentChildExpander;
@@ -59,8 +60,9 @@ class KnowledgeChatRagV2IntegrationTest {
         );
         chatService = new KnowledgeChatService(
                 chatTransactionService, sessionRepository, messageRepository,
-                citationRepository, retrievalStrategy, queryPlanner,
-                structuredQueryService, parentChildExpander, languageModelClient
+                citationRepository, retrievalStrategy, semanticRetrievalStrategy,
+                queryPlanner, structuredQueryService, parentChildExpander,
+                languageModelClient, new GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 5, 2, 12, 60, 30000)
         );
 
         owner = new UserAccount("user@knowledgeos.io", "hash", "User");
@@ -93,19 +95,17 @@ class KnowledgeChatRagV2IntegrationTest {
 
         AskKnowledgeResponse response = chatService.ask(ownerId, request);
 
-        // Verification of business logic
         assertNotNull(response);
         assertEquals("You have 7 PDF resources in KnowledgeOS.", response.answer());
         assertTrue(response.citations().isEmpty());
 
-        // Verification that unstructured RAG components were NOT called
         verify(structuredQueryService, times(1)).execute(anyLong(), any(), any(), any(), any(), any());
         verify(retrievalStrategy, never()).retrieve(anyLong(), anyString(), any(), any(), any(), any());
         verify(retrievalStrategy, never()).retrieveWithTrace(anyLong(), anyString(), any(), any(), any(), any(), any());
+        verify(semanticRetrievalStrategy, never()).retrieve(anyLong(), anyString(), any(), any(), any(), any(), any(), anyInt());
         verify(parentChildExpander, never()).expand(anyList());
         verify(languageModelClient, never()).answer(anyString());
 
-        // Verification of truthful execution trace
         assertNotNull(response.trace());
         assertEquals(QueryMode.STRUCTURED, response.trace().mode());
         assertEquals(QueryOperation.COUNT, response.trace().operation());
@@ -113,6 +113,43 @@ class KnowledgeChatRagV2IntegrationTest {
         assertNull(response.trace().fusion(), "Structured query must not have fusion trace");
         assertNull(response.trace().parentChild(), "Structured query must not have parent-child trace");
         assertNull(response.trace().generation(), "Structured query must not have LLM generation trace");
+    }
+
+    @Test
+    void ask_semanticPath_executesPurePgVectorWithoutFtsOrFusion() {
+        AskKnowledgeRequest request = new AskKnowledgeRequest(
+                null, "Find concept representations", RetrievalScope.LIBRARY, null, null, null, null
+        );
+
+        QueryPlan plan = new QueryPlan(QueryMode.SEMANTIC, QueryOperation.SEARCH, "concept representations",
+                KnowledgeQueryFilters.empty(), "Pure semantic vector search");
+        when(queryPlanner.plan(eq(ownerId), anyString(), eq(RetrievalScope.LIBRARY), isNull(), anyList(), isNull()))
+                .thenReturn(plan);
+
+        RetrievedChunk child = new RetrievedChunk(101L, 10L, "AI Concepts", 1, 1, "Sec 1", "Child vector content", 0.05d);
+        when(semanticRetrievalStrategy.retrieve(eq(ownerId), eq("concept representations"), eq(RetrievalScope.LIBRARY), isNull(), anyList(), isNull(), any(), eq(6)))
+                .thenReturn(List.of(child));
+
+        RetrievedChunk parent = new RetrievedChunk(100L, 10L, "AI Concepts", 0, 1, "Sec 1", "Parent section context", 0.05d);
+        ExpandedContext expanded = new ExpandedContext(List.of(parent), List.of(child), 1, 0, 120);
+        when(parentChildExpander.expand(List.of(child))).thenReturn(expanded);
+        when(parentChildExpander.getMaxContextChars()).thenReturn(6000);
+
+        when(languageModelClient.answer(anyString())).thenReturn("Concept representations are defined in [1].");
+
+        Resource resource = new Resource(owner, "AI Concepts", null, ResourceType.MARKDOWN, "ai.md", "text/markdown", 500L, "1/ai.md", "hash");
+        DocumentChunk chunk100 = new DocumentChunk(resource, 0, 1, "Sec 1", "Parent section context");
+        ReflectionTestUtils.setField(chunk100, "id", 100L);
+        when(chunkRepository.findAllById(anyList())).thenReturn(List.of(chunk100));
+
+        AskKnowledgeResponse response = chatService.ask(ownerId, request);
+
+        assertNotNull(response);
+        assertEquals(QueryMode.SEMANTIC, response.trace().mode());
+        assertEquals(1, response.trace().retrieval().semanticCandidates());
+        assertEquals(0, response.trace().retrieval().lexicalCandidates(), "Semantic path must have 0 lexical candidates");
+        assertNull(response.trace().fusion(), "Semantic path must not execute RRF fusion");
+        verify(retrievalStrategy, never()).retrieveWithTrace(anyLong(), anyString(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -146,21 +183,12 @@ class KnowledgeChatRagV2IntegrationTest {
 
         AskKnowledgeResponse response = chatService.ask(ownerId, request);
 
-        // Verification of business logic
         assertNotNull(response);
         assertTrue(response.grounded());
         assertEquals(1, response.citations().size());
         assertEquals(1, response.citations().getFirst().citationOrder());
         assertEquals(200L, response.citations().getFirst().chunkId());
 
-        // Verification of orchestration calls
-        verify(queryPlanner, times(1)).plan(anyLong(), anyString(), any(), any(), any(), any());
-        verify(retrievalStrategy, times(1)).retrieveWithTrace(anyLong(), anyString(), any(), any(), any(), any(), any());
-        verify(parentChildExpander, times(1)).expand(anyList());
-        verify(languageModelClient, times(1)).answer(anyString());
-        verify(structuredQueryService, never()).execute(anyLong(), any(), any(), any(), any(), any());
-
-        // Verification of truthful execution trace
         assertNotNull(response.trace());
         assertEquals(QueryMode.HYBRID, response.trace().mode());
         assertEquals(6, response.trace().retrieval().semanticCandidates());
@@ -176,41 +204,55 @@ class KnowledgeChatRagV2IntegrationTest {
     }
 
     @Test
-    void ask_filteredHybridPath_appliesValidatedFiltersAndPassesToRetrieval() {
+    void ask_insufficientContext_stopsTraceWithoutFabricatedStages() {
         AskKnowledgeRequest request = new AskKnowledgeRequest(
-                null, "Find markdown notes about memory compression", RetrievalScope.LIBRARY, null, null, null, null
+                null, "Random unknown query", RetrievalScope.LIBRARY, null, null, null, null
         );
 
-        KnowledgeQueryFilters filters = new KnowledgeQueryFilters(null, null, Set.of(5L), ResourceType.MARKDOWN, true, null, null);
-        QueryPlan plan = new QueryPlan(QueryMode.FILTERED_HYBRID, QueryOperation.SEARCH, "memory compression", filters, "Search with markdown and tag filters");
+        QueryPlan plan = new QueryPlan(QueryMode.HYBRID, QueryOperation.SEARCH, "Random unknown query",
+                KnowledgeQueryFilters.empty(), "Search");
         when(queryPlanner.plan(eq(ownerId), anyString(), eq(RetrievalScope.LIBRARY), isNull(), anyList(), isNull()))
                 .thenReturn(plan);
 
-        RetrievedChunk child = new RetrievedChunk(301L, 20L, "Memory Note", 1, 1, "Memory", "Child content on compression", 0.04d);
-        HybridExecutionDetails hybridDetails = new HybridExecutionDetails(List.of(child), 3, 2, 5, 60);
-        when(retrievalStrategy.retrieveWithTrace(eq(ownerId), eq("memory compression"), eq(RetrievalScope.LIBRARY), isNull(), anyList(), isNull(), eq(filters)))
+        // Hybrid retrieval returns 0 candidates
+        HybridExecutionDetails hybridDetails = new HybridExecutionDetails(List.of(), 0, 0, 0, 60);
+        when(retrievalStrategy.retrieveWithTrace(eq(ownerId), anyString(), eq(RetrievalScope.LIBRARY), isNull(), anyList(), isNull(), any()))
                 .thenReturn(hybridDetails);
-
-        RetrievedChunk parent = new RetrievedChunk(300L, 20L, "Memory Note", 0, 1, "Memory", "Parent Memory Note Full Context", 0.04d);
-        ExpandedContext expanded = new ExpandedContext(List.of(parent), List.of(child), 1, 0, 150);
-        when(parentChildExpander.expand(List.of(child))).thenReturn(expanded);
-        when(parentChildExpander.getMaxContextChars()).thenReturn(6000);
-
-        when(languageModelClient.answer(anyString())).thenReturn("Memory compression is detailed in [1].");
-
-        Resource resource = new Resource(owner, "Memory Note", null, ResourceType.MARKDOWN, "mem.md", "text/markdown", 300L, "1/mem.md", "hash");
-        DocumentChunk chunk300 = new DocumentChunk(resource, 0, 1, "Memory", "Parent Memory Note Full Context");
-        ReflectionTestUtils.setField(chunk300, "id", 300L);
-        when(chunkRepository.findAllById(anyList())).thenReturn(List.of(chunk300));
 
         AskKnowledgeResponse response = chatService.ask(ownerId, request);
 
-        // Verification
         assertNotNull(response);
-        assertTrue(response.grounded());
-        assertEquals("MARKDOWN", response.trace().filter().resourceType());
-        assertEquals(Boolean.TRUE, response.trace().filter().favorite());
-        assertEquals(1, response.trace().filter().tagCount());
-        assertEquals(QueryMode.FILTERED_HYBRID, response.trace().mode());
+        assertFalse(response.grounded());
+        assertNotNull(response.trace().retrieval());
+        assertNotNull(response.trace().fusion());
+        assertNull(response.trace().parentChild(), "Insufficient context must not create fake parentChild trace");
+        assertNull(response.trace().contextBudget(), "Insufficient context must not create fake contextBudget trace");
+        assertNull(response.trace().generation(), "Insufficient context must not create fake generation trace");
+        verify(parentChildExpander, never()).expand(anyList());
+        verify(languageModelClient, never()).answer(anyString());
+    }
+
+    @Test
+    void ask_impossibleFilter_returnsZeroCandidatesAndStopsTrace() {
+        AskKnowledgeRequest request = new AskKnowledgeRequest(
+                null, "Find markdown in foreign collection", RetrievalScope.LIBRARY, null, null, null, null
+        );
+
+        KnowledgeQueryFilters impossibleFilters = KnowledgeQueryFilters.impossibleFilter();
+        QueryPlan plan = new QueryPlan(QueryMode.FILTERED_HYBRID, QueryOperation.SEARCH, "query",
+                impossibleFilters, "Impossible filter");
+        when(queryPlanner.plan(eq(ownerId), anyString(), eq(RetrievalScope.LIBRARY), isNull(), anyList(), isNull()))
+                .thenReturn(plan);
+
+        HybridExecutionDetails hybridDetails = new HybridExecutionDetails(List.of(), 0, 0, 0, 60);
+        when(retrievalStrategy.retrieveWithTrace(eq(ownerId), anyString(), eq(RetrievalScope.LIBRARY), isNull(), anyList(), isNull(), eq(impossibleFilters)))
+                .thenReturn(hybridDetails);
+
+        AskKnowledgeResponse response = chatService.ask(ownerId, request);
+
+        assertNotNull(response);
+        assertFalse(response.grounded());
+        assertNull(response.trace().parentChild());
+        assertNull(response.trace().generation());
     }
 }

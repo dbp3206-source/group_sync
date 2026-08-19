@@ -136,10 +136,14 @@ public class ResourceIngestionTransactionService {
                         resource, parent, ChunkLevel.CHILD, 2,
                         hc.index(), hc.pageNumber(), hc.sectionTitle(), hc.content()
                 );
-                float[] emb = childEmbeddings.get(hc.index());
-                if (emb != null) {
-                    child.embed(emb, geminiProperties.embeddingModel());
+                float[] emb = childEmbeddings != null ? childEmbeddings.get(hc.index()) : null;
+                if (emb == null) {
+                    throw new IllegalStateException("Child chunk index " + hc.index() + " is missing vector embedding.");
                 }
+                if (emb.length != geminiProperties.embeddingDimensions()) {
+                    throw new IllegalStateException("Child chunk index " + hc.index() + " has invalid dimension " + emb.length + " (expected " + geminiProperties.embeddingDimensions() + ").");
+                }
+                child.embed(emb, geminiProperties.embeddingModel());
                 children.add(child);
             }
         }

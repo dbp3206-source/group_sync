@@ -36,6 +36,7 @@ public class ResourceService {
     private final CitationRepository citationRepository;
     private final DocumentChunkRepository chunkRepository;
     private final ResourceParserRegistry parserRegistry;
+    private final com.groupsync.backend.knowledge.rag.GeminiProperties geminiProperties;
 
     public ResourceService(
             @Value("${knowledge.upload.max-size:25MB}") org.springframework.util.unit.DataSize maxUploadSize,
@@ -46,6 +47,19 @@ public class ResourceService {
             CitationRepository citationRepository,
             DocumentChunkRepository chunkRepository,
             ResourceParserRegistry parserRegistry) {
+        this(maxUploadSize, resourceRepository, userRepository, storageService, events, citationRepository, chunkRepository, parserRegistry, null);
+    }
+
+    public ResourceService(
+            @Value("${knowledge.upload.max-size:25MB}") org.springframework.util.unit.DataSize maxUploadSize,
+            ResourceRepository resourceRepository,
+            UserAccountRepository userRepository,
+            StorageService storageService,
+            ApplicationEventPublisher events,
+            CitationRepository citationRepository,
+            DocumentChunkRepository chunkRepository,
+            ResourceParserRegistry parserRegistry,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) com.groupsync.backend.knowledge.rag.GeminiProperties geminiProperties) {
         this.maxUploadBytes = maxUploadSize != null ? maxUploadSize.toBytes() : 25L * 1024 * 1024;
         this.resourceRepository = resourceRepository;
         this.userRepository = userRepository;
@@ -54,6 +68,7 @@ public class ResourceService {
         this.citationRepository = citationRepository;
         this.chunkRepository = chunkRepository;
         this.parserRegistry = parserRegistry;
+        this.geminiProperties = geminiProperties;
     }
 
     public long getMaxUploadBytes() {
@@ -220,8 +235,10 @@ public class ResourceService {
             }
         }
 
+        boolean isV2 = maxVersion >= 2;
         int batchSize = 16;
-        int embeddingBatchCount = childCount > 0 ? (int) Math.ceil((double) childCount / batchSize) : 0;
+        int embeddingBatchCount = isV2 ? (childCount > 0 ? (int) Math.ceil((double) childCount / batchSize) : 0) : 0;
+        boolean semanticMetadataIncluded = isV2;
 
         return new ResourceIngestionTraceDto(
                 resource.getId(),
@@ -229,12 +246,12 @@ public class ResourceService {
                 resource.getResourceType().name(),
                 resource.getProcessingStatus().name(),
                 maxVersion,
-                parentCount,
-                childCount,
+                isV2 ? parentCount : 0,
+                isV2 ? childCount : chunks.size(),
                 embeddingBatchCount,
-                "gemini-embedding-001",
-                768,
-                true
+                geminiProperties != null ? geminiProperties.embeddingModel() : "gemini-embedding-001",
+                geminiProperties != null ? geminiProperties.embeddingDimensions() : 768,
+                semanticMetadataIncluded
         );
     }
 
