@@ -329,14 +329,21 @@ export default function KnowledgeLibraryPage() {
         </span>
       </div>
 
-      {error ? (
-        <div className="kos-error" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', padding: '2rem' }}>
-          <span>{error}</span>
-          <button type="button" className="kos-button kos-button--ghost" onClick={() => load()}>
-            Thử lại
-          </button>
+      {error && (
+        <div className="kos-error" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: '8px', marginBottom: '1.5rem' }}>
+          <span style={{ fontSize: '0.9rem' }}>{error}</span>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button type="button" className="kos-button kos-button--sm" onClick={() => load()}>
+              Thử lại
+            </button>
+            <button type="button" className="kos-icon-btn" onClick={() => setError('')} aria-label="Đóng thông báo lỗi">
+              <X size={15} />
+            </button>
+          </div>
         </div>
-      ) : resources.length ? (
+      )}
+
+      {resources.length ? (
         viewMode === 'GRAPH' ? (
           <KnowledgeGraphView
             resources={resources}

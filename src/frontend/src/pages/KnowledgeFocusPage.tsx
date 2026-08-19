@@ -983,7 +983,11 @@ export default function KnowledgeFocusPage() {
                         accept=".pdf,.docx,.txt,.md,.markdown"
                         hidden
                         disabled={uploadBusy}
-                        onChange={e => handleDirectUpload(e.target.files?.[0])}
+                        onChange={e => {
+                          const f = e.target.files?.[0]
+                          e.target.value = ''
+                          handleDirectUpload(f)
+                        }}
                       />
                     </label>
                   </div>
@@ -1124,6 +1128,7 @@ export default function KnowledgeFocusPage() {
                         disabled={uploadBusy}
                         onChange={async e => {
                           const file = e.target.files?.[0]
+                          e.target.value = ''
                           if (file) {
                             setUploadBusy(true)
                             try {

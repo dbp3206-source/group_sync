@@ -46,7 +46,7 @@ export default function KnowledgeInsightsPage() {
           </div>
           <div className="kos-composition">
             <h2>Library composition</h2>
-            {data.composition.length
+            {data.composition && data.composition.length
               ? data.composition.map(item => (
                   <div key={item.resourceType}>
                     <span>{item.resourceType}</span>
