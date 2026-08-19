@@ -64,7 +64,7 @@ const SMART_PROMPT_PILLS = [
 
 export default function KnowledgeAskPage() {
   const [params] = useSearchParams()
-  const initial = Number(params.get('resource'))
+  const initial = Number(params.get('resource') || params.get('resources'))
   const [resources, setResources] = useState<Resource[]>([])
   const [collections, setCollections] = useState<KnowledgeCollection[]>([])
   const [sessions, setSessions] = useState<ChatSession[]>([])

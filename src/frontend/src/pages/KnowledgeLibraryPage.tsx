@@ -90,9 +90,9 @@ export default function KnowledgeLibraryPage() {
   // Targeted polling: refreshes only in-flight resource items without collapsing loaded pages
   const isPollingRef = useRef(false)
   useEffect(() => {
-    const PROCESSING = new Set(['UPLOADING', 'PARSING', 'CHUNKING', 'EMBEDDING'])
+    const PROCESSING = new Set(['UPLOADED', 'UPLOADING', 'PARSING', 'CHUNKING', 'EMBEDDING', 'PROCESSING'])
     const interval = setInterval(async () => {
-      const processingIds = resources.filter(r => PROCESSING.has(r.processingStatus)).map(r => r.id)
+      const processingIds = resources.filter(r => r && PROCESSING.has(r.processingStatus)).map(r => r.id)
       if (processingIds.length === 0) return
       if (isPollingRef.current) return
       isPollingRef.current = true
@@ -112,7 +112,7 @@ export default function KnowledgeLibraryPage() {
       } finally {
         isPollingRef.current = false
       }
-    }, 4000)
+    }, 3000)
     return () => clearInterval(interval)
   }, [resources])
 
@@ -134,7 +134,7 @@ export default function KnowledgeLibraryPage() {
       setTitle('')
       setContent('')
       setOpen(false)
-      load()
+      await load(activeQueryRef.current, tagIdRef.current, collectionIdRef.current, 0, sortRef.current, false)
     } catch {
       setError('The note could not be saved.')
     }
@@ -146,9 +146,9 @@ export default function KnowledgeLibraryPage() {
     setError('')
     try {
       await uploadResource(file)
-      await load()
+      await load(activeQueryRef.current, tagIdRef.current, collectionIdRef.current, 0, sortRef.current, false)
     } catch {
-      setError('The resource could not be imported.')
+      setError('The resource could not be imported. Please verify file format and size.')
     } finally {
       setBusy(false)
     }
@@ -200,7 +200,11 @@ export default function KnowledgeLibraryPage() {
               accept=".pdf,.docx,.txt,.md,.markdown"
               hidden
               disabled={busy}
-              onChange={e => importFile(e.target.files?.[0])}
+              onChange={e => {
+                const f = e.target.files?.[0]
+                e.target.value = ''
+                importFile(f)
+              }}
             />
           </label>
           <button className="kos-button" onClick={() => setCollectionOpen(true)}>

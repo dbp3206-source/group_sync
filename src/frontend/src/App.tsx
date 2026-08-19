@@ -19,11 +19,16 @@ import KnowledgeAskPage from './pages/KnowledgeAskPage'
 import KnowledgeFocusPage from './pages/KnowledgeFocusPage'
 import KnowledgeInsightsPage from './pages/KnowledgeInsightsPage'
 import KnowledgeGuidePage from './pages/KnowledgeGuidePage'
+import ErrorBoundary from './components/ErrorBoundary'
 import ResourceWorkspacePage from './pages/ResourceWorkspacePage'
 
 function App() {
   return (
-    <BrowserRouter><AppShell /></BrowserRouter>
+    <BrowserRouter>
+      <ErrorBoundary>
+        <AppShell />
+      </ErrorBoundary>
+    </BrowserRouter>
   )
 }
 

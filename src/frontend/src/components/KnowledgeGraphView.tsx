@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom'
 import { type KnowledgeCollection, type KnowledgeTag, type Resource } from '../api/knowledge'
 
 interface KnowledgeGraphViewProps {
-  resources: Resource[]
-  collections: KnowledgeCollection[]
+  resources?: Resource[]
+  collections?: KnowledgeCollection[]
   tags?: KnowledgeTag[]
   totalItems?: number
 }
@@ -20,13 +20,17 @@ const TYPE_COLORS: Record<string, { bg: string; border: string; text: string; gl
 
 const DEFAULT_COLOR = { bg: '#f1f5f9', border: '#64748b', text: '#334155', glow: 'rgba(100, 116, 139, 0.3)' }
 
-export default function KnowledgeGraphView({ resources, collections, tags = [], totalItems }: KnowledgeGraphViewProps) {
+export default function KnowledgeGraphView({ resources = [], collections = [], tags = [], totalItems }: KnowledgeGraphViewProps) {
   const [hoveredNode, setHoveredNode] = useState<number | null>(null)
   const [selectedType, setSelectedType] = useState<string>('ALL')
 
+  const safeResources = (resources || []).filter((r): r is Resource => Boolean(r && r.id))
+  const safeCollections = (collections || []).filter((c): c is KnowledgeCollection => Boolean(c && c.id))
+  const safeTags = tags || []
+
   const filteredResources = selectedType === 'ALL'
-    ? resources
-    : resources.filter(r => r.resourceType.toUpperCase() === selectedType.toUpperCase())
+    ? safeResources
+    : safeResources.filter(r => (r.resourceType || '').toUpperCase() === selectedType.toUpperCase())
 
   // Dynamic layout calculation for SVG Canvas (860 x 520)
   const width = 860
@@ -35,13 +39,13 @@ export default function KnowledgeGraphView({ resources, collections, tags = [], 
   const centerY = height / 2
 
   // Hub Collections nodes
-  const collectionNodes = collections.map((col, idx) => {
-    const angle = (idx / (collections.length || 1)) * 2 * Math.PI - Math.PI / 2
+  const collectionNodes = safeCollections.map((col, idx) => {
+    const angle = (idx / (safeCollections.length || 1)) * 2 * Math.PI - Math.PI / 2
     const radius = 130
     return {
       id: `col-${col.id}`,
       rawId: col.id,
-      name: col.name,
+      name: col.name || 'Unnamed',
       x: centerX + Math.cos(angle) * radius,
       y: centerY + Math.sin(angle) * radius,
       type: 'COLLECTION',
@@ -57,13 +61,14 @@ export default function KnowledgeGraphView({ resources, collections, tags = [], 
     const x = centerX + Math.cos(angle) * radius
     const y = centerY + Math.sin(angle) * radius
 
-    const colors = TYPE_COLORS[res.resourceType.toUpperCase()] || DEFAULT_COLOR
+    const typeKey = (res.resourceType || 'NOTE').toUpperCase()
+    const colors = TYPE_COLORS[typeKey] || DEFAULT_COLOR
 
     return {
       id: `res-${res.id}`,
       rawId: res.id,
-      title: res.title,
-      type: res.resourceType,
+      title: res.title || 'Untitled',
+      type: res.resourceType || 'DOC',
       x,
       y,
       colors,
@@ -87,7 +92,6 @@ export default function KnowledgeGraphView({ resources, collections, tags = [], 
 
   // Links from collections or center to resources
   resourceNodes.forEach(res => {
-    // Connect directly to KnowledgeOS core hub
     const isConnected = hoveredNode === res.rawId
 
     links.push({
@@ -102,10 +106,10 @@ export default function KnowledgeGraphView({ resources, collections, tags = [], 
 
   return (
     <div className="kos-graph-container">
-      {totalItems !== undefined && totalItems > resources.length && (
+      {totalItems !== undefined && totalItems > safeResources.length && (
         <div style={{ padding: '0.45rem 0.85rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--kos-border, rgba(255,255,255,0.08))', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--kos-text-muted, #94a3b8)', marginBottom: '0.75rem' }}>
           <Sparkles size={13} style={{ verticalAlign: 'middle', marginRight: '0.35rem', color: 'var(--kos-accent, #60a5fa)' }} />
-          <span>Showing relationships among {resources.length} loaded resources ({totalItems} total in library). Load more in the grid view to expand this graph.</span>
+          <span>Showing relationships among {safeResources.length} loaded resources ({totalItems} total in library). Load more in the grid view to expand this graph.</span>
         </div>
       )}
       {/* Graph Toolbar */}
@@ -119,10 +123,10 @@ export default function KnowledgeGraphView({ resources, collections, tags = [], 
             className={`kos-legend-pill ${selectedType === 'ALL' ? 'is-active' : ''}`}
             onClick={() => setSelectedType('ALL')}
           >
-            Tất cả ({resources.length})
+            Tất cả ({safeResources.length})
           </button>
           {['PDF', 'DOCX', 'MARKDOWN', 'NOTE'].map(t => {
-            const count = resources.filter(r => r.resourceType.toUpperCase() === t).length
+            const count = safeResources.filter(r => (r.resourceType || '').toUpperCase() === t).length
             if (!count) return null
             return (
               <button
@@ -145,7 +149,7 @@ export default function KnowledgeGraphView({ resources, collections, tags = [], 
         <div className="kos-graph-stats">
           <Sparkles size={14} className="kos-text-amber" />
           <span>
-            {filteredResources.length} Node tri thức • {collections.length} Cụm chủ đề • {tags.length} Thẻ
+            {filteredResources.length} Node tri thức • {safeCollections.length} Cụm chủ đề • {safeTags.length} Thẻ
           </span>
         </div>
       </div>
@@ -279,7 +283,7 @@ export default function KnowledgeGraphView({ resources, collections, tags = [], 
                     fill={node.colors.text}
                     className="kos-node-initial"
                   >
-                    {node.type.slice(0, 3)}
+                    {(node.type || 'DOC').slice(0, 3)}
                   </text>
 
                   {/* Node Label Below */}
@@ -289,7 +293,7 @@ export default function KnowledgeGraphView({ resources, collections, tags = [], 
                     textAnchor="middle"
                     className="kos-node-label"
                   >
-                    {node.title.length > 16 ? `${node.title.slice(0, 14)}…` : node.title}
+                    {(node.title || 'Untitled').length > 16 ? `${(node.title || 'Untitled').slice(0, 14)}…` : (node.title || 'Untitled')}
                   </text>
                 </Link>
               </g>
@@ -299,21 +303,22 @@ export default function KnowledgeGraphView({ resources, collections, tags = [], 
 
         {/* Floating Tooltip Card for Active Hovered Node */}
         {hoveredNode !== null && (() => {
-          const res = resources.find(r => r.id === hoveredNode)
+          const res = safeResources.find(r => r.id === hoveredNode)
           if (!res) return null
-          const colors = TYPE_COLORS[res.resourceType.toUpperCase()] || DEFAULT_COLOR
+          const typeKey = (res.resourceType || 'NOTE').toUpperCase()
+          const colors = TYPE_COLORS[typeKey] || DEFAULT_COLOR
 
           return (
             <div className="kos-graph-tooltip" style={{ borderColor: colors.border }}>
               <div className="kos-tooltip-header">
                 <span className="kos-tooltip-badge" style={{ background: colors.bg, color: colors.text }}>
-                  {res.resourceType}
+                  {res.resourceType || 'DOCUMENT'}
                 </span>
                 <span className="kos-tooltip-status">
                   {res.processingStatus === 'READY' ? '🟢 Sẵn sàng tra cứu' : res.processingStatus}
                 </span>
               </div>
-              <h4 className="kos-tooltip-title">{res.title}</h4>
+              <h4 className="kos-tooltip-title">{res.title || 'Untitled'}</h4>
               <p className="kos-tooltip-hint">
                 👉 Nhấp chuột để mở không gian nghiên cứu tài liệu (Workspace)
               </p>

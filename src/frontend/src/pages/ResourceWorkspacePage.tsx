@@ -10,7 +10,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   autoOrganizeResource,
@@ -40,7 +40,9 @@ import KnowledgeGraphView from '../components/KnowledgeGraphView'
 type Tab = 'Overview' | 'Reader' | 'Notes' | 'Related' | 'Activity'
 
 export default function ResourceWorkspacePage() {
-  const resourceId = Number(useParams().resourceId)
+  const params = useParams()
+  const rawId = params.resourceId || params.id
+  const resourceId = Number(rawId)
   const navigate = useNavigate()
 
   // Core metadata state
@@ -48,6 +50,7 @@ export default function ResourceWorkspacePage() {
   const [activity, setActivity] = useState<ResourceActivity | null>(null)
   const [ingestionTrace, setIngestionTrace] = useState<ResourceIngestionTrace | null>(null)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
 
   // Active tab
   const [tab, setTab] = useState<Tab>('Overview')
@@ -77,38 +80,55 @@ export default function ResourceWorkspacePage() {
   const [deleting, setDeleting] = useState(false)
   const [progressVal, setProgressVal] = useState<number | null>(null)
 
-  // Step 1: Initial load fetches resource metadata, activity & ingestion trace
-  useEffect(() => {
-    let active = true
+  const loadResourceData = useCallback(async (id: number) => {
+    if (!id || isNaN(id)) {
+      setError('Mã tài liệu không hợp lệ.')
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
     setError('')
+
+    try {
+      const [resResult, actResult, traceResult] = await Promise.allSettled([
+        getResource(id),
+        getResourceActivity(id),
+        getResourceIngestionTrace(id),
+      ])
+
+      if (resResult.status === 'fulfilled' && resResult.value) {
+        setResource(resResult.value)
+      } else {
+        setError('Không thể tải thông tin tài liệu. Tài liệu có thể không tồn tại hoặc đã bị xoá.')
+      }
+
+      if (actResult.status === 'fulfilled' && actResult.value) {
+        setActivity(actResult.value)
+      }
+
+      if (traceResult.status === 'fulfilled' && traceResult.value) {
+        setIngestionTrace(traceResult.value)
+      }
+    } catch {
+      setError('Đã xảy ra lỗi khi tải không gian làm việc.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
     setContent(null)
     setNotes(null)
     setRelated(null)
     setGraphDataLoaded(false)
+    loadResourceData(resourceId)
+  }, [resourceId, loadResourceData])
 
-    Promise.all([
-      getResource(resourceId),
-      getResourceActivity(resourceId),
-      getResourceIngestionTrace(resourceId).catch(() => null),
-    ])
-      .then(([item, act, trace]) => {
-        if (!active) return
-        setResource(item)
-        setActivity(act)
-        if (trace) setIngestionTrace(trace)
-      })
-      .catch(() => {
-        if (!active) return
-        setError('This resource could not be loaded.')
-      })
-
-    return () => {
-      active = false
-    }
-  }, [resourceId])
-
-  // Step 2: Lazy loading on tab activation
+  // Lazy loading on tab activation
   useEffect(() => {
+    if (!resourceId || isNaN(resourceId)) return
+
     if (tab === 'Reader' && content === null && !contentLoading) {
       setContentLoading(true)
       setContentError('')
@@ -119,30 +139,31 @@ export default function ResourceWorkspacePage() {
     } else if (tab === 'Notes' && notes === null && !notesLoading) {
       setNotesLoading(true)
       getResourceNotes(resourceId)
-        .then(n => setNotes(n))
+        .then(n => setNotes(n || []))
         .catch(() => setNotes([]))
         .finally(() => setNotesLoading(false))
     } else if (tab === 'Related' && related === null && !relatedLoading) {
       setRelatedLoading(true)
       getRelatedResources(resourceId)
-        .then(r => setRelated(r))
-        .catch(() => setRelated([]) )
+        .then(r => setRelated(r || []))
+        .catch(() => setRelated([]))
         .finally(() => setRelatedLoading(false))
     } else if (tab === 'Activity' && !graphDataLoaded) {
       setGraphDataLoaded(true)
-      Promise.all([
-        getResources().then(r => r.items).catch(() => []),
-        getCollections().catch(() => []),
-        getTags().catch(() => []),
+      Promise.allSettled([
+        getResources(undefined, undefined, undefined, 0, 24).then(r => r.items),
+        getCollections(),
+        getTags(),
       ]).then(([allR, cols, t]) => {
-        setAllResources(allR)
-        setCollections(cols)
-        setTags(t)
+        if (allR.status === 'fulfilled') setAllResources(allR.value || [])
+        if (cols.status === 'fulfilled') setCollections(cols.value || [])
+        if (t.status === 'fulfilled') setTags(t.value || [])
       })
     }
   }, [tab, resourceId, content, contentLoading, notes, notesLoading, related, relatedLoading, graphDataLoaded])
 
   function handleRetryReader() {
+    if (!resourceId || isNaN(resourceId)) return
     setContentLoading(true)
     setContentError('')
     getResourceContent(resourceId)
@@ -152,6 +173,7 @@ export default function ResourceWorkspacePage() {
   }
 
   async function handleAutoOrganize() {
+    if (!resourceId || isNaN(resourceId)) return
     setOrganizing(true)
     setAutoOrganizeMsg('')
     try {
@@ -159,7 +181,7 @@ export default function ResourceWorkspacePage() {
       setAutoOrganizeMsg('Đã tự động phân loại vào Collection & Tags phù hợp!')
       setTimeout(() => setAutoOrganizeMsg(''), 4000)
       if (related !== null) {
-        getRelatedResources(resourceId).then(r => setRelated(r)).catch(() => {})
+        getRelatedResources(resourceId).then(r => setRelated(r || [])).catch(() => {})
       }
     } catch {
       setAutoOrganizeMsg('Không thể tự động phân loại.')
@@ -170,13 +192,13 @@ export default function ResourceWorkspacePage() {
 
   async function addNote(e: React.FormEvent) {
     e.preventDefault()
-    if (!draft.trim()) return
+    if (!draft.trim() || !resourceId || isNaN(resourceId)) return
     setNoteBusy(true)
     try {
       const created = await createResourceNote(resourceId, draft.trim())
       setNotes(prev => (prev ? [created, ...prev] : [created]))
       setDraft('')
-      setActivity(prev => (prev ? { ...prev, noteCount: prev.noteCount + 1 } : prev))
+      setActivity(prev => (prev ? { ...prev, noteCount: (prev.noteCount || 0) + 1 } : prev))
     } catch {
       setError('Could not save note.')
     } finally {
@@ -185,16 +207,18 @@ export default function ResourceWorkspacePage() {
   }
 
   async function removeNote(noteId: number) {
+    if (!resourceId || isNaN(resourceId)) return
     try {
       await deleteResourceNote(resourceId, noteId)
       setNotes(prev => (prev ? prev.filter(n => n.id !== noteId) : []))
-      setActivity(prev => (prev ? { ...prev, noteCount: Math.max(0, prev.noteCount - 1) } : prev))
+      setActivity(prev => (prev ? { ...prev, noteCount: Math.max(0, (prev.noteCount || 0) - 1) } : prev))
     } catch {
       setError('Could not delete note.')
     }
   }
 
   async function saveProgress(percent: number) {
+    if (!resourceId || isNaN(resourceId)) return
     try {
       const updated = await updateResourceProgress(resourceId, percent)
       setActivity(updated)
@@ -205,6 +229,7 @@ export default function ResourceWorkspacePage() {
   }
 
   async function handleDelete() {
+    if (!resourceId || isNaN(resourceId)) return
     if (!deleteConfirm) {
       setDeleteConfirm(true)
       return
@@ -221,29 +246,42 @@ export default function ResourceWorkspacePage() {
     }
   }
 
-  if (error && !resource)
+  if (loading) {
     return (
       <section className="kos-page">
-        <p className="kos-error" role="alert">
-          {error}
-        </p>
-      </section>
-    )
-
-  if (!resource)
-    return (
-      <section className="kos-page">
-        <div className="kos-empty" aria-live="polite">
-          <FileText size={28} aria-hidden="true" />
-          <p>Loading resource…</p>
+        <div className="kos-empty" aria-live="polite" style={{ padding: '4rem 1rem', textAlign: 'center' }}>
+          <Loader2 size={32} className="kos-spin-fast" style={{ margin: '0 auto 1rem' }} />
+          <h2>Đang mở không gian tài liệu...</h2>
+          <p>Đang nạp thông tin và bối cảnh tri thức từ KnowledgeOS</p>
         </div>
       </section>
     )
+  }
+
+  if (error || !resource) {
+    return (
+      <section className="kos-page">
+        <div className="kos-empty" role="alert" style={{ padding: '4rem 1rem', textAlign: 'center' }}>
+          <FileText size={32} style={{ margin: '0 auto 1rem', color: 'var(--kos-danger, #ef4444)' }} />
+          <h2>{error || 'Không tìm thấy tài liệu'}</h2>
+          <p>Tài liệu này có thể đã bị xóa hoặc bạn không có quyền truy cập.</p>
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1.5rem' }}>
+            <button type="button" className="kos-button" onClick={() => navigate('/library')}>
+              <ArrowLeft size={16} /> Quay lại Thư viện
+            </button>
+            <button type="button" className="kos-button kos-button--primary" onClick={() => loadResourceData(resourceId)}>
+              <RefreshCw size={16} /> Thử lại
+            </button>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   const metaItems = [
-    { label: 'Type', value: resource.resourceType },
-    { label: 'Status', value: resource.processingStatus },
-    { label: 'Priority', value: resource.priority },
+    { label: 'Type', value: resource.resourceType || 'DOCUMENT' },
+    { label: 'Status', value: resource.processingStatus || 'READY' },
+    { label: 'Priority', value: resource.priority ?? 0 },
     { label: 'Favorite', value: resource.favorite ? 'Yes' : 'No' },
     { label: 'Filename', value: resource.originalFilename || '—' },
     {
@@ -252,7 +290,7 @@ export default function ResourceWorkspacePage() {
         ? `${(resource.sizeBytes / 1024).toFixed(1)} KB`
         : '—',
     },
-    { label: 'Created', value: new Date(resource.createdAt).toLocaleString() },
+    { label: 'Created', value: resource.createdAt ? new Date(resource.createdAt).toLocaleString() : '—' },
   ]
 
   return (
@@ -267,11 +305,11 @@ export default function ResourceWorkspacePage() {
         >
           <ArrowLeft size={16} />
         </button>
-        <span className="kos-workspace-type-badge">{resource.resourceType}</span>
-        <h1 className="kos-workspace-title">{resource.title}</h1>
+        <span className="kos-workspace-type-badge">{resource.resourceType || 'DOCUMENT'}</span>
+        <h1 className="kos-workspace-title">{resource.title || 'Untitled'}</h1>
         <div className="kos-workspace-actions">
           <Link
-            to={`/knowledge/ask?resources=${resource.id}`}
+            to={`/ask?resource=${resource.id}`}
             className="kos-button kos-button--primary"
           >
             <BrainCircuit size={16} /> Ask with this source
@@ -349,24 +387,24 @@ export default function ResourceWorkspacePage() {
                   <div>
                     <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Structure-aware Chunking</small>
                     <strong style={{ fontSize: '0.9rem' }}>
-                      {ingestionTrace.chunkingVersion >= 2 ? (
-                        `${ingestionTrace.parentChunkCount} Parents (~1500 chars) · ${ingestionTrace.childChunkCount} Children (~500 chars)`
+                      {(ingestionTrace.chunkingVersion ?? 2) >= 2 ? (
+                        `${ingestionTrace.parentChunkCount ?? 0} Parents (~1500 chars) · ${ingestionTrace.childChunkCount ?? 0} Children (~500 chars)`
                       ) : (
-                        `${ingestionTrace.childChunkCount} Chunks (Legacy Flat Index)`
+                        `${ingestionTrace.childChunkCount ?? 0} Chunks (Legacy Flat Index)`
                       )}
                     </strong>
                   </div>
                   <div>
                     <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Vector Embeddings</small>
                     <strong style={{ fontSize: '0.9rem' }}>
-                      {ingestionTrace.embeddingModel} ({ingestionTrace.embeddingDimensions}d)
-                      {ingestionTrace.chunkingVersion >= 2 && ingestionTrace.embeddingBatchCount > 0 ? ` · ${ingestionTrace.embeddingBatchCount} Embedding Batches` : ''}
+                      {ingestionTrace.embeddingModel || 'gemini-embedding-001'} ({ingestionTrace.embeddingDimensions || 768}d)
+                      {(ingestionTrace.chunkingVersion ?? 2) >= 2 && (ingestionTrace.embeddingBatchCount || 0) > 0 ? ` · ${ingestionTrace.embeddingBatchCount} Embedding Batches` : ''}
                     </strong>
                   </div>
                   <div>
                     <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Chunking Engine Version</small>
                     <strong style={{ fontSize: '0.9rem' }}>
-                      v{ingestionTrace.chunkingVersion} {ingestionTrace.chunkingVersion >= 2 ? '(Hierarchical Parent–Child)' : '(Legacy Flat Chunking)'}
+                      v{ingestionTrace.chunkingVersion ?? 2} {(ingestionTrace.chunkingVersion ?? 2) >= 2 ? '(Hierarchical Parent–Child)' : '(Legacy Flat Chunking)'}
                     </strong>
                   </div>
                   <div>
@@ -388,7 +426,7 @@ export default function ResourceWorkspacePage() {
           <div className="kos-reader-toolbar">
             <span>{content ? `${content.length} characters extracted` : 'Document text reader'}</span>
             <Link
-              to={`/knowledge/ask?resources=${resource.id}`}
+              to={`/ask?resource=${resource.id}`}
               className="kos-button kos-button--sm"
             >
               <BrainCircuit size={14} /> Ground with RAG
@@ -454,7 +492,7 @@ export default function ResourceWorkspacePage() {
                 <div key={n.id} className="kos-note-card">
                   <p className="kos-note-body">{n.content}</p>
                   <div className="kos-note-footer">
-                    <small>{new Date(n.createdAt).toLocaleString()}</small>
+                    <small>{n.createdAt ? new Date(n.createdAt).toLocaleString() : '—'}</small>
                     <button
                       type="button"
                       className="kos-icon-btn kos-icon-btn--danger"
@@ -485,9 +523,9 @@ export default function ResourceWorkspacePage() {
             ) : related && related.length > 0 ? (
               related.map(r => (
                 <div key={r.id} className="kos-related-card">
-                  <span className="kos-workspace-type-badge">{r.resourceType}</span>
+                  <span className="kos-workspace-type-badge">{r.resourceType || 'DOCUMENT'}</span>
                   <div className="kos-related-info">
-                    <h4>{r.title}</h4>
+                    <h4>{r.title || 'Untitled'}</h4>
                     <p>{r.description || 'No description'}</p>
                   </div>
                   <Link to={`/library/${r.id}`} className="kos-button kos-button--sm">
@@ -533,7 +571,7 @@ export default function ResourceWorkspacePage() {
               style={{ maxWidth: '100%', width: '100%', margin: '.6rem 0' }}
             />
             <small style={{ color: 'var(--kos-muted)' }}>
-              Status: {activity?.processingStatus} · Last updated:{' '}
+              Status: {activity?.processingStatus || resource.processingStatus || 'READY'} · Last updated:{' '}
               {activity?.updatedAt ? new Date(activity.updatedAt).toLocaleString() : 'Not yet recorded'}
             </small>
           </div>
@@ -555,10 +593,10 @@ export default function ResourceWorkspacePage() {
                 💡 Tài liệu này đã được phân đoạn (chunking) và vector hóa. Bạn có thể mở <strong>Topic Deepdive Studio</strong> để xây dựng lộ trình học tập theo khái niệm trọng tâm hoặc làm bài kiểm tra <strong>Active Recall 5 câu hỏi có đối chứng</strong>.
               </p>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                <Link to="/knowledge/focus" className="kos-button kos-button--primary">
+                <Link to="/focus" className="kos-button kos-button--primary">
                   <Compass size={16} /> Mở Topic Deepdive Studio
                 </Link>
-                <Link to={`/knowledge/ask?resources=${resource.id}`} className="kos-button">
+                <Link to={`/ask?resource=${resource.id}`} className="kos-button">
                   <BrainCircuit size={16} /> Hỏi RAG AI về tài liệu này
                 </Link>
               </div>
@@ -571,9 +609,9 @@ export default function ResourceWorkspacePage() {
               <Network size={18} /> Sơ đồ Mạng lưới Tri thức Liên quan
             </h3>
             <KnowledgeGraphView
-              resources={related && related.length ? [resource, ...(related as unknown as Resource[])] : allResources.slice(0, 8)}
-              collections={collections}
-              tags={tags}
+              resources={related && related.length ? ([resource, ...related].filter(Boolean) as unknown as Resource[]) : (allResources || []).slice(0, 8)}
+              collections={collections || []}
+              tags={tags || []}
             />
           </div>
         </div>
