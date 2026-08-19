@@ -41,6 +41,12 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
               and (:query is null or :query = '' or lower(r.title) like lower(concat('%', :query, '%')))
               and (:tagId is null or rt.tag_id = :tagId)
               and (:collectionId is null or rc.collection_id = :collectionId)
+            order by
+              case when :sort = 'updated_desc' then r.updated_at end desc nulls last,
+              case when :sort = 'created_desc' then r.created_at end desc nulls last,
+              case when :sort = 'title_asc' then lower(r.title) end asc nulls last,
+              case when :sort = 'title_desc' then lower(r.title) end desc nulls last,
+              r.id desc
             """,
             countQuery = """
             select count(distinct r.id) from resources r
@@ -57,5 +63,6 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
             @Param("query") String query,
             @Param("tagId") Long tagId,
             @Param("collectionId") Long collectionId,
+            @Param("sort") String sort,
             org.springframework.data.domain.Pageable pageable);
 }

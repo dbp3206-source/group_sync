@@ -11,8 +11,8 @@
 	<groupId>com.groupsync</groupId>
 	<artifactId>backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>GroupSync Backend</name>
-	<description>GroupSync backend foundation</description>
+	<name>KnowledgeOS Backend</name>
+	<description>KnowledgeOS Personal Knowledge Operating System backend with Gemini RAG v2</description>
 	<url/>
 	<licenses>
 		<license/>

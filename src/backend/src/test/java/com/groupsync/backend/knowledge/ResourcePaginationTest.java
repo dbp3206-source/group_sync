@@ -59,7 +59,8 @@ class ResourcePaginationTest {
     @Test
     void listPaged_boundsNegativePageAndExcessiveSize() {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        when(resourceRepository.searchPaged(eq(1L), isNull(), isNull(), isNull(), pageableCaptor.capture()))
+        ArgumentCaptor<String> sortCaptor = ArgumentCaptor.forClass(String.class);
+        when(resourceRepository.searchPaged(eq(1L), isNull(), isNull(), isNull(), sortCaptor.capture(), pageableCaptor.capture()))
                 .thenReturn(new PageImpl<>(List.of(), Pageable.unpaged(), 0));
 
         // Negative page (-5) and excessive size (500)
@@ -68,19 +69,27 @@ class ResourcePaginationTest {
         Pageable captured = pageableCaptor.getValue();
         assertEquals(0, captured.getPageNumber(), "Negative page must be clamped to 0");
         assertEquals(100, captured.getPageSize(), "Size exceeding 100 must be clamped to max 100");
+        assertEquals("updated_desc", sortCaptor.getValue());
     }
 
     @Test
-    void listPaged_mapsSortOptionsCorrectly() {
-        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        when(resourceRepository.searchPaged(anyLong(), any(), any(), any(), pageableCaptor.capture()))
+    void listPaged_normalizesSortTokensAndFallsBackSafely() {
+        ArgumentCaptor<String> sortCaptor = ArgumentCaptor.forClass(String.class);
+        when(resourceRepository.searchPaged(anyLong(), any(), any(), any(), sortCaptor.capture(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), Pageable.unpaged(), 0));
 
         resourceService.listPaged(1L, "rag", 2L, 3L, 0, 24, "created_desc");
-        Pageable captured = pageableCaptor.getValue();
-        Sort.Order order = captured.getSort().getOrderFor("createdAt");
-        assertNotNull(order);
-        assertEquals(Sort.Direction.DESC, order.getDirection());
+        assertEquals("created_desc", sortCaptor.getValue());
+
+        resourceService.listPaged(1L, "rag", 2L, 3L, 0, 24, "title_asc");
+        assertEquals("title_asc", sortCaptor.getValue());
+
+        resourceService.listPaged(1L, "rag", 2L, 3L, 0, 24, "title_desc");
+        assertEquals("title_desc", sortCaptor.getValue());
+
+        // Unknown sort token falls back to updated_desc
+        resourceService.listPaged(1L, "rag", 2L, 3L, 0, 24, "DROP TABLE resources;--");
+        assertEquals("updated_desc", sortCaptor.getValue(), "Unknown or malicious sort token must safely fall back to updated_desc");
     }
 
     @Test
@@ -91,7 +100,7 @@ class ResourcePaginationTest {
         org.springframework.test.util.ReflectionTestUtils.setField(r2, "id", 102L);
 
         Page<Resource> pageResult = new PageImpl<>(List.of(r1, r2), org.springframework.data.domain.PageRequest.of(0, 2), 5L);
-        when(resourceRepository.searchPaged(eq(1L), eq("ai"), isNull(), isNull(), any(Pageable.class)))
+        when(resourceRepository.searchPaged(eq(1L), eq("ai"), isNull(), isNull(), eq("updated_desc"), any(Pageable.class)))
                 .thenReturn(pageResult);
 
         PagedResponse<ResourceResponse> response = resourceService.listPaged(1L, "ai", null, null, 0, 2, "updated_desc");

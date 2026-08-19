@@ -7,22 +7,11 @@ import './styles/redesign.css'
 import './styles/knowledgeos-responsive.css'
 import { useAuth } from './auth/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
-import GroupDetailPage from './pages/GroupDetailPage'
-import GroupsPage from './pages/GroupsPage'
-import CalendarPage from './pages/CalendarPage'
-import StudyPage from './pages/StudyPage'
-import BadmintonPage from './pages/BadmintonPage'
 import HealthPage from './pages/HealthPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
-import NotificationsPage from './pages/NotificationsPage'
-import BadmintonSessionDetailPage from './pages/BadmintonSessionDetailPage'
-import BadmintonProfilePage from './pages/BadmintonProfilePage'
-import CheckinPage from './pages/CheckinPage'
-import TournamentPage from './pages/TournamentPage'
 import ProfileSetupPage from './pages/ProfileSetupPage'
 import ProfilePage from './pages/ProfilePage'
-import AvailabilityPage from './pages/AvailabilityPage'
 import Avatar from './components/Avatar'
 import KnowledgeHomePage from './pages/KnowledgeHomePage'
 import KnowledgeLibraryPage from './pages/KnowledgeLibraryPage'
@@ -89,21 +78,11 @@ function AppShell() {
           <Route path="/knowledge/focus" element={<KnowledgeFocusPage />} />
           <Route path="/knowledge/insights" element={<KnowledgeInsightsPage />} />
           <Route path="/knowledge/guide" element={<KnowledgeGuidePage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="/calendar" element={<CalendarPage />} />
-          <Route path="/study" element={<StudyPage />} />
-          <Route path="/badminton" element={<BadmintonPage />} />
-          <Route path="/groups/:groupId/availability" element={<AvailabilityPage />} />
-          <Route path="/badminton/sessions/:sessionId" element={<BadmintonSessionDetailPage />} />
-          <Route path="/badminton/profile" element={<BadmintonProfilePage />} />
           <Route path="/profile/setup" element={<ProfileSetupPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
-        <Route path="/check-in" element={user ? <CheckinPage /> : <Navigate to="/login" replace />} />
-        <Route element={<ProtectedRoute />}><Route path="/tournaments" element={<TournamentPage />} /></Route>
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
         <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
-        <Route element={<ProtectedRoute />}><Route path="/groups" element={<GroupsPage />} /><Route path="/groups/:groupId" element={<GroupDetailPage />} /></Route>
         <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
       </Routes>
     </main>

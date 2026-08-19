@@ -185,7 +185,7 @@ erDiagram
   - `V11`: Persistent chat sessions, messages, and grounded citations.
   - `V12`: Full-Text Search tsvector column and GIN index.
   - `V13`: Durable database-backed binary storage (`storage_blobs`).
-  - `V14`: Vietnamese full-text search unaccent dictionaries and immutable triggers.
+  - `V14`: Study topics, concept nodes, recall checks, and learning studio schema.
   - `V15`: RAG v2 hierarchical parent-child chunks (`chunk_level`, `parent_chunk_id`, `chunking_version`).
 
 ---
@@ -255,7 +255,7 @@ GEMINI_API_KEY=your_gemini_api_key
 cd src/backend
 ./mvnw spring-boot:run
 ```
-*The backend boots on `http://localhost:8080`. Flyway applies migrations V1–V13 automatically.*
+*The backend boots on `http://localhost:8080`. Flyway applies migrations V1–V15 automatically.*
 
 ### Step 3: Start the Frontend SPA
 ```bash
@@ -328,7 +328,7 @@ KnowledgeOS/
 ├── src/                                         # RUNNABLE APPLICATION SOURCE
 │   ├── backend/                                 # Spring Boot 4 REST API Service (Java 21)
 │   │   ├── src/main/java/com/groupsync/backend/ # Controllers, Services, Repositories, Entities
-│   │   ├── src/main/resources/db/migration/     # Flyway migrations V1 through V13
+│   │   ├── src/main/resources/db/migration/     # Flyway migrations V1 through V15
 │   │   ├── src/test/java/                       # 57 automated unit, repository, and service tests
 │   │   ├── pom.xml                              # Maven build configuration
 │   │   └── Dockerfile                           # Production container definition

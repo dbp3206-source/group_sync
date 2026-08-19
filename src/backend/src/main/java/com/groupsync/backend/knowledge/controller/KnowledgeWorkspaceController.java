@@ -134,13 +134,13 @@ public class KnowledgeWorkspaceController {
     }
 
     @GetMapping("/api/resources/{resourceId}/organization/suggestions")
-    public Map<String, Object> organizationSuggestions(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId) {
+    public OrganizationSuggestionsResponse organizationSuggestions(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId) {
         return organization.suggestions(user.getId(), resourceId);
     }
 
     @PostMapping("/api/resources/{resourceId}/organization/apply")
-    public ResponseEntity<Void> applyOrganization(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId, @RequestBody Map<String, Object> body) {
-        organization.apply(user.getId(), resourceId, body);
+    public ResponseEntity<Void> applyOrganization(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId, @Valid @RequestBody ApplyOrganizationRequest request) {
+        organization.apply(user.getId(), resourceId, request);
         return ResponseEntity.noContent().build();
     }
 }

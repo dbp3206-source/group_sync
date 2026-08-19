@@ -7,6 +7,7 @@ interface KnowledgeGraphViewProps {
   resources: Resource[]
   collections: KnowledgeCollection[]
   tags?: KnowledgeTag[]
+  totalItems?: number
 }
 
 const TYPE_COLORS: Record<string, { bg: string; border: string; text: string; glow: string }> = {
@@ -19,7 +20,7 @@ const TYPE_COLORS: Record<string, { bg: string; border: string; text: string; gl
 
 const DEFAULT_COLOR = { bg: '#f1f5f9', border: '#64748b', text: '#334155', glow: 'rgba(100, 116, 139, 0.3)' }
 
-export default function KnowledgeGraphView({ resources, collections, tags = [] }: KnowledgeGraphViewProps) {
+export default function KnowledgeGraphView({ resources, collections, tags = [], totalItems }: KnowledgeGraphViewProps) {
   const [hoveredNode, setHoveredNode] = useState<number | null>(null)
   const [selectedType, setSelectedType] = useState<string>('ALL')
 
@@ -59,14 +60,12 @@ export default function KnowledgeGraphView({ resources, collections, tags = [] }
     const colors = TYPE_COLORS[res.resourceType.toUpperCase()] || DEFAULT_COLOR
 
     return {
-      id: res.id,
+      id: `res-${res.id}`,
+      rawId: res.id,
       title: res.title,
       type: res.resourceType,
-      status: res.processingStatus,
-      priority: res.priority,
-      favorite: res.favorite,
-      x: Math.max(50, Math.min(width - 50, x)),
-      y: Math.max(50, Math.min(height - 50, y)),
+      x,
+      y,
       colors,
     }
   })
@@ -89,7 +88,7 @@ export default function KnowledgeGraphView({ resources, collections, tags = [] }
   // Links from collections or center to resources
   resourceNodes.forEach(res => {
     // Connect directly to KnowledgeOS core hub
-    const isConnected = hoveredNode === res.id
+    const isConnected = hoveredNode === res.rawId
 
     links.push({
       x1: centerX,
@@ -103,6 +102,12 @@ export default function KnowledgeGraphView({ resources, collections, tags = [] }
 
   return (
     <div className="kos-graph-container">
+      {totalItems !== undefined && totalItems > resources.length && (
+        <div style={{ padding: '0.45rem 0.85rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--kos-border, rgba(255,255,255,0.08))', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--kos-text-muted, #94a3b8)', marginBottom: '0.75rem' }}>
+          <Sparkles size={13} style={{ verticalAlign: 'middle', marginRight: '0.35rem', color: 'var(--kos-accent, #60a5fa)' }} />
+          <span>Showing relationships among {resources.length} loaded resources ({totalItems} total in library). Load more in the grid view to expand this graph.</span>
+        </div>
+      )}
       {/* Graph Toolbar */}
       <div className="kos-graph-toolbar">
         <div className="kos-graph-legend">
@@ -232,18 +237,18 @@ export default function KnowledgeGraphView({ resources, collections, tags = [] }
 
           {/* Resource Leaf Nodes */}
           {resourceNodes.map(node => {
-            const isHovered = hoveredNode === node.id
-            const isDimmed = hoveredNode !== null && hoveredNode !== node.id
+            const isHovered = hoveredNode === node.rawId
+            const isDimmed = hoveredNode !== null && hoveredNode !== node.rawId
 
             return (
               <g
                 key={node.id}
                 className={`kos-resource-node ${isHovered ? 'is-hovered' : ''} ${isDimmed ? 'is-dimmed' : ''}`}
-                onMouseEnter={() => setHoveredNode(node.id)}
+                onMouseEnter={() => setHoveredNode(node.rawId)}
                 onMouseLeave={() => setHoveredNode(null)}
                 style={{ cursor: 'pointer' }}
               >
-                <Link to={`/library/${node.id}`}>
+                <Link to={`/library/${node.rawId}`}>
                   {/* Outer Pulsing Aura when hovered */}
                   {isHovered && (
                     <circle

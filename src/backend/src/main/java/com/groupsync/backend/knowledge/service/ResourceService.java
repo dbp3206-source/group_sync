@@ -3,6 +3,7 @@ package com.groupsync.backend.knowledge.service;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,26 +136,30 @@ public class ResourceService {
         return resources.stream().map(ResourceResponse::from).toList();
     }
 
+    private String normalizeSort(String sort) {
+        if (sort == null) return "updated_desc";
+        String normalized = sort.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "created_desc" -> "created_desc";
+            case "title_asc" -> "title_asc";
+            case "title_desc" -> "title_desc";
+            default -> "updated_desc";
+        };
+    }
+
     @Transactional(readOnly = true)
     public PagedResponse<ResourceResponse> listPaged(Long ownerId, String query, Long tagId, Long collectionId, int page, int size, String sort) {
         int boundedPage = Math.max(0, page);
-        int boundedSize = Math.min(Math.max(1, size), 100);
+        int boundedSize = Math.min(Math.max(1, size <= 0 ? 24 : size), 100);
+        String normalizedSort = normalizeSort(sort);
 
-        org.springframework.data.domain.Sort sortOrder = switch (sort != null ? sort.trim().toLowerCase() : "updated_desc") {
-            case "created_desc", "createdat_desc", "createdat,desc" -> org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt");
-            case "created_asc", "createdat_asc", "createdat,asc" -> org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "createdAt");
-            case "title_asc", "title,asc" -> org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "title");
-            case "title_desc", "title,desc" -> org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "title");
-            case "priority_desc", "priority,desc" -> org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "priority");
-            default -> org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "updatedAt");
-        };
-
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(boundedPage, boundedSize, sortOrder);
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(boundedPage, boundedSize);
         org.springframework.data.domain.Page<Resource> result = resourceRepository.searchPaged(
                 ownerId,
                 query == null || query.isBlank() ? null : query.trim(),
                 tagId,
                 collectionId,
+                normalizedSort,
                 pageable
         );
 

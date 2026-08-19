@@ -7,6 +7,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import com.groupsync.backend.auth.security.AuthenticatedUser;
 import com.groupsync.backend.knowledge.dto.FocusStudioDto.*;
+import com.groupsync.backend.knowledge.dto.UpdateConceptStatusRequest;
 import com.groupsync.backend.knowledge.service.LearningStudioService;
 import com.groupsync.backend.knowledge.service.RecallCheckService;
 
@@ -77,8 +78,8 @@ public class LearningStudioController {
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable Long id,
             @PathVariable Long conceptId,
-            @RequestBody Map<String, String> body) {
-        return studioService.updateConceptStatus(user.getId(), id, conceptId, body.get("status"));
+            @jakarta.validation.Valid @RequestBody UpdateConceptStatusRequest request) {
+        return studioService.updateConceptStatus(user.getId(), id, conceptId, request.status());
     }
 
     @PostMapping("/topics/{id}/quiz")

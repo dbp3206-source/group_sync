@@ -18,6 +18,7 @@ import {
   createCollection,
   createNote,
   getCollections,
+  getResource,
   getResources,
   getTags,
   uploadResource,
@@ -86,19 +87,34 @@ export default function KnowledgeLibraryPage() {
     [],
   )
 
-  // Poll every 4 s while any resource is still processing; stop when all reach terminal state
+  // Targeted polling: refreshes only in-flight resource items without collapsing loaded pages
+  const isPollingRef = useRef(false)
   useEffect(() => {
     const PROCESSING = new Set(['UPLOADING', 'PARSING', 'CHUNKING', 'EMBEDDING'])
-    const interval = setInterval(() => {
-      setResources(current => {
-        const hasInFlight = current.some(r => PROCESSING.has(r.processingStatus))
-        if (hasInFlight) load(activeQueryRef.current, tagIdRef.current, collectionIdRef.current, 0, sortRef.current, false)
-        else clearInterval(interval)
-        return current
-      })
+    const interval = setInterval(async () => {
+      const processingIds = resources.filter(r => PROCESSING.has(r.processingStatus)).map(r => r.id)
+      if (processingIds.length === 0) return
+      if (isPollingRef.current) return
+      isPollingRef.current = true
+      try {
+        const updatedList: (Resource | null)[] = await Promise.all(
+          processingIds.map(id => getResource(id).catch(() => null))
+        )
+        const updatedMap = new Map<number, Resource>()
+        updatedList.forEach((r: Resource | null) => {
+          if (r) updatedMap.set(r.id, r)
+        })
+        if (updatedMap.size > 0) {
+          setResources(current =>
+            current.map(item => updatedMap.get(item.id) || item)
+          )
+        }
+      } finally {
+        isPollingRef.current = false
+      }
     }, 4000)
     return () => clearInterval(interval)
-  }, [load])
+  }, [resources])
 
   useEffect(() => {
     load()
@@ -324,6 +340,7 @@ export default function KnowledgeLibraryPage() {
             resources={resources}
             collections={collections}
             tags={tags}
+            totalItems={totalItems}
           />
         ) : (
           <>
