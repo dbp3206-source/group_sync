@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import hero from '../assets/knowledgeos-hero.png'
 import { getFocusNext, type FocusNext } from '../api/knowledge'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth'
 
 export default function KnowledgeHomePage() {
   const { user } = useAuth(); const [focus, setFocus] = useState<FocusNext | null>(null)

@@ -120,10 +120,10 @@ export default function KnowledgeLibraryPage() {
     load()
     getCollections()
       .then(setCollections)
-      .catch(() => setError('Collections could not be loaded.'))
+      .catch(() => console.warn('Collections could not be loaded.'))
     getTags()
       .then(setTags)
-      .catch(() => setError('Tags could not be loaded.'))
+      .catch(() => console.warn('Tags could not be loaded.'))
   }, [load])
 
   async function saveNote(e: React.FormEvent) {
@@ -325,16 +325,14 @@ export default function KnowledgeLibraryPage() {
         </span>
       </div>
 
-      {error && (
-        <div className="kos-error" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      {error ? (
+        <div className="kos-error" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', padding: '2rem' }}>
           <span>{error}</span>
           <button type="button" className="kos-button kos-button--ghost" onClick={() => load()}>
             Thử lại
           </button>
         </div>
-      )}
-
-      {resources.length ? (
+      ) : resources.length ? (
         viewMode === 'GRAPH' ? (
           <KnowledgeGraphView
             resources={resources}

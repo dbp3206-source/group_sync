@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/errors'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth'
 import { getEmailHistory } from '../auth/emailHistory'
 
 function RegisterPage() {

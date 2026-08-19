@@ -113,4 +113,20 @@ class ResourcePaginationTest {
         assertTrue(response.hasNext());
         assertEquals("Doc 1", response.items().get(0).title());
     }
+
+    @Test
+    void listPaged_returnsEmptyCalculatedMetadataWhenZeroResults() {
+        Page<Resource> emptyPage = new PageImpl<>(List.of(), org.springframework.data.domain.PageRequest.of(0, 24), 0L);
+        when(resourceRepository.searchPaged(eq(1L), isNull(), isNull(), isNull(), eq("updated_desc"), any(Pageable.class)))
+                .thenReturn(emptyPage);
+
+        PagedResponse<ResourceResponse> response = resourceService.listPaged(1L, null, null, null, 0, 24, "updated_desc");
+
+        assertEquals(0, response.items().size());
+        assertEquals(0, response.page());
+        assertEquals(24, response.size());
+        assertEquals(0L, response.totalItems());
+        assertEquals(0, response.totalPages());
+        assertFalse(response.hasNext());
+    }
 }

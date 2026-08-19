@@ -21,7 +21,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   addTopicSource,
@@ -79,8 +79,22 @@ export default function KnowledgeFocusPage() {
   const [planBusy, setPlanBusy] = useState(false)
   const [error, setError] = useState('')
 
+  const loadTopicDetail = useCallback(async (topicId: number) => {
+    try {
+      const detail = await getStudyTopicDetail(topicId)
+      setTopicDetail(detail)
+      if (detail.concepts.length > 0) {
+        setSelectedConceptId(prev => (prev && detail.concepts.some(c => c.id === prev) ? prev : detail.concepts[0].id))
+      } else {
+        setSelectedConceptId(null)
+      }
+    } catch {
+      setError('Không thể tải chi tiết chủ đề.')
+    }
+  }, [])
+
   // Initial Load
-  const initLoad = async () => {
+  const initLoad = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -108,25 +122,11 @@ export default function KnowledgeFocusPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [loadTopicDetail, selectedTopicId])
 
   useEffect(() => {
     initLoad()
-  }, [])
-
-  const loadTopicDetail = async (topicId: number) => {
-    try {
-      const detail = await getStudyTopicDetail(topicId)
-      setTopicDetail(detail)
-      if (detail.concepts.length > 0) {
-        setSelectedConceptId(prev => (prev && detail.concepts.some(c => c.id === prev) ? prev : detail.concepts[0].id))
-      } else {
-        setSelectedConceptId(null)
-      }
-    } catch {
-      setError('Không thể tải chi tiết chủ đề.')
-    }
-  }
+  }, [initLoad])
 
   const handleSelectTopic = async (topicId: number) => {
     setSelectedTopicId(topicId)

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/errors'
 import { updateProfile, uploadAvatar } from '../api/profile'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth'
 
 async function cropAvatar(sourceFile: File) {
   const image = await createImageBitmap(sourceFile)

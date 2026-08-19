@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import axios from 'axios'
 import {
   getCsrfToken,
@@ -6,21 +6,10 @@ import {
   login as loginRequest,
   logout as logoutRequest,
   register as registerRequest,
-  type RegisterInput,
   type User,
 } from '../api/auth'
 import { rememberEmail } from './emailHistory'
-
-type AuthContextValue = {
-  user: User | null
-  loading: boolean
-  login: (email: string, password: string) => Promise<void>
-  register: (input: RegisterInput) => Promise<void>
-  updateCurrentUser: (user: User) => void
-  logout: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined)
+import { AuthContext, type AuthContextValue } from './authContextDef'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -62,10 +51,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }), [loading, user])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) throw new Error('useAuth must be used inside AuthProvider')
-  return context
 }

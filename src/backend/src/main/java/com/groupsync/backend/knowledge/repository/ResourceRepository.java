@@ -21,26 +21,22 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
             @Param("newStatus") com.groupsync.backend.knowledge.model.ResourceProcessingStatus newStatus);
 
     @Query(value = """
-            select distinct r.* from resources r
-            left join resource_tags rt on rt.resource_id = r.id
-            left join resource_collections rc on rc.resource_id = r.id
+            select r.* from resources r
             where r.owner_id = :ownerId
               and (:query is null or :query = '' or lower(r.title) like lower(concat('%', :query, '%')))
-              and (:tagId is null or rt.tag_id = :tagId)
-              and (:collectionId is null or rc.collection_id = :collectionId)
+              and (:tagId is null or exists (select 1 from resource_tags rt where rt.resource_id = r.id and rt.tag_id = :tagId))
+              and (:collectionId is null or exists (select 1 from resource_collections rc where rc.resource_id = r.id and rc.collection_id = :collectionId))
             order by r.updated_at desc
             """, nativeQuery = true)
     List<Resource> search(@Param("ownerId") Long ownerId, @Param("query") String query,
             @Param("tagId") Long tagId, @Param("collectionId") Long collectionId);
 
     @Query(value = """
-            select distinct r.* from resources r
-            left join resource_tags rt on rt.resource_id = r.id
-            left join resource_collections rc on rc.resource_id = r.id
+            select r.* from resources r
             where r.owner_id = :ownerId
               and (:query is null or :query = '' or lower(r.title) like lower(concat('%', :query, '%')))
-              and (:tagId is null or rt.tag_id = :tagId)
-              and (:collectionId is null or rc.collection_id = :collectionId)
+              and (:tagId is null or exists (select 1 from resource_tags rt where rt.resource_id = r.id and rt.tag_id = :tagId))
+              and (:collectionId is null or exists (select 1 from resource_collections rc where rc.resource_id = r.id and rc.collection_id = :collectionId))
             order by
               case when :sort = 'updated_desc' then r.updated_at end desc nulls last,
               case when :sort = 'created_desc' then r.created_at end desc nulls last,
@@ -49,13 +45,11 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
               r.id desc
             """,
             countQuery = """
-            select count(distinct r.id) from resources r
-            left join resource_tags rt on rt.resource_id = r.id
-            left join resource_collections rc on rc.resource_id = r.id
+            select count(r.id) from resources r
             where r.owner_id = :ownerId
               and (:query is null or :query = '' or lower(r.title) like lower(concat('%', :query, '%')))
-              and (:tagId is null or rt.tag_id = :tagId)
-              and (:collectionId is null or rc.collection_id = :collectionId)
+              and (:tagId is null or exists (select 1 from resource_tags rt where rt.resource_id = r.id and rt.tag_id = :tagId))
+              and (:collectionId is null or exists (select 1 from resource_collections rc where rc.resource_id = r.id and rc.collection_id = :collectionId))
             """,
             nativeQuery = true)
     org.springframework.data.domain.Page<Resource> searchPaged(

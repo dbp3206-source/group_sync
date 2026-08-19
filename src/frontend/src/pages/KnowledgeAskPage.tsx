@@ -82,14 +82,30 @@ export default function KnowledgeAskPage() {
   const [latestTrace, setLatestTrace] = useState<RagExecutionTrace | null>(null)
   const timerRef = useRef<number | null>(null)
 
-  const load = () =>
-    Promise.all([getResources(), getCollections(), getChatSessions()])
-      .then(([r, c, s]) => {
-        setResources(r.items)
-        setCollections(c)
-        setSessions(s)
-      })
-      .catch(() => setError('KnowledgeOS could not load this workspace.'))
+  const load = () => {
+    setError('')
+    Promise.allSettled([getResources(), getCollections(), getChatSessions()]).then(
+      ([resResult, colResult, sessResult]) => {
+        if (resResult.status === 'fulfilled') {
+          setResources(resResult.value.items)
+        }
+        if (colResult.status === 'fulfilled') {
+          setCollections(colResult.value)
+        }
+        if (sessResult.status === 'fulfilled') {
+          setSessions(sessResult.value)
+        }
+
+        if (
+          resResult.status === 'rejected' &&
+          colResult.status === 'rejected' &&
+          sessResult.status === 'rejected'
+        ) {
+          setError('KnowledgeOS could not load this workspace. Please check your connection and retry.')
+        }
+      },
+    )
+  }
 
   useEffect(() => {
     load()

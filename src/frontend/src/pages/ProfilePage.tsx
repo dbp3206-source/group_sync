@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { changePassword, updateProfile } from '../api/profile'
 import { getApiErrorMessage } from '../api/errors'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
 
 function ProfilePage() {
