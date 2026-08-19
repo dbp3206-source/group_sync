@@ -80,15 +80,15 @@ public class KnowledgeQueryPlanner {
         jdbcTemplate.query(
                 "SELECT id, name FROM collections WHERE owner_id = :ownerId",
                 params,
-                rs -> { collections.put(rs.getString("name").toLowerCase(Locale.ROOT), rs.getLong("id")); }
-        );
+                (rs, rowNum) -> Map.entry(rs.getString("name").toLowerCase(Locale.ROOT), rs.getLong("id"))
+        ).forEach(entry -> collections.put(entry.getKey(), entry.getValue()));
 
         Map<String, Long> tags = new HashMap<>();
         jdbcTemplate.query(
                 "SELECT id, name FROM tags WHERE owner_id = :ownerId",
                 params,
-                rs -> { tags.put(rs.getString("name").toLowerCase(Locale.ROOT), rs.getLong("id")); }
-        );
+                (rs, rowNum) -> Map.entry(rs.getString("name").toLowerCase(Locale.ROOT), rs.getLong("id"))
+        ).forEach(entry -> tags.put(entry.getKey(), entry.getValue()));
 
         return new UserMetadataContext(collections, tags);
     }
@@ -161,52 +161,79 @@ public class KnowledgeQueryPlanner {
                 semanticQuery = originalQuestion;
             }
 
+            boolean impossible = false;
+
             // Parse Filters
             ResourceType resourceType = null;
             if (node.hasNonNull("resourceType")) {
-                try {
-                    resourceType = ResourceType.valueOf(node.path("resourceType").asText().toUpperCase(Locale.ROOT));
-                } catch (Exception ignored) { }
+                String rawType = node.path("resourceType").asText().trim();
+                if (!rawType.isBlank() && !"null".equalsIgnoreCase(rawType)) {
+                    try {
+                        resourceType = ResourceType.valueOf(rawType.toUpperCase(Locale.ROOT));
+                    } catch (Exception ex) {
+                        impossible = true;
+                    }
+                }
             }
 
             Boolean favorite = node.hasNonNull("favorite") ? node.path("favorite").asBoolean() : null;
 
             LocalDateTime createdAfter = null;
             if (node.hasNonNull("createdAfter")) {
-                try {
-                    createdAfter = LocalDate.parse(node.path("createdAfter").asText()).atStartOfDay();
-                } catch (Exception ignored) { }
+                String rawDate = node.path("createdAfter").asText().trim();
+                if (!rawDate.isBlank() && !"null".equalsIgnoreCase(rawDate)) {
+                    try {
+                        createdAfter = LocalDate.parse(rawDate).atStartOfDay();
+                    } catch (Exception ex) {
+                        impossible = true;
+                    }
+                }
             }
 
             LocalDateTime createdBefore = null;
             if (node.hasNonNull("createdBefore")) {
-                try {
-                    createdBefore = LocalDate.parse(node.path("createdBefore").asText()).atTime(23, 59, 59);
-                } catch (Exception ignored) { }
+                String rawDate = node.path("createdBefore").asText().trim();
+                if (!rawDate.isBlank() && !"null".equalsIgnoreCase(rawDate)) {
+                    try {
+                        createdBefore = LocalDate.parse(rawDate).atTime(23, 59, 59);
+                    } catch (Exception ex) {
+                        impossible = true;
+                    }
+                }
             }
 
             // Resolve Collection Name
             Set<Long> collectionIds = null;
             if (node.hasNonNull("collectionName")) {
-                String collName = node.path("collectionName").asText().trim().toLowerCase(Locale.ROOT);
-                Long collId = context.collectionsByName().get(collName);
-                if (collId != null) {
-                    collectionIds = Set.of(collId);
+                String collName = node.path("collectionName").asText().trim();
+                if (!collName.isBlank() && !"null".equalsIgnoreCase(collName)) {
+                    Long collId = context.collectionsByName().get(collName.toLowerCase(Locale.ROOT));
+                    if (collId != null) {
+                        collectionIds = Set.of(collId);
+                    } else {
+                        impossible = true;
+                        collectionIds = Set.of(-1L);
+                    }
                 }
             }
 
             // Resolve Tag Name
             Set<Long> tagIds = null;
             if (node.hasNonNull("tagName")) {
-                String tagName = node.path("tagName").asText().trim().toLowerCase(Locale.ROOT);
-                Long tagId = context.tagsByName().get(tagName);
-                if (tagId != null) {
-                    tagIds = Set.of(tagId);
+                String tagName = node.path("tagName").asText().trim();
+                if (!tagName.isBlank() && !"null".equalsIgnoreCase(tagName)) {
+                    Long tagId = context.tagsByName().get(tagName.toLowerCase(Locale.ROOT));
+                    if (tagId != null) {
+                        tagIds = Set.of(tagId);
+                    } else {
+                        impossible = true;
+                        tagIds = Set.of(-1L);
+                    }
                 }
             }
 
             KnowledgeQueryFilters filters = new KnowledgeQueryFilters(
-                    null, collectionIds, tagIds, resourceType, favorite, createdAfter, createdBefore
+                    null, collectionIds, tagIds, resourceType, favorite, createdAfter, createdBefore, impossible
             );
 
             String explanation = node.path("explanation").asText("Planned by KnowledgeOS");

@@ -39,6 +39,7 @@ public class ResourceIngestionService {
     private final EmbeddingProvider embeddingProvider;
     private final EmbeddingTextBuilder embeddingTextBuilder;
     private final ResourceIngestionTransactionService transactionService;
+    private final com.groupsync.backend.knowledge.rag.GeminiProperties geminiProperties;
 
     public ResourceIngestionService(
             ResourceRepository resourceRepository,
@@ -48,6 +49,18 @@ public class ResourceIngestionService {
             EmbeddingProvider embeddingProvider,
             EmbeddingTextBuilder embeddingTextBuilder,
             ResourceIngestionTransactionService transactionService) {
+        this(resourceRepository, parserRegistry, chunkingStrategy, storageService, embeddingProvider, embeddingTextBuilder, transactionService, null);
+    }
+
+    public ResourceIngestionService(
+            ResourceRepository resourceRepository,
+            ResourceParserRegistry parserRegistry,
+            StructureAwareChunkingStrategy chunkingStrategy,
+            StorageService storageService,
+            EmbeddingProvider embeddingProvider,
+            EmbeddingTextBuilder embeddingTextBuilder,
+            ResourceIngestionTransactionService transactionService,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) com.groupsync.backend.knowledge.rag.GeminiProperties geminiProperties) {
         this.resourceRepository = resourceRepository;
         this.parserRegistry = parserRegistry;
         this.chunkingStrategy = chunkingStrategy;
@@ -55,6 +68,7 @@ public class ResourceIngestionService {
         this.embeddingProvider = embeddingProvider;
         this.embeddingTextBuilder = embeddingTextBuilder;
         this.transactionService = transactionService;
+        this.geminiProperties = geminiProperties;
     }
 
     @Async
@@ -139,14 +153,16 @@ public class ResourceIngestionService {
                 throw new IllegalStateException("Embedding count mismatch: expected " + childChunks.size() + " embeddings but received " + received);
             }
 
+            int expectedDimensions = (geminiProperties != null && geminiProperties.embeddingDimensions() > 0)
+                    ? geminiProperties.embeddingDimensions() : 768;
             Map<Integer, float[]> childEmbeddingMap = new HashMap<>();
             for (int i = 0; i < childChunks.size(); i++) {
                 float[] emb = embeddings.get(i);
                 if (emb == null) {
                     throw new IllegalStateException("Embedding for child chunk at index " + i + " was null.");
                 }
-                if (emb.length != 768) {
-                    throw new IllegalStateException("Embedding for child chunk at index " + i + " has invalid dimension " + emb.length + " (expected 768).");
+                if (emb.length != expectedDimensions) {
+                    throw new IllegalStateException("Embedding for child chunk at index " + i + " has invalid dimension " + emb.length + " (expected " + expectedDimensions + ").");
                 }
                 childEmbeddingMap.put(childChunks.get(i).index(), emb);
             }

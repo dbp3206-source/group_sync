@@ -14,6 +14,7 @@ import com.groupsync.backend.knowledge.rag.RetrievalScope;
 /**
  * Executes safe, parameterized relational queries for structured metadata questions (e.g. COUNT, LIST).
  * Directly resolves answers from PostgreSQL without invoking semantic vector search or executing raw LLM SQL.
+ * Strictly honors impossible filters and validated resource/collection constraints.
  */
 @Service
 public class StructuredKnowledgeQueryService {
@@ -36,33 +37,50 @@ public class StructuredKnowledgeQueryService {
         KnowledgeQueryFilters filters = plan.filters() != null ? plan.filters() : KnowledgeQueryFilters.empty();
         QueryOperation operation = plan.operation() != null ? plan.operation() : QueryOperation.COUNT;
 
+        // Step 1: Handle impossible constraints immediately with truthful zero results
+        if (filters.impossible()) {
+            if (operation == QueryOperation.COUNT) {
+                return new StructuredResult("You have 0 resources in KnowledgeOS.", 0L, List.of());
+            } else {
+                return new StructuredResult("Found 0 matching resource(s).", 0L, List.of());
+            }
+        }
+
         MapSqlParameterSource params = new MapSqlParameterSource("ownerId", ownerId);
         StringBuilder where = new StringBuilder(" WHERE r.owner_id = :ownerId ");
 
-        // Scope filter
-        switch (scope) {
-            case THIS_RESOURCE -> {
-                if (thisResourceId != null) {
-                    where.append(" AND r.id = :thisResourceId ");
-                    params.addValue("thisResourceId", thisResourceId);
+        // Step 2: Resource scope / validated resource IDs restriction
+        if (filters.resourceIds() != null && !filters.resourceIds().isEmpty()) {
+            where.append(" AND r.id IN (:filterResourceIds) ");
+            params.addValue("filterResourceIds", filters.resourceIds());
+        } else {
+            switch (scope) {
+                case THIS_RESOURCE -> {
+                    if (thisResourceId != null) {
+                        where.append(" AND r.id = :thisResourceId ");
+                        params.addValue("thisResourceId", thisResourceId);
+                    }
                 }
-            }
-            case SELECTED_RESOURCES -> {
-                if (selectedResourceIds != null && !selectedResourceIds.isEmpty()) {
-                    where.append(" AND r.id IN (:selectedResourceIds) ");
-                    params.addValue("selectedResourceIds", selectedResourceIds);
+                case SELECTED_RESOURCES -> {
+                    if (selectedResourceIds != null && !selectedResourceIds.isEmpty()) {
+                        where.append(" AND r.id IN (:selectedResourceIds) ");
+                        params.addValue("selectedResourceIds", selectedResourceIds);
+                    }
                 }
+                default -> { }
             }
-            case COLLECTION -> {
-                if (collectionId != null) {
-                    where.append(" AND EXISTS (SELECT 1 FROM resource_collections rc WHERE rc.resource_id = r.id AND rc.collection_id = :scopedCollectionId) ");
-                    params.addValue("scopedCollectionId", collectionId);
-                }
-            }
-            case LIBRARY -> { }
         }
 
-        // Metadata filters
+        // Step 3: Collection scope / validated collection IDs restriction
+        if (filters.collectionIds() != null && !filters.collectionIds().isEmpty()) {
+            where.append(" AND EXISTS (SELECT 1 FROM resource_collections rc WHERE rc.resource_id = r.id AND rc.collection_id IN (:filterColls)) ");
+            params.addValue("filterColls", filters.collectionIds());
+        } else if (scope == RetrievalScope.COLLECTION && collectionId != null) {
+            where.append(" AND EXISTS (SELECT 1 FROM resource_collections rc WHERE rc.resource_id = r.id AND rc.collection_id = :scopedCollectionId) ");
+            params.addValue("scopedCollectionId", collectionId);
+        }
+
+        // Step 4: Other relational metadata filters
         if (filters.resourceType() != null) {
             where.append(" AND r.resource_type = :resType ");
             params.addValue("resType", filters.resourceType().name());
@@ -79,15 +97,12 @@ public class StructuredKnowledgeQueryService {
             where.append(" AND r.created_at <= :cBefore ");
             params.addValue("cBefore", filters.createdBefore());
         }
-        if (filters.collectionIds() != null && !filters.collectionIds().isEmpty()) {
-            where.append(" AND EXISTS (SELECT 1 FROM resource_collections rc WHERE rc.resource_id = r.id AND rc.collection_id IN (:filterColls)) ");
-            params.addValue("filterColls", filters.collectionIds());
-        }
         if (filters.tagIds() != null && !filters.tagIds().isEmpty()) {
             where.append(" AND EXISTS (SELECT 1 FROM resource_tags rt WHERE rt.resource_id = r.id AND rt.tag_id IN (:filterTags)) ");
             params.addValue("filterTags", filters.tagIds());
         }
 
+        // Step 5: Execute COUNT or LIST query
         if (operation == QueryOperation.COUNT) {
             String sql = "SELECT COUNT(*) FROM resources r " + where;
             Long count = jdbcTemplate.queryForObject(sql, params, Long.class);
@@ -99,9 +114,11 @@ public class StructuredKnowledgeQueryService {
         } else {
             String sql = "SELECT r.title FROM resources r " + where + " ORDER BY r.created_at DESC LIMIT 50";
             List<String> titles = jdbcTemplate.query(sql, params, (rs, rowNum) -> rs.getString("title"));
-            String response = "Found " + titles.size() + " matching resource(s):\n" +
-                    String.join("\n", titles.stream().map(t -> "- " + t).toList());
-            return new StructuredResult(response, titles.size(), titles);
+            String response = (titles == null || titles.isEmpty())
+                    ? "Found 0 matching resource(s)."
+                    : "Found " + titles.size() + " matching resource(s):\n" +
+                      String.join("\n", titles.stream().map(t -> "- " + t).toList());
+            return new StructuredResult(response, titles != null ? titles.size() : 0, titles != null ? titles : List.of());
         }
     }
 

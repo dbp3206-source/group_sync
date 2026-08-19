@@ -360,7 +360,7 @@ export default function ResourceWorkspacePage() {
                     <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Vector Embeddings</small>
                     <strong style={{ fontSize: '0.9rem' }}>
                       {ingestionTrace.embeddingModel} ({ingestionTrace.embeddingDimensions}d)
-                      {ingestionTrace.chunkingVersion >= 2 && ingestionTrace.embeddingBatchCount > 0 ? ` · ${ingestionTrace.embeddingBatchCount} Batches` : ''}
+                      {ingestionTrace.chunkingVersion >= 2 && ingestionTrace.embeddingBatchCount > 0 ? ` · ${ingestionTrace.embeddingBatchCount} Embedding Batches` : ''}
                     </strong>
                   </div>
                   <div>

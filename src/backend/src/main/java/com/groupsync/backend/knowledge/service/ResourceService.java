@@ -236,7 +236,7 @@ public class ResourceService {
         }
 
         boolean isV2 = maxVersion >= 2;
-        int batchSize = 16;
+        int batchSize = (geminiProperties != null) ? geminiProperties.embeddingBatchSize() : 16;
         int embeddingBatchCount = isV2 ? (childCount > 0 ? (int) Math.ceil((double) childCount / batchSize) : 0) : 0;
         boolean semanticMetadataIncluded = isV2;
 

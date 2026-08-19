@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component;
 public class GeminiEmbeddingProvider implements EmbeddingProvider {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiEmbeddingProvider.class);
-    private static final int BATCH_SIZE = 16;
     private static final int MAX_RETRIES = 2;
     private static final long INITIAL_BACKOFF_MS = 500L;
 
@@ -50,9 +49,10 @@ public class GeminiEmbeddingProvider implements EmbeddingProvider {
 
         List<float[]> allResults = new ArrayList<>(texts.size());
         int providerRequestCount = 0;
+        int batchSize = properties.embeddingBatchSize();
 
-        for (int i = 0; i < texts.size(); i += BATCH_SIZE) {
-            int end = Math.min(i + BATCH_SIZE, texts.size());
+        for (int i = 0; i < texts.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, texts.size());
             List<String> batch = texts.subList(i, end);
 
             EmbedContentResponse response = executeWithRetry(() ->

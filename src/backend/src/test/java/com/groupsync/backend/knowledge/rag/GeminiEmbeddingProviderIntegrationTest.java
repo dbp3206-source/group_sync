@@ -16,6 +16,7 @@ class GeminiEmbeddingProviderIntegrationTest {
                 "gemini-3.5-flash",
                 "gemini-embedding-001",
                 768,
+                16,
                 5,
                 2,
                 12,

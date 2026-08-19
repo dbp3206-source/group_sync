@@ -35,7 +35,7 @@ public class QueryPlanValidator {
 
         KnowledgeQueryFilters rawFilters = rawPlan.filters() != null ? rawPlan.filters() : KnowledgeQueryFilters.empty();
 
-        boolean[] impossible = new boolean[]{ false };
+        boolean[] impossible = new boolean[]{ rawFilters.impossible() };
 
         // Validate and scope-constrain resource IDs
         Set<Long> sanitizedResourceIds = sanitizeResourceIds(ownerId, rawFilters.resourceIds(), scope, thisResourceId, selectedResourceIds, impossible);
@@ -45,6 +45,10 @@ public class QueryPlanValidator {
 
         // Validate tag IDs
         Set<Long> sanitizedTagIds = sanitizeTagIds(ownerId, rawFilters.tagIds(), impossible);
+
+        if (impossible[0] && (sanitizedResourceIds == null || sanitizedResourceIds.isEmpty())) {
+            sanitizedResourceIds = Set.of(-1L);
+        }
 
         KnowledgeQueryFilters sanitizedFilters = new KnowledgeQueryFilters(
                 sanitizedResourceIds,

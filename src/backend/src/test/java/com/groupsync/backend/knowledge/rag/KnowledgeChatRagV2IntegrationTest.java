@@ -62,7 +62,7 @@ class KnowledgeChatRagV2IntegrationTest {
                 chatTransactionService, sessionRepository, messageRepository,
                 citationRepository, retrievalStrategy, semanticRetrievalStrategy,
                 queryPlanner, structuredQueryService, parentChildExpander,
-                languageModelClient, new GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 5, 2, 12, 60, 30000)
+                languageModelClient, new GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000)
         );
 
         owner = new UserAccount("user@knowledgeos.io", "hash", "User");

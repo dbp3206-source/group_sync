@@ -117,36 +117,42 @@ KnowledgeOS is designed to demonstrate clear, defensible Object-Oriented princip
 
 ---
 
-## 6. Hybrid RAG Architecture
+## 6. RAG v2 Architecture
 
 ```mermaid
 graph TD
-    Query[User Query] --> Embed[Gemini 768-dim Vector]
-    Query --> FTS[to_tsquery 'simple']
-
-    Embed --> SemBranch["Semantic Branch<br>(pgvector Cosine <=> HNSW)"]
-    FTS --> LexBranch["Lexical Branch<br>(PostgreSQL FTS GIN)"]
-
-    SemBranch -->|Top 10 Ranked Chunks| RRF["Reciprocal Rank Fusion<br>Score = sum(1 / (60 + rank))"]
-    LexBranch -->|Top 10 Ranked Chunks| RRF
-
-    RRF --> TopEvidence[Top Grounded Evidence Chunks]
-    TopEvidence --> PromptBuilder[GroundedPromptBuilder]
-    PromptBuilder --> GeminiLLM[Google Gemini 3.5 Flash Lite]
-    GeminiLLM --> ChatOutput[Synthesized Answer + Citations]
+    Query[User Query] --> Planner[KnowledgeQueryPlanner]
+    Planner --> Plan[Typed QueryPlan & Metadata Filters]
+    Plan --> Validator[QueryPlanValidator]
+    Validator --> Route{Query Mode}
+    
+    Route -->|STRUCTURED| SQL[Direct Relational SQL Facts<br>COUNT / LIST]
+    Route -->|SEMANTIC| SemOnly["Semantic Branch<br>(pgvector Cosine <=> HNSW)"]
+    Route -->|HYBRID / FILTERED_HYBRID| Fused["Hybrid Retrieval<br>(pgvector + FTS GIN + RRF)"]
+    
+    SemOnly --> TopChild[Top Precision Child Chunks]
+    Fused --> TopChild
+    
+    TopChild --> Expander[ParentChildContextExpander<br>Expand to Parent Context & Deduplicate]
+    Expander --> Budget[Context Budget Enforcement<br>Max Character Limits]
+    Budget --> Prompt[GroundedPromptBuilder]
+    Prompt --> Gemini[Gemini 3.5 Flash Lite]
+    Gemini --> Answer[Answer + Verified Citations + Truthful Trace]
+    SQL --> Answer
 ```
 
-- **Embedding Model**: `gemini-embedding-001` (768 dimensions).
+- **Query Planning & Validation**: `KnowledgeQueryPlanner` classifies intent into typed execution plans (`STRUCTURED`, `SEMANTIC`, `HYBRID`, `FILTERED_HYBRID`). `QueryPlanValidator` ensures strict ownership validation and scope containment without search broadening.
+- **Hierarchical Ingestion**: `StructureAwareChunkingStrategy` generates large parent chunks (~1500 chars) for rich LLM context and small child chunks (~500 chars) with `EmbeddingTextBuilder` metadata for precise vector retrieval.
+- **Batch Vector Embeddings**: `GeminiEmbeddingProvider` performs native multi-content batch embeddings via Google GenAI SDK (`gemini-embedding-001`, 768 dimensions).
 - **Generation Model**: `gemini-3.5-flash-lite`.
-- **Reciprocal Rank Fusion Formula**:
+- **Reciprocal Rank Fusion**:
   $$\text{RRF Score}(d) = \sum_{m \in \{\text{semantic}, \text{lexical}\}} \frac{1}{60 + \text{rank}_m(d)}$$
 - **Four Retrieval Scopes**:
   1. `THIS_RESOURCE`: Filters strictly to the active document.
   2. `SELECTED_RESOURCES`: Filters to an explicit multi-document subset.
   3. `COLLECTION`: Queries all resources within a course/topic folder.
   4. `LIBRARY`: Global search across all user documents.
-- **Audit Citations**: Persistent `Citation` records link responses to verbatim chunk snippets.
-- **Prompt Injection Defense**: Untrusted text inside `<evidence>` XML blocks is parsed strictly as passive data evidence, neutralizing basic prompt injection attacks.
+- **Audit Citations & Explainability**: Persistent `Citation` records link responses to verbatim chunk snippets, and a deterministic system execution trace exposes executed stages without chain-of-thought exposure.
 
 ---
 
@@ -167,17 +173,20 @@ erDiagram
     RESOURCES }o--o{ TAGS : tagged_with
     RESOURCES }o--o{ COLLECTIONS : grouped_in
 
+    DOCUMENT_CHUNKS ||--o{ DOCUMENT_CHUNKS : parent_of
     CHAT_SESSIONS ||--o{ CHAT_MESSAGES : contains
     CHAT_MESSAGES ||--o{ CITATIONS : references
     DOCUMENT_CHUNKS ||--o{ CITATIONS : cited_by
 ```
 
-- **Migrations (Flyway V1–V13)**:
+- **Migrations (Flyway V1–V15)**:
   - `V9`: Relational knowledge base foundation (`resources`, `tags`, `collections`).
   - `V10`: Vector chunks table with `vector(768)` and HNSW index.
   - `V11`: Persistent chat sessions, messages, and grounded citations.
   - `V12`: Full-Text Search tsvector column and GIN index.
   - `V13`: Durable database-backed binary storage (`storage_blobs`).
+  - `V14`: Vietnamese full-text search unaccent dictionaries and immutable triggers.
+  - `V15`: RAG v2 hierarchical parent-child chunks (`chunk_level`, `parent_chunk_id`, `chunking_version`).
 
 ---
 
@@ -274,10 +283,10 @@ npm run dev
 
 ## 12. Automated & Quality Testing
 
-KnowledgeOS maintains comprehensive test coverage across backend algorithms, database durability, and RAG retrieval quality:
+KnowledgeOS maintains comprehensive test coverage across backend algorithms, database durability, and RAG v2 retrieval quality:
 
 ```bash
-# Run backend unit and service test suite (57 tests)
+# Run backend unit and orchestration test suite
 cd src/backend
 ./mvnw test
 
@@ -286,26 +295,26 @@ cd src/backend
 
 # Run frontend typechecking and fast linting
 cd ../frontend
-npx oxlint
+npm run lint
 npm run build
 ```
 
-- **Automated Tests**: 57 tests run, 0 failures, 0 errors.
+- **Backend Test Suite**: Automated unit and execution-path orchestration tests covering query planning, filter validation, structured execution, hybrid retrieval, parent-child expansion, and native Gemini batch embedding (plus optional live Neon pgvector and Gemini integration tests).
 - **RAG Evaluation Dataset**: 34 version-controlled test cases in `refer/qa_dataset/` validated by `RagEvaluationDatasetTest.java`.
 - **Manual QA Test Pack**: 28 structured test cards in `docs/05_qa_and_demo/TEST_CASES.md`.
 
 ---
 
-## 13. Known Limitations & Roadmap for v2
+## 13. System Boundaries & Future Roadmap
 
-We maintain complete engineering transparency regarding current v1 boundaries:
+We maintain complete engineering transparency regarding current Phase 2 capabilities and future roadmap:
 
-| Area | Current v1 Implementation | Future v2 Roadmap |
+| Area | Current Phase 2 Implementation | Future Roadmap |
 |---|---|---|
 | **Binary File Storage** | PostgreSQL `storage_blobs` (`BYTEA`). Simple, durable, and self-contained for moderate datasets. | S3-compatible object storage (`S3StorageService`) for massive multi-terabyte binary datasets. |
-| **Document Chunking** | Fixed 500-character window with 100-character overlap. | Hierarchical parent-child chunking (small chunks for vector retrieval; parent chunks for LLM context). |
-| **Reranking** | Mathematical Reciprocal Rank Fusion ($k=60$). Fast, lightweight, zero compute cost. | Cross-Encoder neural reranker (e.g. BGE-Reranker) for ultra-high semantic precision. |
-| **Response Streaming** | Synchronous JSON response payload. | Server-Sent Events (SSE) for token-by-token streaming generation in the chat UI. |
+| **Document Chunking** | Structure-Aware Hierarchical Chunking (Parent ~1500 chars for LLM context, Child ~500 chars for vector indexing). | Advanced Markdown AST table parser and visual layout boundary detectors. |
+| **RAG Retrieval** | Intent-Aware Query Planning, pgvector cosine similarity, PostgreSQL Full-Text Search, and Reciprocal Rank Fusion ($k=60$). | Cross-Encoder neural reranker (e.g. BGE-Reranker) for optional secondary reranking. |
+| **Response Streaming** | Synchronous JSON response payload with deterministic execution trace. | Server-Sent Events (SSE) for token-by-token streaming generation in the chat UI. |
 | **Scanned Documents** | Text extraction via Apache PDFBox / POI. | Optical Character Recognition (OCR) pipeline using Tesseract for image-based PDFs. |
 
 ---

@@ -31,7 +31,7 @@ class MetadataFilteringRetrievalTest {
     @BeforeEach
     void setUp() {
         semanticRepo = new SemanticRetrievalRepository(jdbcTemplate);
-        properties = new GeminiProperties("key", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 5, 2, 12, 60, 30000);
+        properties = new GeminiProperties("key", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000);
         semanticStrategy = new SemanticRetrievalStrategy(embeddingProvider, semanticRepo, properties);
         keywordStrategy = new KeywordRetrievalStrategy(jdbcTemplate);
     }
