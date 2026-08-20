@@ -128,6 +128,11 @@ public class KnowledgeWorkspaceController {
         return workspace.activity(user.getId(), resourceId);
     }
 
+    @PostMapping("/api/resources/{resourceId}/open")
+    public ResourceActivityResponse open(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId) {
+        return workspace.recordResourceOpened(user.getId(), resourceId);
+    }
+
     @PutMapping("/api/resources/{resourceId}/progress")
     public ResourceActivityResponse progress(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId, @Valid @RequestBody UpdateProgressRequest request) {
         return workspace.updateProgress(user.getId(), resourceId, request.progressPercent());

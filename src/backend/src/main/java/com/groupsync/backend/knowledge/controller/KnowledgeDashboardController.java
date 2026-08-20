@@ -6,7 +6,10 @@ import org.springframework.web.bind.annotation.*;
 import com.groupsync.backend.auth.security.AuthenticatedUser;
 import com.groupsync.backend.knowledge.dto.FocusNextResponse;
 import com.groupsync.backend.knowledge.dto.InsightOverviewResponse;
+import com.groupsync.backend.knowledge.dto.RecentActivityResponse;
 import com.groupsync.backend.knowledge.service.KnowledgeDashboardService;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api")
@@ -20,5 +23,10 @@ public class KnowledgeDashboardController {
     @GetMapping("/insights/overview")
     public InsightOverviewResponse overview(@AuthenticationPrincipal AuthenticatedUser user) {
         return dashboardService.overview(user.getId());
+    }
+
+    @GetMapping("/activity/recent")
+    public List<RecentActivityResponse> recentActivity(@AuthenticationPrincipal AuthenticatedUser user) {
+        return dashboardService.recentActivity(user.getId());
     }
 }

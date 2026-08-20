@@ -10,7 +10,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   autoOrganizeResource,
@@ -26,6 +26,7 @@ import {
   getResourceNotes,
   getResources,
   getTags,
+  recordResourceOpened,
   updateResourceProgress,
   type KnowledgeCollection,
   type KnowledgeTag,
@@ -79,6 +80,7 @@ export default function ResourceWorkspacePage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [progressVal, setProgressVal] = useState<number | null>(null)
+  const resourceOpenRecorded = useRef<number | null>(null)
 
   const loadResourceData = useCallback(async (id: number) => {
     if (!id || isNaN(id)) {
@@ -99,6 +101,10 @@ export default function ResourceWorkspacePage() {
 
       if (resResult.status === 'fulfilled' && resResult.value) {
         setResource(resResult.value)
+        if (resourceOpenRecorded.current !== id) {
+          resourceOpenRecorded.current = id
+          recordResourceOpened(id).then(setActivity).catch(() => {})
+        }
       } else {
         setError('Không thể tải thông tin tài liệu. Tài liệu có thể không tồn tại hoặc đã bị xoá.')
       }

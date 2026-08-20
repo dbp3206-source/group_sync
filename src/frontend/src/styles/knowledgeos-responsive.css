@@ -15,3 +15,18 @@
     animation-duration: 0.01ms !important;
   }
 }
+
+@media (max-width: 720px) {
+  .kos-home {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    min-height: auto;
+  }
+
+  .kos-home-copy { padding-top: 0; }
+  .kos-home h1 { font-size: clamp(2.85rem, 14vw, 4.5rem); }
+  .kos-hero-art { grid-row: 2; min-height: 390px; }
+  .kos-hero-art img { min-height: 390px; }
+  .kos-resume-card { grid-column: 1; grid-row: 3; width: 100%; margin-top: 0; }
+  .kos-home-band { grid-row: 4; grid-template-columns: 1fr; gap: .9rem; }
+}

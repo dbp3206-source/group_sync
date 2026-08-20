@@ -18,7 +18,7 @@ export type RegisterInput = {
 
 function parseUser(value: unknown): User {
   if (!value || typeof value !== 'object' || typeof (value as Partial<User>).id !== 'number' || typeof (value as Partial<User>).displayName !== 'string') {
-    throw new Error('GroupSync API is not available yet.')
+    throw new Error('KnowledgeOS server is not available yet.')
   }
   return value as User
 }
@@ -26,7 +26,7 @@ function parseUser(value: unknown): User {
 export async function getCsrfToken() {
   const response = await apiClient.get<{ token: string }>('/auth/csrf')
   if (!response.data || typeof response.data.token !== 'string' || !response.data.token) {
-    throw new Error('GroupSync API is not available yet.')
+    throw new Error('KnowledgeOS server is not available yet.')
   }
   return response.data.token
 }

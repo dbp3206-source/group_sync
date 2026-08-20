@@ -65,6 +65,7 @@ const SMART_PROMPT_PILLS = [
 export default function KnowledgeAskPage() {
   const [params] = useSearchParams()
   const initial = Number(params.get('resource') || params.get('resources'))
+  const sessionFromUrl = Number(params.get('session'))
   const [resources, setResources] = useState<Resource[]>([])
   const [collections, setCollections] = useState<KnowledgeCollection[]>([])
   const [sessions, setSessions] = useState<ChatSession[]>([])
@@ -109,10 +110,11 @@ export default function KnowledgeAskPage() {
 
   useEffect(() => {
     load()
+    if (sessionFromUrl) void open(sessionFromUrl)
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [])
+  }, [sessionFromUrl])
 
   const toggle = (id: number) =>
     setSelected(values =>

@@ -286,6 +286,16 @@ public class KnowledgeWorkspaceService {
         return activity(ownerId, resourceId);
     }
 
+    @Transactional
+    public ResourceActivityResponse recordResourceOpened(Long ownerId, Long resourceId) {
+        requireResource(ownerId, resourceId);
+        jdbc.update("insert into learning_progress(resource_id,owner_id,progress_percent,last_opened_at,updated_at) " +
+                        "values(:resource,:owner,0,now(),now()) " +
+                        "on conflict(resource_id,owner_id) do update set last_opened_at=excluded.last_opened_at,updated_at=excluded.updated_at",
+                Map.of("resource", resourceId, "owner", ownerId));
+        return activity(ownerId, resourceId);
+    }
+
     public void requireCollection(Long ownerId, Long id) {
         if (jdbc.queryForObject("select count(*) from collections where id=:id and owner_id=:owner", Map.of("id", id, "owner", ownerId), Integer.class) == 0) {
             throw new NotFoundException("Collection not found.");

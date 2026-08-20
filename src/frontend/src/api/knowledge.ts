@@ -94,6 +94,7 @@ export type KnowledgeCollection = { id: number; name: string; description: strin
 export type KnowledgeTag = { id: number; name: string; createdAt?: string }
 export type ResourceNote = { id: number; content: string; createdAt: string; updatedAt: string }
 export type ResourceActivity = { processingStatus: string; progressPercent: number; noteCount: number; createdAt: string; updatedAt: string; lastOpenedAt: string | null }
+export type RecentActivity = { type: 'RESOURCE_OPENED' | 'ASK_ACTIVITY' | 'FOCUS_ACTIVITY' | 'RECALL_ACTIVITY'; title: string; occurredAt: string; resumeUrl: string; context: string }
 export type RelatedResource = { id: number; title: string; description: string | null; resourceType: string; processingStatus: string; relationType?: string; createdAt?: string }
 export type ChatSession = { id: number; title: string; scope: string; collectionId: number; updatedAt: string }
 export type ChatDetail = ChatSession & { resourceIds: number[]; messages: { id:number; role:'USER'|'ASSISTANT'; content:string; citations:Citation[] }[] }
@@ -129,7 +130,9 @@ export async function updateResourceNote(id:number,noteId:number,content:string)
 export async function deleteResourceNote(id:number,noteId:number) { await apiClient.delete(`/resources/${id}/notes/${noteId}`) }
 export async function getRelatedResources(id:number) { return (await apiClient.get<RelatedResource[]>(`/resources/${id}/related`)).data }
 export async function getResourceActivity(id:number) { return (await apiClient.get<ResourceActivity>(`/resources/${id}/activity`)).data }
+export async function recordResourceOpened(id:number) { return (await apiClient.post<ResourceActivity>(`/resources/${id}/open`)).data }
 export async function updateResourceProgress(id:number, progressPercent:number) { return (await apiClient.put<ResourceActivity>(`/resources/${id}/progress`, { progressPercent })).data }
+export async function getRecentActivity() { return (await apiClient.get<RecentActivity[]>('/activity/recent')).data }
 export async function getOrganizationSuggestions(id:number) { return (await apiClient.get<OrganizationSuggestions>(`/resources/${id}/organization/suggestions`)).data }
 export async function applyOrganization(id:number, payload:{tagNames:string[]; collectionIds:number[]; newCollectionNames:string[]; relatedResourceIds:number[]}) { await apiClient.post(`/resources/${id}/organization/apply`, payload) }
 export async function deleteResource(id:number) { await apiClient.delete(`/resources/${id}`) }

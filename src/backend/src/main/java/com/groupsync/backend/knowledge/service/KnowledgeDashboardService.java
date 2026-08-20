@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import com.groupsync.backend.knowledge.dto.FocusNextResponse;
 import com.groupsync.backend.knowledge.dto.InsightOverviewResponse;
+import com.groupsync.backend.knowledge.dto.RecentActivityResponse;
 
 @Service
 public class KnowledgeDashboardService {
@@ -114,5 +115,54 @@ public class KnowledgeDashboardService {
                 """, parameters, (row, index) -> new InsightOverviewResponse.InsightTopicCount(row.getString("resource_type"), row.getLong("count")));
         return new InsightOverviewResponse(total == null ? 0 : total, ready == null ? 0 : ready,
                 inProgress == null ? 0 : inProgress, completed == null ? 0 : completed, composition);
+    }
+
+    public List<RecentActivityResponse> recentActivity(Long ownerId) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource("ownerId", ownerId)
+                .addValue("limit", 4);
+
+        List<RecentActivityResponse> candidates = jdbcTemplate.query("""
+                SELECT 'RESOURCE_OPENED' AS activity_type, r.title, lp.last_opened_at AS occurred_at,
+                       '/library/' || r.id AS resume_url, 'Mở không gian tài liệu' AS activity_context
+                FROM learning_progress lp
+                JOIN resources r ON r.id = lp.resource_id
+                WHERE lp.owner_id = :ownerId AND r.owner_id = :ownerId AND lp.last_opened_at IS NOT NULL
+
+                UNION ALL
+
+                SELECT 'ASK_ACTIVITY' AS activity_type, cs.title, cs.updated_at AS occurred_at,
+                       '/ask?session=' || cs.id AS resume_url, 'Đặt câu hỏi trong Ask' AS activity_context
+                FROM chat_sessions cs
+                WHERE cs.owner_id = :ownerId
+
+                UNION ALL
+
+                SELECT 'FOCUS_ACTIVITY' AS activity_type, st.title, st.updated_at AS occurred_at,
+                       '/focus' AS resume_url, 'Làm việc trong Focus' AS activity_context
+                FROM study_topics st
+                WHERE st.owner_id = :ownerId
+
+                UNION ALL
+
+                SELECT 'RECALL_ACTIVITY' AS activity_type, st.title, qa.created_at AS occurred_at,
+                       '/focus' AS resume_url, 'Thực hiện một lượt Recall' AS activity_context
+                FROM quiz_attempts qa
+                JOIN study_topics st ON st.id = qa.topic_id
+                WHERE qa.owner_id = :ownerId AND st.owner_id = :ownerId
+
+                ORDER BY occurred_at DESC
+                LIMIT :limit
+                """, parameters, (row, index) -> new RecentActivityResponse(
+                row.getString("activity_type"),
+                row.getString("title"),
+                row.getTimestamp("occurred_at").toInstant(),
+                row.getString("resume_url"),
+                row.getString("activity_context")
+        ));
+
+        return candidates.stream()
+                .sorted(java.util.Comparator.comparing(RecentActivityResponse::occurredAt).reversed())
+                .limit(4)
+                .toList();
     }
 }

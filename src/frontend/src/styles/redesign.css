@@ -271,7 +271,7 @@
   font: 600 1.1rem var(--kos-font-display);
 }
 
-.kos-focus-card {
+.kos-resume-card {
   grid-column: 1;
   align-self: end;
   margin-top: -9rem;
@@ -284,7 +284,7 @@
   box-shadow: var(--gs-shadow);
 }
 
-.kos-focus-card span,
+.kos-resume-card span,
 .kos-resource p {
   color: var(--kos-blue);
   font-size: .67rem;
@@ -293,7 +293,7 @@
   text-transform: uppercase;
 }
 
-.kos-focus-card h2 {
+.kos-resume-card h2 {
   color: var(--kos-ink);
   margin: .55rem 0;
   font-family: var(--kos-font-display);
@@ -301,13 +301,13 @@
   font-weight: 700;
 }
 
-.kos-focus-card p {
+.kos-resume-card p {
   color: var(--kos-muted);
   line-height: 1.5;
   font-size: .86rem;
 }
 
-.kos-focus-card a {
+.kos-resume-card a {
   display: inline-flex;
   gap: .35rem;
   align-items: center;
@@ -315,6 +315,39 @@
   font-weight: 700;
   font-size: .82rem;
 }
+
+.kos-resume-time {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  margin: .8rem 0 0;
+  color: var(--kos-muted) !important;
+  font-size: .76rem !important;
+}
+
+.kos-recent-list {
+  display: grid;
+  gap: .65rem;
+  margin-top: 1.1rem;
+  padding-top: .85rem;
+  border-top: 1px solid var(--kos-line);
+}
+
+.kos-recent-list a {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: .65rem;
+  align-items: start;
+  color: var(--kos-ink);
+  font-size: .76rem;
+  text-decoration: none;
+}
+
+.kos-recent-list a:hover { color: var(--kos-blue); }
+.kos-recent-list time { color: var(--kos-muted); font-size: .7rem; }
+.kos-recent-list b,
+.kos-recent-list small { display: block; }
+.kos-recent-list small { margin-top: .12rem; color: var(--kos-muted); font-size: .7rem; }
 
 .kos-home-band {
   grid-column: 1 / -1;
@@ -354,9 +387,44 @@
     animation: kos-page-enter 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
+  .kos-home-copy > * {
+    animation: kos-home-reveal 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .kos-home-copy > :nth-child(1) { animation-delay: 60ms; }
+  .kos-home-copy > :nth-child(2) { animation-delay: 120ms; }
+  .kos-home-copy > :nth-child(3) { animation-delay: 180ms; }
+  .kos-home-copy > :nth-child(4) { animation-delay: 240ms; }
+  .kos-home-copy > :nth-child(5) { animation-delay: 300ms; }
+
+  .kos-hero-art {
+    animation: kos-home-art-reveal 680ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: 120ms;
+  }
+
+  .kos-resume-card {
+    animation: kos-home-reveal 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: 260ms;
+  }
+
+  .kos-home-band {
+    animation: kos-home-reveal 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: 340ms;
+  }
+
   @keyframes kos-page-enter {
     from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: none; }
+  }
+
+  @keyframes kos-home-reveal {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @keyframes kos-home-art-reveal {
+    from { opacity: 0; clip-path: inset(0 0 0 12%); }
+    to { opacity: 1; clip-path: inset(0); }
   }
 }
 
@@ -3523,4 +3591,3 @@
     position: static;
   }
 }
-
