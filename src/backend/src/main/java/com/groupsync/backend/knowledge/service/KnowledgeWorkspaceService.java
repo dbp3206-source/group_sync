@@ -4,14 +4,19 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.groupsync.backend.knowledge.dto.*;
 import com.groupsync.backend.knowledge.model.ResourceProcessingStatus;
 import com.groupsync.backend.knowledge.model.ResourceType;
+import com.groupsync.backend.shared.exception.ConflictException;
 import com.groupsync.backend.shared.exception.NotFoundException;
 
 /** Small query layer for workspace data that is intentionally stored in simple join tables. */
@@ -26,14 +31,17 @@ public class KnowledgeWorkspaceService {
 
     @Transactional(readOnly = true)
     public List<CollectionResponse> collections(Long ownerId) {
-        String sql = "select id, name, description, created_at, updated_at from collections where owner_id=:owner order by updated_at desc";
+        String sql = "select c.id, c.name, c.description, c.created_at, c.updated_at, "
+                + "(select count(*) from resource_collections rc where rc.collection_id=c.id) as resource_count "
+                + "from collections c where c.owner_id=:owner order by c.updated_at desc";
         return jdbc.query(sql, Map.of("owner", ownerId), (rs, rowNum) ->
                 new CollectionResponse(
                         rs.getLong("id"),
                         rs.getString("name"),
                         rs.getString("description"),
                         toInstant(rs.getTimestamp("created_at")),
-                        toInstant(rs.getTimestamp("updated_at"))
+                        toInstant(rs.getTimestamp("updated_at")),
+                        rs.getLong("resource_count")
                 )
         );
     }
@@ -112,33 +120,43 @@ public class KnowledgeWorkspaceService {
     @Transactional
     public CollectionResponse createCollection(Long ownerId, String name, String description) {
         String reqName = required(name);
+        if (collectionExists(ownerId, reqName, null)) {
+            throw new ConflictException("A collection with this name already exists.");
+        }
+        MapSqlParameterSource params = collectionParams(ownerId, null, reqName, description);
         jdbc.update("insert into collections(owner_id,name,description,created_at,updated_at) values(:owner,:name,:description,now(),now())",
-                Map.of("owner", ownerId, "name", reqName, "description", blankToNull(description)));
-        return jdbc.queryForObject("select id,name,description,created_at,updated_at from collections where owner_id=:owner and name=:name",
-                Map.of("owner", ownerId, "name", reqName),
-                (rs, rowNum) -> new CollectionResponse(rs.getLong("id"), rs.getString("name"), rs.getString("description"), toInstant(rs.getTimestamp("created_at")), toInstant(rs.getTimestamp("updated_at")))
+                params);
+        return jdbc.queryForObject("select c.id,c.name,c.description,c.created_at,c.updated_at,(select count(*) from resource_collections rc where rc.collection_id=c.id) as resource_count from collections c where c.owner_id=:owner and c.name=:name",
+                new MapSqlParameterSource("owner", ownerId).addValue("name", reqName),
+                this::mapCollection
         );
     }
 
     @Transactional
     public CollectionResponse findOrCreateCollection(Long ownerId, String name, String description) {
         String reqName = required(name);
+        MapSqlParameterSource params = collectionParams(ownerId, null, reqName, description);
         jdbc.update("insert into collections(owner_id,name,description,created_at,updated_at) values(:owner,:name,:description,now(),now()) on conflict(owner_id,name) do update set updated_at=now()",
-                Map.of("owner", ownerId, "name", reqName, "description", blankToNull(description)));
-        return jdbc.queryForObject("select id,name,description,created_at,updated_at from collections where owner_id=:owner and name=:name",
-                Map.of("owner", ownerId, "name", reqName),
-                (rs, rowNum) -> new CollectionResponse(rs.getLong("id"), rs.getString("name"), rs.getString("description"), toInstant(rs.getTimestamp("created_at")), toInstant(rs.getTimestamp("updated_at")))
+                params);
+        return jdbc.queryForObject("select c.id,c.name,c.description,c.created_at,c.updated_at,(select count(*) from resource_collections rc where rc.collection_id=c.id) as resource_count from collections c where c.owner_id=:owner and c.name=:name",
+                new MapSqlParameterSource("owner", ownerId).addValue("name", reqName),
+                this::mapCollection
         );
     }
 
     @Transactional
     public CollectionResponse updateCollection(Long ownerId, Long id, String name, String description) {
         requireCollection(ownerId, id);
+        String reqName = required(name);
+        if (collectionExists(ownerId, reqName, id)) {
+            throw new ConflictException("A collection with this name already exists.");
+        }
+        MapSqlParameterSource params = collectionParams(ownerId, id, reqName, description);
         jdbc.update("update collections set name=:name,description=:description,updated_at=now() where id=:id",
-                Map.of("id", id, "name", required(name), "description", blankToNull(description)));
-        return jdbc.queryForObject("select id,name,description,created_at,updated_at from collections where id=:id",
-                Map.of("id", id),
-                (rs, rowNum) -> new CollectionResponse(rs.getLong("id"), rs.getString("name"), rs.getString("description"), toInstant(rs.getTimestamp("created_at")), toInstant(rs.getTimestamp("updated_at")))
+                params);
+        return jdbc.queryForObject("select c.id,c.name,c.description,c.created_at,c.updated_at,(select count(*) from resource_collections rc where rc.collection_id=c.id) as resource_count from collections c where c.id=:id",
+                new MapSqlParameterSource("id", id),
+                this::mapCollection
         );
     }
 
@@ -154,6 +172,17 @@ public class KnowledgeWorkspaceService {
         requireResource(ownerId, resourceId);
         jdbc.update("insert into resource_collections(resource_id,collection_id) values(:resource,:collection) on conflict do nothing",
                 Map.of("resource", resourceId, "collection", collectionId));
+    }
+
+    @Transactional
+    public BulkOperationResponse assignResources(Long ownerId, Long collectionId, List<Long> resourceIds) {
+        List<Long> ids = normalizedIds(resourceIds);
+        requireCollection(ownerId, collectionId);
+        ids.forEach(resourceId -> requireResource(ownerId, resourceId));
+        ids.forEach(resourceId -> jdbc.update(
+                "insert into resource_collections(resource_id,collection_id) values(:resource,:collection) on conflict do nothing",
+                Map.of("resource", resourceId, "collection", collectionId)));
+        return new BulkOperationResponse(ids.size(), ids.size());
     }
 
     @Transactional
@@ -329,5 +358,47 @@ public class KnowledgeWorkspaceService {
 
     private String normalizeTag(String value) {
         return required(value).toLowerCase(java.util.Locale.ROOT).replaceAll("\\s+", "-");
+    }
+
+    private MapSqlParameterSource collectionParams(Long ownerId, Long id, String name, String description) {
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("owner", ownerId)
+                .addValue("name", name)
+                .addValue("description", blankToNull(description));
+        if (id != null) params.addValue("id", id);
+        return params;
+    }
+
+    private boolean collectionExists(Long ownerId, String name, Long excludedId) {
+        String sql = "select count(*) from collections where owner_id=:owner and name=:name"
+                + (excludedId == null ? "" : " and id<>:excludedId");
+        MapSqlParameterSource params = new MapSqlParameterSource("owner", ownerId).addValue("name", name);
+        if (excludedId != null) params.addValue("excludedId", excludedId);
+        return Objects.requireNonNull(jdbc.queryForObject(sql, params, Integer.class)) > 0;
+    }
+
+    private CollectionResponse mapCollection(ResultSet rs, int rowNum) throws SQLException {
+        return new CollectionResponse(
+                rs.getLong("id"),
+                rs.getString("name"),
+                rs.getString("description"),
+                toInstant(rs.getTimestamp("created_at")),
+                toInstant(rs.getTimestamp("updated_at")),
+                rs.getLong("resource_count")
+        );
+    }
+
+    private List<Long> normalizedIds(List<Long> resourceIds) {
+        if (resourceIds == null || resourceIds.isEmpty()) {
+            throw new IllegalArgumentException("Select at least one resource.");
+        }
+        if (resourceIds.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("Resource selection contains an invalid id.");
+        }
+        Set<Long> unique = new HashSet<>(resourceIds);
+        if (unique.size() != resourceIds.size()) {
+            throw new IllegalArgumentException("Resource selection contains duplicates.");
+        }
+        return List.copyOf(resourceIds);
     }
 }

@@ -7,5 +7,10 @@ public record CollectionResponse(
         String name,
         String description,
         Instant createdAt,
-        Instant updatedAt
-) {}
+        Instant updatedAt,
+        long resourceCount
+) {
+    public CollectionResponse(Long id, String name, String description, Instant createdAt, Instant updatedAt) {
+        this(id, name, description, createdAt, updatedAt, 0L);
+    }
+}

@@ -78,6 +78,13 @@ public class ResourceController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/bulk-delete")
+    public BulkOperationResponse bulkDelete(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @Valid @RequestBody BulkResourceIdsRequest request) {
+        return resourceService.deleteBulk(user.getId(), request.resourceIds());
+    }
+
     @PostMapping("/{resourceId}/retry")
     public ResourceResponse retry(
             @AuthenticationPrincipal AuthenticatedUser user,

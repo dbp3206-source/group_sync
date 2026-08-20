@@ -20,6 +20,8 @@ import com.groupsync.backend.knowledge.repository.CitationRepository;
 import com.groupsync.backend.knowledge.repository.ResourceRepository;
 import com.groupsync.backend.knowledge.service.ResourceService;
 import com.groupsync.backend.knowledge.storage.StorageService;
+import com.groupsync.backend.shared.exception.BadRequestException;
+import com.groupsync.backend.shared.exception.NotFoundException;
 import com.groupsync.backend.user.model.UserAccount;
 import com.groupsync.backend.user.repository.UserAccountRepository;
 
@@ -89,5 +91,36 @@ class ResourceDeleteWithCitationsTest {
         assertDoesNotThrow(() -> resourceService.delete(ownerId, resourceId));
         verify(citationRepository).deleteByChunkResourceId(resourceId);
         verify(resourceRepository).delete(resource);
+    }
+
+    @Test
+    void bulkDeleteValidatesEveryOwnerBeforeDeletingAnyResource() throws IOException {
+        Long ownerId = 1L;
+        UserAccount owner = new UserAccount("owner@example.com", "hash", "Owner");
+        Resource first = new Resource(owner, "First", null, ResourceType.NOTE, null, "text/markdown", 50L, "1/first.md", "one");
+        Resource second = new Resource(owner, "Second", null, ResourceType.NOTE, null, "text/markdown", 50L, "1/second.md", "two");
+        when(resourceRepository.findByIdAndOwnerId(10L, ownerId)).thenReturn(Optional.of(first));
+        when(resourceRepository.findByIdAndOwnerId(11L, ownerId)).thenReturn(Optional.of(second));
+
+        assertEquals(2, resourceService.deleteBulk(ownerId, java.util.List.of(10L, 11L)).affectedCount());
+        verify(resourceRepository, times(2)).delete(any(Resource.class));
+    }
+
+    @Test
+    void bulkDeleteRejectsCrossOwnerSelectionWithoutPartialDeletion() {
+        Long ownerId = 1L;
+        UserAccount owner = new UserAccount("owner@example.com", "hash", "Owner");
+        Resource first = new Resource(owner, "First", null, ResourceType.NOTE, null, "text/markdown", 50L, "1/first.md", "one");
+        when(resourceRepository.findByIdAndOwnerId(10L, ownerId)).thenReturn(Optional.of(first));
+        when(resourceRepository.findByIdAndOwnerId(11L, ownerId)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> resourceService.deleteBulk(ownerId, java.util.List.of(10L, 11L)));
+        verify(resourceRepository, never()).delete(any(Resource.class));
+    }
+
+    @Test
+    void bulkDeleteRejectsEmptySelection() {
+        assertThrows(BadRequestException.class, () -> resourceService.deleteBulk(1L, java.util.List.of()));
+        verifyNoInteractions(resourceRepository);
     }
 }

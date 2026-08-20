@@ -203,6 +203,20 @@ public class ResourceService {
     }
 
     @Transactional
+    public BulkOperationResponse deleteBulk(Long ownerId, List<Long> resourceIds) {
+        if (resourceIds == null || resourceIds.isEmpty()) {
+            throw new BadRequestException("Select at least one resource.");
+        }
+        if (resourceIds.stream().anyMatch(Objects::isNull)
+                || resourceIds.stream().distinct().count() != resourceIds.size()) {
+            throw new BadRequestException("Resource selection contains an invalid or duplicate id.");
+        }
+        resourceIds.forEach(resourceId -> find(ownerId, resourceId));
+        resourceIds.forEach(resourceId -> delete(ownerId, resourceId));
+        return new BulkOperationResponse(resourceIds.size(), resourceIds.size());
+    }
+
+    @Transactional
     public ResourceResponse retry(Long ownerId, Long resourceId) {
         Resource resource = find(ownerId, resourceId);
         resource.retry();

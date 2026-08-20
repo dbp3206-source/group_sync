@@ -74,6 +74,14 @@ public class KnowledgeWorkspaceController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/api/collections/{id}/resources/bulk")
+    public BulkOperationResponse assignBulk(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long id,
+            @Valid @RequestBody BulkResourceIdsRequest request) {
+        return workspace.assignResources(user.getId(), id, request.resourceIds());
+    }
+
     @DeleteMapping("/api/collections/{id}/resources/{resourceId}")
     public ResponseEntity<Void> remove(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id, @PathVariable Long resourceId) {
         workspace.removeResource(user.getId(), id, resourceId);

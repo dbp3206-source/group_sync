@@ -9,7 +9,7 @@ export type PagedResponse<T> = {
   hasNext: boolean
 }
 
-export type Resource = { id: number; title: string; description: string | null; resourceType: string; processingStatus: string; favorite: boolean; priority: number; originalFilename?: string | null; sizeBytes?: number | null; createdAt: string }
+export type Resource = { id: number; title: string; description: string | null; resourceType: string; processingStatus: string; processingError?: string | null; favorite: boolean; priority: number; originalFilename?: string | null; sizeBytes?: number | null; createdAt: string; updatedAt?: string }
 export type FocusNext = { resourceId: number; title: string; resourceType: string; priority: number; favorite: boolean; progressPercent: number; reason: string }
 export type InsightOverview = { totalResources: number; readyResources: number; inProgressResources: number; completedResources: number; composition: { resourceType: string; count: number }[] }
 export type PlannerTrace = {
@@ -90,7 +90,7 @@ export type ResourceIngestionTrace = {
 export type Citation = { chunkId: number; resourceId: number; resourceTitle: string; pageNumber: number | null; section: string | null; citationOrder: number; relevanceScore: number; evidenceExcerpt: string }
 export type AskResponse = { sessionId: number; answer: string; grounded: boolean; citations: Citation[]; trace?: RagExecutionTrace }
 export type AskInput = { sessionId?: number; question: string; scope: 'THIS_RESOURCE' | 'SELECTED_RESOURCES' | 'COLLECTION' | 'LIBRARY'; resourceId?: number; resourceIds?: number[]; collectionId?: number; sessionTitle?: string }
-export type KnowledgeCollection = { id: number; name: string; description: string | null; createdAt?: string; updatedAt?: string }
+export type KnowledgeCollection = { id: number; name: string; description: string | null; createdAt?: string; updatedAt?: string; resourceCount?: number }
 export type KnowledgeTag = { id: number; name: string; createdAt?: string }
 export type ResourceNote = { id: number; content: string; createdAt: string; updatedAt: string }
 export type ResourceActivity = { processingStatus: string; progressPercent: number; noteCount: number; createdAt: string; updatedAt: string; lastOpenedAt: string | null }
@@ -115,12 +115,16 @@ export async function uploadResource(file: File, title?: string) { const body = 
 export async function askKnowledge(input: AskInput) { return (await apiClient.post<AskResponse>('/ask', input)).data }
 export async function getCollections() { return (await apiClient.get<KnowledgeCollection[]>('/collections')).data }
 export async function createCollection(name:string, description='') { return (await apiClient.post<KnowledgeCollection>('/collections', { name, description })).data }
+export async function updateCollection(id:number, name:string, description='') { return (await apiClient.patch<KnowledgeCollection>(`/collections/${id}`, { name, description })).data }
+export async function deleteCollection(id:number) { await apiClient.delete(`/collections/${id}`) }
 export async function getTags() { return (await apiClient.get<KnowledgeTag[]>('/tags')).data }
 export async function createTag(name:string) { return (await apiClient.post<KnowledgeTag>('/tags', { name })).data }
 export async function getResourceTags(id:number) { return (await apiClient.get<KnowledgeTag[]>(`/resources/${id}/tags`)).data }
 export async function assignTagToResource(resourceId:number, tagId:number) { await apiClient.put(`/resources/${resourceId}/tags/${tagId}`) }
 export async function removeTagFromResource(resourceId:number, tagId:number) { await apiClient.delete(`/resources/${resourceId}/tags/${tagId}`) }
 export async function assignResourceToCollection(collectionId:number, resourceId:number) { await apiClient.put(`/collections/${collectionId}/resources/${resourceId}`) }
+export async function assignResourcesToCollection(collectionId:number, resourceIds:number[]) { return (await apiClient.post<{ requestedCount:number; affectedCount:number }>(`/collections/${collectionId}/resources/bulk`, { resourceIds })).data }
+export async function removeResourceFromCollection(collectionId:number, resourceId:number) { await apiClient.delete(`/collections/${collectionId}/resources/${resourceId}`) }
 export async function getCollectionResources(collectionId:number) { return (await apiClient.get<Resource[]>(`/collections/${collectionId}/resources`)).data }
 export async function getChatSessions() { return (await apiClient.get<ChatSession[]>('/ask/sessions')).data }
 export async function getChatSession(id:number) { return (await apiClient.get<ChatDetail>(`/ask/sessions/${id}`)).data }
@@ -136,6 +140,8 @@ export async function getRecentActivity() { return (await apiClient.get<RecentAc
 export async function getOrganizationSuggestions(id:number) { return (await apiClient.get<OrganizationSuggestions>(`/resources/${id}/organization/suggestions`)).data }
 export async function applyOrganization(id:number, payload:{tagNames:string[]; collectionIds:number[]; newCollectionNames:string[]; relatedResourceIds:number[]}) { await apiClient.post(`/resources/${id}/organization/apply`, payload) }
 export async function deleteResource(id:number) { await apiClient.delete(`/resources/${id}`) }
+export async function retryResource(id:number) { return (await apiClient.post<Resource>(`/resources/${id}/retry`)).data }
+export async function deleteResources(ids:number[]) { return (await apiClient.post<{ requestedCount:number; affectedCount:number }>('/resources/bulk-delete', { resourceIds: ids })).data }
 export async function updateResourceFavorite(id:number, favorite:boolean) { return (await apiClient.patch<Resource>(`/resources/${id}`, { favorite })).data }
 export async function autoOrganizeAll() { return (await apiClient.post<{ message: string }>('/resources/auto-organize-all')).data }
 export async function autoOrganizeResource(id: number) { return (await apiClient.post<{ message: string }>(`/resources/${id}/auto-organize`)).data }
