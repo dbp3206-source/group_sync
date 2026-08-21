@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import com.groupsync.backend.knowledge.dto.DocumentUnderstandingResult;
+import com.groupsync.backend.knowledge.dto.ResourceUnderstandingResponse;
 import com.groupsync.backend.knowledge.rag.GeminiProperties;
 import com.groupsync.backend.knowledge.rag.LanguageModelClient;
 import com.groupsync.backend.knowledge.service.DocumentUnderstandingTransactionService.StoredUnderstanding;
@@ -35,6 +36,17 @@ public class DocumentUnderstandingService {
     }
 
     public record Outcome(String status, DocumentUnderstandingResult result, boolean reused, List<String> warnings) { }
+
+    public ResourceUnderstandingResponse readForWorkspace(Long ownerId, Long resourceId) {
+        Optional<DocumentUnderstandingTransactionService.WorkspaceUnderstanding> stored =
+                transactions.readForWorkspace(ownerId, resourceId);
+        if (stored.isEmpty()) {
+            return new ResourceUnderstandingResponse("NOT_AVAILABLE", null, null, List.of(), List.of(), 0, null);
+        }
+        var value = stored.get();
+        return new ResourceUnderstandingResponse(value.status(), value.normalizedTitle(), value.summary(),
+                parseList(value.keyIdeasJson()), parseList(value.broadThemesJson()), value.evidenceCount(), value.updatedAt());
+    }
 
     public Outcome understand(Long ownerId, Long resourceId) {
         long started = System.nanoTime();
@@ -104,6 +116,16 @@ public class DocumentUnderstandingService {
                     stored.difficultyLevel(), stored.evidenceChunkIds());
         } catch (Exception e) {
             throw new IllegalStateException("Stored document understanding is invalid.", e);
+        }
+    }
+
+    private List<String> parseList(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() { });
+        } catch (Exception e) {
+            log.warn("Stored document understanding list could not be read: {}", e.getMessage());
+            return List.of();
         }
     }
 

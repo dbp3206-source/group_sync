@@ -1,84 +1,115 @@
 import {
   ArrowLeft,
-  BookOpen,
-  BrainCircuit,
-  Compass,
+  Check,
+  ChevronDown,
   FileText,
+  Folder,
   Loader2,
+  MoreHorizontal,
   Network,
+  Pencil,
   RefreshCw,
   Sparkles,
+  Tag,
   Trash2,
+  X,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  autoOrganizeResource,
   applyOrganization,
+  autoOrganizeResource,
   createResourceNote,
   deleteResource,
   deleteResourceNote,
-  getCollections,
-  getOrganizationSuggestions,
-  getRelatedResources,
   getResource,
-  getResourceActivity,
-  getResourceContent,
+  getResourceCollections,
+  getResourceDeepDive,
   getResourceIngestionTrace,
+  getResourceKnowledgeMap,
   getResourceNotes,
-  getResources,
-  getTags,
+  getResourceTags,
+  getResourceUnderstanding,
   recordResourceOpened,
-  updateResourceProgress,
+  getOrganizationSuggestions,
+  retryResource,
+  updateResourceNote,
   type KnowledgeCollection,
   type KnowledgeTag,
   type OrganizationSuggestions,
-  type RelatedResource,
   type Resource,
-  type ResourceActivity,
+  type ResourceDeepDive,
   type ResourceIngestionTrace,
+  type ResourceKnowledgeMap,
   type ResourceNote,
+  type ResourceUnderstanding,
   type SemanticOrganizationResult,
 } from '../api/knowledge'
 import KnowledgeGraphView from '../components/KnowledgeGraphView'
 
-type Tab = 'Overview' | 'Reader' | 'Notes' | 'Related' | 'Activity'
+type Surface = 'overview' | 'deep-dive' | 'knowledge-map'
+
+function cleanFilename(value: string | null | undefined) {
+  const raw = (value || '').trim()
+  if (!raw) return 'Untitled resource'
+  const cleaned = raw.replace(/\.(pdf|docx|txt|md)$/i, '').replace(/(?:[_-](?:final|copy|draft|v\d+)(?:[_-]?\d+)?)+$/i, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim()
+  return cleaned || 'Untitled resource'
+}
+
+function displayTitle(resource: Resource, understanding: ResourceUnderstanding | null) {
+  if (understanding?.status === 'CURRENT' && understanding.normalizedTitle?.trim()) return understanding.normalizedTitle.trim()
+  return cleanFilename(resource.title || resource.originalFilename)
+}
+
+function statusLabel(status: string | undefined) {
+  switch (status) {
+    case 'CURRENT': return 'Understanding ready'
+    case 'FAILED': return 'Understanding failed'
+    case 'UNSUPPORTED': return 'Not enough readable evidence'
+    case 'STALE': return 'Understanding needs refresh'
+    default: return 'Understanding not available'
+  }
+}
+
+function formatBytes(value: number | null | undefined) {
+  if (!value) return '—'
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
 
 export default function ResourceWorkspacePage() {
-  const params = useParams()
-  const rawId = params.resourceId || params.id
-  const resourceId = Number(rawId)
+  const { resourceId: resourceParam, id: legacyId } = useParams()
+  const resourceId = Number(resourceParam || legacyId)
   const navigate = useNavigate()
-
-  // Core metadata state
   const [resource, setResource] = useState<Resource | null>(null)
-  const [activity, setActivity] = useState<ResourceActivity | null>(null)
-  const [ingestionTrace, setIngestionTrace] = useState<ResourceIngestionTrace | null>(null)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
-
-  // Active tab
-  const [tab, setTab] = useState<Tab>('Overview')
-
-  // Lazy tab caches
-  const [content, setContent] = useState<string | null>(null)
-  const [contentLoading, setContentLoading] = useState(false)
-  const [contentError, setContentError] = useState('')
-
-  const [notes, setNotes] = useState<ResourceNote[] | null>(null)
-  const [notesLoading, setNotesLoading] = useState(false)
-
-  const [related, setRelated] = useState<RelatedResource[] | null>(null)
-  const [relatedLoading, setRelatedLoading] = useState(false)
-
-  const [graphDataLoaded, setGraphDataLoaded] = useState(false)
-  const [allResources, setAllResources] = useState<Resource[]>([])
-  const [collections, setCollections] = useState<KnowledgeCollection[]>([])
+  const [understanding, setUnderstanding] = useState<ResourceUnderstanding | null>(null)
   const [tags, setTags] = useState<KnowledgeTag[]>([])
-
-  // Note form & UI state
+  const [collections, setCollections] = useState<KnowledgeCollection[]>([])
+  const [notes, setNotes] = useState<ResourceNote[]>([])
+  const [deepDive, setDeepDive] = useState<ResourceDeepDive | null>(null)
+  const [knowledgeMap, setKnowledgeMap] = useState<ResourceKnowledgeMap | null>(null)
+  const [ingestionTrace, setIngestionTrace] = useState<ResourceIngestionTrace | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [surface, setSurface] = useState<Surface>('overview')
+  const [optionalLoading, setOptionalLoading] = useState(true)
+  const [optionalErrors, setOptionalErrors] = useState<Record<string, string>>({})
+  const [notesOpen, setNotesOpen] = useState(false)
   const [draft, setDraft] = useState('')
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null)
+  const [editingNoteDraft, setEditingNoteDraft] = useState('')
+  const [noteDeleteId, setNoteDeleteId] = useState<number | null>(null)
   const [noteBusy, setNoteBusy] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [retryBusy, setRetryBusy] = useState(false)
+  const [organizing, setOrganizing] = useState(false)
   const [autoOrganizeMsg, setAutoOrganizeMsg] = useState('')
   const [organizationResult, setOrganizationResult] = useState<SemanticOrganizationResult | null>(null)
   const [organizationSuggestions, setOrganizationSuggestions] = useState<OrganizationSuggestions | null>(null)
@@ -86,129 +117,182 @@ export default function ResourceWorkspacePage() {
   const [selectedTagNames, setSelectedTagNames] = useState<string[]>([])
   const [selectedCollectionKeys, setSelectedCollectionKeys] = useState<string[]>([])
   const [suggestionBusy, setSuggestionBusy] = useState(false)
-  const [organizing, setOrganizing] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [progressVal, setProgressVal] = useState<number | null>(null)
-  const resourceOpenRecorded = useRef<number | null>(null)
+  const openedResource = useRef<number | null>(null)
 
-  const loadResourceData = useCallback(async (id: number) => {
-    if (!id || isNaN(id)) {
+  const loadResource = useCallback(async (id: number) => {
+    if (!id || Number.isNaN(id)) {
       setError('Mã tài liệu không hợp lệ.')
       setLoading(false)
       return
     }
-
     setLoading(true)
     setError('')
-
     try {
-      const [resResult, actResult, traceResult] = await Promise.allSettled([
-        getResource(id),
-        getResourceActivity(id),
-        getResourceIngestionTrace(id),
-      ])
-
-      if (resResult.status === 'fulfilled' && resResult.value) {
-        setResource(resResult.value)
-        if (resourceOpenRecorded.current !== id) {
-          resourceOpenRecorded.current = id
-          recordResourceOpened(id).then(setActivity).catch(() => {})
-        }
-      } else {
-        setError('Không thể tải thông tin tài liệu. Tài liệu có thể không tồn tại hoặc đã bị xoá.')
-      }
-
-      if (actResult.status === 'fulfilled' && actResult.value) {
-        setActivity(actResult.value)
-      }
-
-      if (traceResult.status === 'fulfilled' && traceResult.value) {
-        setIngestionTrace(traceResult.value)
+      const loaded = await getResource(id)
+      setResource(loaded)
+      if (openedResource.current !== id) {
+        openedResource.current = id
+        void recordResourceOpened(id).catch(() => {})
       }
     } catch {
-      setError('Đã xảy ra lỗi khi tải không gian làm việc.')
+      setError('Không thể tải thông tin tài liệu. Tài liệu có thể không tồn tại hoặc đã bị xoá.')
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    setContent(null)
-    setNotes(null)
-    setRelated(null)
-    setGraphDataLoaded(false)
-    loadResourceData(resourceId)
-  }, [resourceId, loadResourceData])
+    setResource(null)
+    setUnderstanding(null)
+    setTags([])
+    setCollections([])
+    setNotes([])
+    setDeepDive(null)
+    setKnowledgeMap(null)
+    setIngestionTrace(null)
+    setOptionalErrors({})
+    setSurface('overview')
+    setNotesOpen(false)
+    openedResource.current = null
+    void loadResource(resourceId)
+  }, [loadResource, resourceId])
 
-  // Lazy loading on tab activation
   useEffect(() => {
-    if (!resourceId || isNaN(resourceId)) return
-
-    if (tab === 'Reader' && content === null && !contentLoading) {
-      setContentLoading(true)
-      setContentError('')
-      getResourceContent(resourceId)
-        .then(text => setContent(text || ''))
-        .catch(() => setContentError('Không thể đọc nội dung tài liệu. Vui lòng thử lại.'))
-        .finally(() => setContentLoading(false))
-    } else if (tab === 'Notes' && notes === null && !notesLoading) {
-      setNotesLoading(true)
-      getResourceNotes(resourceId)
-        .then(n => setNotes(n || []))
-        .catch(() => setNotes([]))
-        .finally(() => setNotesLoading(false))
-    } else if (tab === 'Related' && related === null && !relatedLoading) {
-      setRelatedLoading(true)
-      getRelatedResources(resourceId)
-        .then(r => setRelated(r || []))
-        .catch(() => setRelated([]))
-        .finally(() => setRelatedLoading(false))
-    } else if (tab === 'Activity' && !graphDataLoaded) {
-      setGraphDataLoaded(true)
-      Promise.allSettled([
-        getResources(undefined, undefined, undefined, 0, 24).then(r => r.items),
-        getCollections(),
-        getTags(),
-      ]).then(([allR, cols, t]) => {
-        if (allR.status === 'fulfilled') setAllResources(allR.value || [])
-        if (cols.status === 'fulfilled') setCollections(cols.value || [])
-        if (t.status === 'fulfilled') setTags(t.value || [])
+    if (!resource || !resourceId || Number.isNaN(resourceId)) return
+    let cancelled = false
+    setOptionalLoading(true)
+    const requests: [string, Promise<unknown>][] = [
+      ['understanding', getResourceUnderstanding(resourceId)],
+      ['tags', getResourceTags(resourceId)],
+      ['collections', getResourceCollections(resourceId)],
+      ['notes', getResourceNotes(resourceId)],
+      ['deepDive', getResourceDeepDive(resourceId)],
+      ['knowledgeMap', getResourceKnowledgeMap(resourceId)],
+      ['trace', getResourceIngestionTrace(resourceId)],
+    ]
+    Promise.allSettled(requests.map(([, request]) => request)).then(results => {
+      if (cancelled) return
+      const nextErrors: Record<string, string> = {}
+      results.forEach((result, index) => {
+        const [key] = requests[index]
+        if (result.status === 'rejected') nextErrors[key] = 'Không khả dụng lúc này.'
+        if (result.status === 'fulfilled') {
+          switch (key) {
+            case 'understanding': setUnderstanding(result.value as ResourceUnderstanding); break
+            case 'tags': setTags((result.value as KnowledgeTag[]) || []); break
+            case 'collections': setCollections((result.value as KnowledgeCollection[]) || []); break
+            case 'notes': setNotes((result.value as ResourceNote[]) || []); break
+            case 'deepDive': setDeepDive(result.value as ResourceDeepDive); break
+            case 'knowledgeMap': setKnowledgeMap(result.value as ResourceKnowledgeMap); break
+            case 'trace': setIngestionTrace(result.value as ResourceIngestionTrace); break
+          }
+        }
       })
-    }
-  }, [tab, resourceId, content, contentLoading, notes, notesLoading, related, relatedLoading, graphDataLoaded])
+      setOptionalErrors(nextErrors)
+      setOptionalLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [resource, resourceId])
 
-  function handleRetryReader() {
-    if (!resourceId || isNaN(resourceId)) return
-    setContentLoading(true)
-    setContentError('')
-    getResourceContent(resourceId)
-      .then(text => setContent(text || ''))
-      .catch(() => setContentError('Không thể đọc nội dung tài liệu. Vui lòng thử lại.'))
-      .finally(() => setContentLoading(false))
+  async function handleRetry() {
+    if (!resourceId || Number.isNaN(resourceId)) return
+    setRetryBusy(true)
+    try {
+      const updated = await retryResource(resourceId)
+      setResource(updated)
+      setUnderstanding(null)
+      setOptionalErrors({})
+    } catch {
+      setError('Không thể yêu cầu xử lý lại tài liệu.')
+    } finally {
+      setRetryBusy(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!resourceId || Number.isNaN(resourceId)) return
+    if (!deleteConfirm) {
+      setDeleteConfirm(true)
+      return
+    }
+    setDeleting(true)
+    try {
+      await deleteResource(resourceId)
+      navigate('/library')
+    } catch {
+      setError('Không thể xoá tài liệu lúc này.')
+      setDeleteConfirm(false)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function addNote(event: React.FormEvent) {
+    event.preventDefault()
+    if (!draft.trim() || !resourceId || Number.isNaN(resourceId)) return
+    setNoteBusy(true)
+    try {
+      const created = await createResourceNote(resourceId, draft.trim())
+      setNotes(current => [created, ...current])
+      setDraft('')
+    } catch {
+      setOptionalErrors(current => ({ ...current, notes: 'Không thể lưu Quick Note.' }))
+    } finally {
+      setNoteBusy(false)
+    }
+  }
+
+  async function saveNote(noteId: number) {
+    if (!editingNoteDraft.trim() || !resourceId) return
+    setNoteBusy(true)
+    try {
+      const updated = await updateResourceNote(resourceId, noteId, editingNoteDraft.trim())
+      setNotes(current => current.map(note => note.id === noteId ? updated : note))
+      setEditingNoteId(null)
+      setEditingNoteDraft('')
+    } catch {
+      setOptionalErrors(current => ({ ...current, notes: 'Không thể cập nhật Quick Note.' }))
+    } finally {
+      setNoteBusy(false)
+    }
+  }
+
+  async function removeNote(noteId: number) {
+    if (!resourceId) return
+    setNoteBusy(true)
+    try {
+      await deleteResourceNote(resourceId, noteId)
+      setNotes(current => current.filter(note => note.id !== noteId))
+      setNoteDeleteId(null)
+    } catch {
+      setOptionalErrors(current => ({ ...current, notes: 'Không thể xoá Quick Note.' }))
+    } finally {
+      setNoteBusy(false)
+    }
   }
 
   async function handleAutoOrganize() {
-    if (!resourceId || isNaN(resourceId)) return
+    if (!resourceId) return
     setOrganizing(true)
     setAutoOrganizeMsg('')
     setOrganizationResult(null)
     try {
       const result = await autoOrganizeResource(resourceId)
       setOrganizationResult(result)
-      setAutoOrganizeMsg(result.understandingStatus === 'CURRENT' ? 'Phân tích ngữ nghĩa đã hoàn tất.' : 'Không đủ bằng chứng để tự động phân loại an toàn.')
-      if (related !== null) {
-        getRelatedResources(resourceId).then(r => setRelated(r || [])).catch(() => {})
-      }
+      setAutoOrganizeMsg(result.understandingStatus === 'CURRENT' ? 'Phân tích ngữ nghĩa đã hoàn tất.' : 'Chưa đủ bằng chứng để tự động phân loại an toàn.')
+      const [nextTags, nextCollections, nextMap] = await Promise.allSettled([getResourceTags(resourceId), getResourceCollections(resourceId), getResourceKnowledgeMap(resourceId)])
+      if (nextTags.status === 'fulfilled') setTags(nextTags.value)
+      if (nextCollections.status === 'fulfilled') setCollections(nextCollections.value)
+      if (nextMap.status === 'fulfilled') setKnowledgeMap(nextMap.value)
     } catch {
-      setAutoOrganizeMsg('Không thể tự động phân loại.')
+      setAutoOrganizeMsg('Không thể tự động phân loại lúc này.')
     } finally {
       setOrganizing(false)
     }
   }
 
   async function loadOrganizationSuggestions() {
-    if (!resourceId || isNaN(resourceId)) return
+    if (!resourceId) return
     setSuggestionBusy(true)
     setSuggestionError('')
     try {
@@ -224,20 +308,17 @@ export default function ResourceWorkspacePage() {
   }
 
   async function applySelectedSuggestions() {
-    if (!resourceId || isNaN(resourceId) || !organizationSuggestions) return
+    if (!resourceId || !organizationSuggestions) return
     setSuggestionBusy(true)
-    setSuggestionError('')
     try {
-      const chosenCollections = organizationSuggestions.suggestedCollections.filter(item =>
-        selectedCollectionKeys.includes(item.existingCollectionId > 0 ? `existing:${item.existingCollectionId}` : `new:${item.name}`))
-      await applyOrganization(resourceId, {
-        tagNames: selectedTagNames,
-        collectionIds: chosenCollections.filter(item => item.existingCollectionId > 0).map(item => item.existingCollectionId),
-        newCollectionNames: chosenCollections.filter(item => item.existingCollectionId <= 0).map(item => item.name),
-        relatedResourceIds: [],
-      })
-      setAutoOrganizeMsg('Đã áp dụng các đề xuất bạn chọn.')
+      const selectedCollections = organizationSuggestions.suggestedCollections.filter(item => selectedCollectionKeys.includes(item.existingCollectionId > 0 ? `existing:${item.existingCollectionId}` : `new:${item.name}`))
+      await applyOrganization(resourceId, { tagNames: selectedTagNames, collectionIds: selectedCollections.filter(item => item.existingCollectionId > 0).map(item => item.existingCollectionId), newCollectionNames: selectedCollections.filter(item => item.existingCollectionId <= 0).map(item => item.name), relatedResourceIds: [] })
+      setAutoOrganizeMsg('Đã áp dụng các đề xuất đã chọn.')
       setOrganizationSuggestions(null)
+      const [nextTags, nextCollections, nextMap] = await Promise.all([getResourceTags(resourceId), getResourceCollections(resourceId), getResourceKnowledgeMap(resourceId)])
+      setTags(nextTags)
+      setCollections(nextCollections)
+      setKnowledgeMap(nextMap)
     } catch {
       setSuggestionError('Không thể áp dụng đề xuất đã chọn.')
     } finally {
@@ -245,477 +326,52 @@ export default function ResourceWorkspacePage() {
     }
   }
 
-  async function addNote(e: React.FormEvent) {
-    e.preventDefault()
-    if (!draft.trim() || !resourceId || isNaN(resourceId)) return
-    setNoteBusy(true)
-    try {
-      const created = await createResourceNote(resourceId, draft.trim())
-      setNotes(prev => (prev ? [created, ...prev] : [created]))
-      setDraft('')
-      setActivity(prev => (prev ? { ...prev, noteCount: (prev.noteCount || 0) + 1 } : prev))
-    } catch {
-      setError('Could not save note.')
-    } finally {
-      setNoteBusy(false)
-    }
-  }
+  if (loading) return <section className="kos-page"><div className="kos-empty kos-workspace-loading" aria-live="polite"><Loader2 size={30} className="kos-spin-fast" /><h2>Đang mở Resource Workspace...</h2><p>Đang nạp tài liệu và các lớp hiểu biết đã lưu.</p></div></section>
 
-  async function removeNote(noteId: number) {
-    if (!resourceId || isNaN(resourceId)) return
-    try {
-      await deleteResourceNote(resourceId, noteId)
-      setNotes(prev => (prev ? prev.filter(n => n.id !== noteId) : []))
-      setActivity(prev => (prev ? { ...prev, noteCount: Math.max(0, (prev.noteCount || 0) - 1) } : prev))
-    } catch {
-      setError('Could not delete note.')
-    }
-  }
+  if (error || !resource) return <section className="kos-page"><div className="kos-empty" role="alert"><FileText size={32} /><h2>{error || 'Không tìm thấy tài liệu'}</h2><p>Tài liệu có thể đã bị xoá hoặc bạn không có quyền truy cập.</p><div className="kos-workspace-error-actions"><button type="button" className="kos-button" onClick={() => navigate('/library')}><ArrowLeft size={16} /> Quay lại Thư viện</button><button type="button" className="kos-button kos-button--primary" onClick={() => loadResource(resourceId)}><RefreshCw size={16} /> Thử lại</button></div></div></section>
 
-  async function saveProgress(percent: number) {
-    if (!resourceId || isNaN(resourceId)) return
-    try {
-      const updated = await updateResourceProgress(resourceId, percent)
-      setActivity(updated)
-      setProgressVal(null)
-    } catch {
-      setError('Could not update progress.')
-    }
-  }
+  const title = displayTitle(resource, understanding)
+  const understandingStatus = understanding?.status || 'NOT_AVAILABLE'
+  const profileItems: [string, string][] = [['Type', resource.resourceType || 'DOCUMENT'], ['Status', resource.processingStatus || 'UNKNOWN'], ['Imported', formatDate(resource.createdAt)], ['Size', formatBytes(resource.sizeBytes)]]
 
-  async function handleDelete() {
-    if (!resourceId || isNaN(resourceId)) return
-    if (!deleteConfirm) {
-      setDeleteConfirm(true)
-      return
-    }
-    setDeleting(true)
-    try {
-      await deleteResource(resourceId)
-      navigate('/library')
-    } catch {
-      setError('This resource could not be deleted.')
-      setDeleteConfirm(false)
-    } finally {
-      setDeleting(false)
-    }
-  }
+  return <section className="kos-page kos-workspace kos-workspace-v2">
+    <header className="kos-workspace-v2-header"><div className="kos-workspace-header-main"><Link to="/library" className="kos-workspace-back"><ArrowLeft size={16} /> Library</Link><div className="kos-workspace-title-row"><span className="kos-workspace-type-badge">{resource.resourceType || 'DOCUMENT'}</span><span className={`kos-understanding-status kos-understanding-status--${understandingStatus.toLowerCase()}`}>{statusLabel(understandingStatus)}</span></div><h1 className="kos-workspace-title-v2">{title}</h1><p className="kos-workspace-filename">{resource.originalFilename || 'Original filename unavailable'}</p></div><div className="kos-workspace-header-actions"><Link to={`/ask?resource=${resource.id}`} className="kos-button kos-button--primary">Ask this source</Link><details className="kos-workspace-more"><summary className="kos-button kos-button--quiet"><MoreHorizontal size={17} /> <span>More</span></summary><div className="kos-workspace-more-menu">{resource.processingStatus === 'FAILED' && <button type="button" onClick={handleRetry} disabled={retryBusy}>{retryBusy ? <Loader2 size={15} className="kos-spin-fast" /> : <RefreshCw size={15} />} Retry processing</button>}<button type="button" className="is-danger" onClick={handleDelete} disabled={deleting}><Trash2 size={15} /> {deleting ? 'Deleting…' : 'Delete resource'}</button></div></details></div></header>
+    {deleteConfirm && <div className="kos-workspace-confirm" role="alert"><strong>Delete this resource?</strong><span>Its Workspace will no longer be available.</span><button type="button" className="kos-button kos-button--danger" onClick={handleDelete} disabled={deleting}>{deleting ? 'Deleting…' : 'Confirm delete'}</button><button type="button" className="kos-button" onClick={() => setDeleteConfirm(false)}>Cancel</button></div>}
+    <nav className="kos-workspace-v2-nav" aria-label="Resource Workspace">{([['overview', 'Overview'], ['deep-dive', 'Deep Dive'], ['knowledge-map', 'Knowledge Map']] as [Surface, string][]).map(([key, label]) => <button type="button" key={key} className={surface === key ? 'is-active' : ''} onClick={() => setSurface(key)}>{label}</button>)}</nav>
+    {surface === 'overview' && <OverviewSurface resource={resource} understanding={understanding} understandingStatus={understandingStatus} profileItems={profileItems} tags={tags} collections={collections} notes={notes} notesOpen={notesOpen} setNotesOpen={setNotesOpen} draft={draft} setDraft={setDraft} addNote={addNote} editingNoteId={editingNoteId} setEditingNoteId={setEditingNoteId} editingNoteDraft={editingNoteDraft} setEditingNoteDraft={setEditingNoteDraft} saveNote={saveNote} noteDeleteId={noteDeleteId} setNoteDeleteId={setNoteDeleteId} removeNote={removeNote} noteBusy={noteBusy} optionalLoading={optionalLoading} optionalErrors={optionalErrors} ingestionTrace={ingestionTrace} organizationSuggestions={organizationSuggestions} selectedTagNames={selectedTagNames} setSelectedTagNames={setSelectedTagNames} selectedCollectionKeys={selectedCollectionKeys} setSelectedCollectionKeys={setSelectedCollectionKeys} suggestionBusy={suggestionBusy} suggestionError={suggestionError} loadOrganizationSuggestions={loadOrganizationSuggestions} applySelectedSuggestions={applySelectedSuggestions} organizing={organizing} autoOrganizeMsg={autoOrganizeMsg} organizationResult={organizationResult} handleAutoOrganize={handleAutoOrganize} />}
+    {surface === 'deep-dive' && <DeepDiveSurface deepDive={deepDive} loading={optionalLoading && !deepDive} error={optionalErrors.deepDive} />}
+    {surface === 'knowledge-map' && <MapSurface map={knowledgeMap} loading={optionalLoading && !knowledgeMap} error={optionalErrors.knowledgeMap} />}
+  </section>
+}
 
-  if (loading) {
-    return (
-      <section className="kos-page">
-        <div className="kos-empty" aria-live="polite" style={{ padding: '4rem 1rem', textAlign: 'center' }}>
-          <Loader2 size={32} className="kos-spin-fast" style={{ margin: '0 auto 1rem' }} />
-          <h2>Đang mở không gian tài liệu...</h2>
-          <p>Đang nạp thông tin và bối cảnh tri thức từ KnowledgeOS</p>
-        </div>
-      </section>
-    )
-  }
+type OverviewProps = {
+  resource: Resource; understanding: ResourceUnderstanding | null; understandingStatus: string; profileItems: [string, string][]; tags: KnowledgeTag[]; collections: KnowledgeCollection[]; notes: ResourceNote[]; notesOpen: boolean; setNotesOpen: (open: boolean) => void; draft: string; setDraft: (value: string) => void; addNote: (event: React.FormEvent) => void; editingNoteId: number | null; setEditingNoteId: (id: number | null) => void; editingNoteDraft: string; setEditingNoteDraft: (value: string) => void; saveNote: (id: number) => void; noteDeleteId: number | null; setNoteDeleteId: (id: number | null) => void; removeNote: (id: number) => void; noteBusy: boolean; optionalLoading: boolean; optionalErrors: Record<string, string>; ingestionTrace: ResourceIngestionTrace | null; organizationSuggestions: OrganizationSuggestions | null; selectedTagNames: string[]; setSelectedTagNames: (names: string[]) => void; selectedCollectionKeys: string[]; setSelectedCollectionKeys: (keys: string[]) => void; suggestionBusy: boolean; suggestionError: string; loadOrganizationSuggestions: () => void; applySelectedSuggestions: () => void; organizing: boolean; autoOrganizeMsg: string; organizationResult: SemanticOrganizationResult | null; handleAutoOrganize: () => void
+}
 
-  if (error || !resource) {
-    return (
-      <section className="kos-page">
-        <div className="kos-empty" role="alert" style={{ padding: '4rem 1rem', textAlign: 'center' }}>
-          <FileText size={32} style={{ margin: '0 auto 1rem', color: 'var(--kos-danger, #ef4444)' }} />
-          <h2>{error || 'Không tìm thấy tài liệu'}</h2>
-          <p>Tài liệu này có thể đã bị xóa hoặc bạn không có quyền truy cập.</p>
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1.5rem' }}>
-            <button type="button" className="kos-button" onClick={() => navigate('/library')}>
-              <ArrowLeft size={16} /> Quay lại Thư viện
-            </button>
-            <button type="button" className="kos-button kos-button--primary" onClick={() => loadResourceData(resourceId)}>
-              <RefreshCw size={16} /> Thử lại
-            </button>
-          </div>
-        </div>
-      </section>
-    )
-  }
+function OverviewSurface(props: OverviewProps) {
+  const currentUnderstanding = props.understandingStatus === 'CURRENT'
+  return <div className="kos-workspace-v2-surface"><div className="kos-workspace-overview-grid-v2"><main className="kos-workspace-primary-column"><section className="kos-workspace-section kos-brief-section"><div className="kos-section-kicker">Document Brief</div><h2>{currentUnderstanding ? 'What this source is about' : 'Document understanding is not available'}</h2>{currentUnderstanding ? <p className="kos-brief-copy">{props.understanding?.summary}</p> : <p className="kos-muted">This Workspace only shows persisted understanding. It will not invent a summary while the source is unavailable or needs refresh.</p>}{currentUnderstanding && props.understanding && <div className="kos-evidence-line">{props.understanding.evidenceCount} verified evidence chunk{props.understanding.evidenceCount === 1 ? '' : 's'} · updated {formatDate(props.understanding.updatedAt)}</div>}</section><section className="kos-workspace-section"><div className="kos-section-heading"><div><div className="kos-section-kicker">Key Ideas</div><h2>Keep these in view</h2></div>{props.optionalLoading && <Loader2 size={17} className="kos-spin-fast" aria-label="Loading" />}</div>{currentUnderstanding && props.understanding?.keyIdeas.length ? <ol className="kos-key-ideas">{props.understanding.keyIdeas.map((idea, index) => <li key={`${idea}-${index}`}><span>{String(index + 1).padStart(2, '0')}</span><p>{idea}</p></li>)}</ol> : <p className="kos-muted">No persisted key ideas are available for this source.</p>}</section><section className="kos-workspace-section"><div className="kos-section-kicker">Knowledge Profile</div><h2>Source context</h2><div className="kos-profile-grid">{props.profileItems.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div><div className="kos-profile-groups"><div><span className="kos-profile-label"><Tag size={14} /> Resource Tags</span>{props.tags.length ? <div className="kos-chip-row">{props.tags.map(tag => <span className="kos-chip" key={tag.id}>{tag.name}</span>)}</div> : <p className="kos-muted">No assigned tags.</p>}</div><div><span className="kos-profile-label"><Folder size={14} /> Collections</span>{props.collections.length ? <div className="kos-membership-list">{props.collections.map(collection => <span key={collection.id}>{collection.name}</span>)}</div> : <p className="kos-muted">No collection membership.</p>}</div></div></section><OrganizationPanel {...props} /><details className="kos-workspace-advanced"><summary><span><ChevronDown size={16} /> Advanced</span><small>Ingestion trace and operational detail</small></summary><div className="kos-advanced-body">{props.ingestionTrace ? <div className="kos-trace-grid"><TraceItem label="Processing" value={props.ingestionTrace.processingStatus} /><TraceItem label="Chunks" value={`${props.ingestionTrace.parentChunkCount} parent / ${props.ingestionTrace.childChunkCount} child`} /><TraceItem label="Embeddings" value={`${props.ingestionTrace.embeddingModel} · ${props.ingestionTrace.embeddingDimensions}d`} /><TraceItem label="Semantic metadata" value={props.ingestionTrace.semanticMetadataIncluded ? 'Included' : 'Not included'} /></div> : <p className="kos-muted">{props.optionalErrors.trace || 'Ingestion trace is not available.'}</p>}</div></details></main><aside className="kos-workspace-side-column"><button type="button" className="kos-notes-card" onClick={() => props.setNotesOpen(true)}><span className="kos-section-kicker">Quick Notes</span><strong>{props.notes.length} note{props.notes.length === 1 ? '' : 's'}</strong><small>Capture a thought without leaving the source.</small><span className="kos-text-action">Open notes <ChevronDown size={15} /></span></button><div className="kos-workspace-ask-card"><Sparkles size={18} /><div><strong>Ask this source</strong><p>Use the grounded answer flow with this resource already in scope.</p><Link to={`/ask?resource=${props.resource.id}`} className="kos-text-action">Open Ask <ChevronDown size={15} /></Link></div></div></aside></div>{props.notesOpen && <NotesDrawer {...props} />}</div>
+}
 
-  const metaItems = [
-    { label: 'Type', value: resource.resourceType || 'DOCUMENT' },
-    { label: 'Status', value: resource.processingStatus || 'READY' },
-    { label: 'Priority', value: resource.priority ?? 0 },
-    { label: 'Favorite', value: resource.favorite ? 'Yes' : 'No' },
-    { label: 'Filename', value: resource.originalFilename || '—' },
-    {
-      label: 'Size',
-      value: resource.sizeBytes
-        ? `${(resource.sizeBytes / 1024).toFixed(1)} KB`
-        : '—',
-    },
-    { label: 'Created', value: resource.createdAt ? new Date(resource.createdAt).toLocaleString() : '—' },
-  ]
+function TraceItem({ label, value }: { label: string; value: string }) { return <div><span>{label}</span><strong>{value}</strong></div> }
 
-  return (
-    <section className="kos-page kos-workspace">
-      {/* Top action bar */}
-      <div className="kos-workspace-nav">
-        <button
-          type="button"
-          className="kos-icon-btn"
-          onClick={() => navigate('/library')}
-          aria-label="Back to Library"
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <span className="kos-workspace-type-badge">{resource.resourceType || 'DOCUMENT'}</span>
-        <h1 className="kos-workspace-title">{resource.title || 'Untitled'}</h1>
-        <div className="kos-workspace-actions">
-          <Link
-            to={`/ask?resource=${resource.id}`}
-            className="kos-button kos-button--primary"
-          >
-            <BrainCircuit size={16} /> Ask with this source
-          </Link>
-          <button
-            type="button"
-            className="kos-button kos-button--danger"
-            onClick={handleDelete}
-            disabled={deleting}
-          >
-            <Trash2 size={16} />
-            {deleting ? 'Deleting…' : deleteConfirm ? 'Confirm Delete?' : 'Delete'}
-          </button>
-        </div>
-      </div>
+function OrganizationPanel(props: OverviewProps) {
+  return <section className="kos-workspace-section kos-organization-panel"><div className="kos-section-heading"><div><div className="kos-section-kicker">Semantic Organization</div><h2>Keep structure intentional</h2></div><button type="button" className="kos-button" onClick={props.handleAutoOrganize} disabled={props.organizing}>{props.organizing ? <Loader2 size={15} className="kos-spin-fast" /> : <Sparkles size={15} />} Auto-organize</button></div><p className="kos-muted">Assigned tags and collections above are the saved state. Suggestions stay reviewable until you apply them.</p>{props.autoOrganizeMsg && <p className="kos-inline-success">{props.autoOrganizeMsg}</p>}{props.organizationResult && <p className="kos-muted">Assigned {props.organizationResult.tagsAssigned.length} tag{props.organizationResult.tagsAssigned.length === 1 ? '' : 's'} and {props.organizationResult.collectionsAssigned.length} collection{props.organizationResult.collectionsAssigned.length === 1 ? '' : 's'}.</p>}<div className="kos-organization-actions"><button type="button" className="kos-button kos-button--quiet" onClick={props.loadOrganizationSuggestions} disabled={props.suggestionBusy}>{props.suggestionBusy ? <Loader2 size={15} className="kos-spin-fast" /> : <Network size={15} />} Review suggestions</button></div>{props.suggestionError && <p className="kos-inline-error">{props.suggestionError}</p>}{props.organizationSuggestions && <div className="kos-suggestion-review"><div><strong>Suggested tags</strong>{props.organizationSuggestions.suggestedTags.length ? props.organizationSuggestions.suggestedTags.map(item => <label key={item.name}><input type="checkbox" checked={props.selectedTagNames.includes(item.name)} onChange={event => props.setSelectedTagNames(event.target.checked ? [...props.selectedTagNames, item.name] : props.selectedTagNames.filter(name => name !== item.name))} />{item.name}</label>) : <span className="kos-muted">None</span>}</div><div><strong>Suggested collections</strong>{props.organizationSuggestions.suggestedCollections.length ? props.organizationSuggestions.suggestedCollections.map(item => { const key = item.existingCollectionId > 0 ? `existing:${item.existingCollectionId}` : `new:${item.name}`; return <label key={key}><input type="checkbox" checked={props.selectedCollectionKeys.includes(key)} onChange={event => props.setSelectedCollectionKeys(event.target.checked ? [...props.selectedCollectionKeys, key] : props.selectedCollectionKeys.filter(value => value !== key))} />{item.name}</label> }) : <span className="kos-muted">None</span>}</div><button type="button" className="kos-button kos-button--primary" onClick={props.applySelectedSuggestions} disabled={props.suggestionBusy}><Check size={15} /> Apply selected</button></div>}</section>
+}
 
-      {/* Tabs */}
-      <nav className="kos-workspace-tabs" aria-label="Resource sections">
-        {(['Overview', 'Reader', 'Notes', 'Related', 'Activity'] as Tab[]).map(item => (
-          <button
-            key={item}
-            type="button"
-            className={`kos-workspace-tab ${tab === item ? 'is-active' : ''}`}
-            onClick={() => setTab(item)}
-          >
-            {item === 'Overview' ? '📋 Tổng quan' : item === 'Reader' ? '📖 Đọc tài liệu' : item === 'Notes' ? '📝 Ghi chú' : item === 'Related' ? '🔗 Liên quan' : '⚡ Hoạt động & Recall'}
-          </button>
-        ))}
-      </nav>
+function NotesDrawer(props: OverviewProps) {
+  return <div className="kos-notes-drawer-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) props.setNotesOpen(false) }}><section className="kos-notes-drawer" role="dialog" aria-modal="true" aria-labelledby="quick-notes-title"><div className="kos-section-heading"><div><div className="kos-section-kicker">Quick Notes</div><h2 id="quick-notes-title">Thoughts to keep</h2></div><button type="button" className="kos-icon-btn" onClick={() => props.setNotesOpen(false)} aria-label="Close Quick Notes"><X size={17} /></button></div><form className="kos-note-form" onSubmit={props.addNote}><textarea value={props.draft} onChange={event => props.setDraft(event.target.value)} placeholder="Write a note about this source…" rows={3} /><button type="submit" className="kos-button kos-button--primary" disabled={props.noteBusy || !props.draft.trim()}>{props.noteBusy ? <Loader2 size={15} className="kos-spin-fast" /> : 'Add note'}</button></form>{props.optionalErrors.notes && <p className="kos-inline-error">{props.optionalErrors.notes}</p>}<div className="kos-note-list">{props.notes.length ? props.notes.map(note => <article className="kos-note-item" key={note.id}>{props.editingNoteId === note.id ? <><textarea value={props.editingNoteDraft} onChange={event => props.setEditingNoteDraft(event.target.value)} rows={4} /><div className="kos-note-actions"><button type="button" className="kos-button kos-button--primary" onClick={() => props.saveNote(note.id)} disabled={props.noteBusy}>Save</button><button type="button" className="kos-button" onClick={() => props.setEditingNoteId(null)}>Cancel</button></div></> : <><p>{note.content}</p><div className="kos-note-meta"><time>{formatDate(note.updatedAt)}</time><span><button type="button" onClick={() => { props.setEditingNoteId(note.id); props.setEditingNoteDraft(note.content) }}><Pencil size={13} /> Edit</button><button type="button" onClick={() => props.setNoteDeleteId(note.id)}><Trash2 size={13} /> Delete</button></span></div>{props.noteDeleteId === note.id && <div className="kos-note-delete-confirm"><span>Delete this note?</span><button type="button" className="kos-button kos-button--danger" onClick={() => props.removeNote(note.id)} disabled={props.noteBusy}>Delete</button><button type="button" className="kos-button" onClick={() => props.setNoteDeleteId(null)}>Keep</button></div>}</>}</article>) : <p className="kos-muted">No Quick Notes yet.</p>}</div></section></div>
+}
 
-      {/* Tab: Overview */}
-      {tab === 'Overview' && (
-        <div className="kos-workspace-panel">
-          <div className="kos-workspace-overview-grid">
-            <div className="kos-overview-card">
-              <h3>Description</h3>
-              <p>{resource.description || 'No description provided.'}</p>
+function DeepDiveSurface({ deepDive, loading, error }: { deepDive: ResourceDeepDive | null; loading: boolean; error?: string }) {
+  if (loading) return <div className="kos-workspace-v2-surface"><div className="kos-workspace-section kos-loading-inline"><Loader2 size={22} className="kos-spin-fast" /> Loading Deep Dive…</div></div>
+  if (error || !deepDive) return <div className="kos-workspace-v2-surface"><div className="kos-workspace-section"><div className="kos-section-kicker">Deep Dive</div><h2>Deep Dive is unavailable</h2><p className="kos-muted">{error || 'The learning studio could not be reached. The rest of this Workspace remains available.'}</p></div></div>
+  const percent = deepDive.conceptCount > 0 ? Math.round((deepDive.checkedCount / deepDive.conceptCount) * 100) : 0
+  return <div className="kos-workspace-v2-surface"><section className="kos-workspace-section kos-deep-dive-hero"><div className="kos-section-kicker">Deep Dive</div>{deepDive.available ? <><h2>{deepDive.topicTitle}</h2><p className="kos-brief-copy">{deepDive.goal}</p><div className="kos-deep-dive-progress"><div><span>Checked concepts</span><strong>{percent}%</strong></div><div className="kos-progress-track"><span style={{ width: `${percent}%` }} /></div><small>{deepDive.checkedCount} of {deepDive.conceptCount} concepts checked. Derived from the current concept statuses.</small></div><div className="kos-deep-dive-stats"><TraceItem label="Checked" value={String(deepDive.checkedCount)} /><TraceItem label="Review needed" value={String(deepDive.reviewNeededCount)} /><TraceItem label="Learning" value={String(deepDive.learningCount)} /><TraceItem label="Not started" value={String(deepDive.notStartedCount)} /></div><Link to="/focus" className="kos-button kos-button--primary">Continue in Deep Dive</Link></> : <><h2>Build a source-grounded learning path</h2><p className="kos-muted">No Study Topic currently includes this resource. Build Deep Dive in the existing Learning Studio when you are ready.</p><Link to="/focus" className="kos-button kos-button--primary"><Sparkles size={15} /> Build Deep Dive</Link></>}</section></div>
+}
 
-              <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--kos-line)' }}>
-                <button
-                  type="button"
-                  className="kos-button kos-button--sm"
-                  onClick={handleAutoOrganize}
-                  disabled={organizing}
-                >
-                  <Sparkles size={14} className={organizing ? 'kos-spin' : ''} />
-                  {organizing ? 'Đang phân loại...' : 'Tự động phân loại vào Collection/Tag'}
-                </button>
-                {autoOrganizeMsg && (
-                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: 'var(--kos-green)' }} aria-live="polite">
-                    {autoOrganizeMsg}
-                  </p>
-                )}
-                {organizationResult && (
-                  <div className="kos-semantic-resource-result">
-                    <span>{organizationResult.tagsAssigned.length} tags added</span>
-                    <span>{organizationResult.collectionsAssigned.length} strong collection matches applied</span>
-                    <span>{organizationResult.collectionSuggestions.length + organizationResult.newCollectionSuggestions.length} suggestions need review</span>
-                    {(organizationResult.collectionSuggestions.length + organizationResult.newCollectionSuggestions.length > 0) && (
-                      <button type="button" className="kos-button kos-button--quiet" disabled={suggestionBusy} onClick={() => void loadOrganizationSuggestions()}>
-                        {suggestionBusy ? 'Loading...' : 'Review suggestions'}
-                      </button>
-                    )}
-                  </div>
-                )}
-                {suggestionError && <p className="kos-modal-error" role="alert">{suggestionError}</p>}
-                {organizationSuggestions && (
-                  <div className="kos-semantic-review" aria-label="Semantic organization suggestions">
-                    <h4>Review possible matches</h4>
-                    {organizationSuggestions.suggestedTags.length > 0 && (
-                      <fieldset>
-                        <legend>Semantic tags</legend>
-                        {organizationSuggestions.suggestedTags.map(tag => (
-                          <label key={`${tag.existingTagId}-${tag.name}`}>
-                            <input type="checkbox" checked={selectedTagNames.includes(tag.name)} onChange={event => setSelectedTagNames(current => event.target.checked ? [...current, tag.name] : current.filter(name => name !== tag.name))} />
-                            <span><strong>{tag.name}</strong><small>{tag.confidence >= 0.8 ? 'Strong match' : 'Possible match'}</small></span>
-                          </label>
-                        ))}
-                      </fieldset>
-                    )}
-                    {organizationSuggestions.suggestedCollections.length > 0 && (
-                      <fieldset>
-                        <legend>Collections</legend>
-                        {organizationSuggestions.suggestedCollections.map(collection => {
-                          const key = collection.existingCollectionId > 0 ? `existing:${collection.existingCollectionId}` : `new:${collection.name}`
-                          return <label key={key}>
-                            <input type="checkbox" checked={selectedCollectionKeys.includes(key)} onChange={event => setSelectedCollectionKeys(current => event.target.checked ? [...current, key] : current.filter(value => value !== key))} />
-                            <span><strong>{collection.name}</strong><small>{collection.existingCollectionId > 0 ? 'Existing collection' : 'New collection suggestion'} · {collection.confidence >= 0.8 ? 'Strong match' : 'Possible match'}</small></span>
-                          </label>
-                        })}
-                      </fieldset>
-                    )}
-                    <div className="kos-modal-actions">
-                      <button type="button" className="kos-button kos-button--quiet" onClick={() => setOrganizationSuggestions(null)}>Cancel</button>
-                      <button type="button" className="kos-button kos-button--primary" disabled={suggestionBusy || (selectedTagNames.length === 0 && selectedCollectionKeys.length === 0)} onClick={() => void applySelectedSuggestions()}>{suggestionBusy ? 'Applying...' : 'Apply selected'}</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="kos-overview-card">
-              <h3>Metadata</h3>
-              <dl className="kos-metadata-list">
-                {metaItems.map(m => (
-                  <div key={m.label} className="kos-metadata-row">
-                    <dt>{m.label}</dt>
-                    <dd>{m.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-
-            {ingestionTrace && (
-              <div className="kos-overview-card" style={{ gridColumn: '1 / -1', background: 'var(--kos-subtle)' }}>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <BrainCircuit size={16} /> RAG Ingestion & Index Trace (Explainability)
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
-                  <div>
-                    <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Structure-aware Chunking</small>
-                    <strong style={{ fontSize: '0.9rem' }}>
-                      {(ingestionTrace.chunkingVersion ?? 2) >= 2 ? (
-                        `${ingestionTrace.parentChunkCount ?? 0} Parents (~1500 chars) · ${ingestionTrace.childChunkCount ?? 0} Children (~500 chars)`
-                      ) : (
-                        `${ingestionTrace.childChunkCount ?? 0} Chunks (Legacy Flat Index)`
-                      )}
-                    </strong>
-                  </div>
-                  <div>
-                    <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Vector Embeddings</small>
-                    <strong style={{ fontSize: '0.9rem' }}>
-                      {ingestionTrace.embeddingModel || 'gemini-embedding-001'} ({ingestionTrace.embeddingDimensions || 768}d)
-                      {(ingestionTrace.chunkingVersion ?? 2) >= 2 && (ingestionTrace.embeddingBatchCount || 0) > 0 ? ` · ${ingestionTrace.embeddingBatchCount} Embedding Batches` : ''}
-                    </strong>
-                  </div>
-                  <div>
-                    <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Chunking Engine Version</small>
-                    <strong style={{ fontSize: '0.9rem' }}>
-                      v{ingestionTrace.chunkingVersion ?? 2} {(ingestionTrace.chunkingVersion ?? 2) >= 2 ? '(Hierarchical Parent–Child)' : '(Legacy Flat Chunking)'}
-                    </strong>
-                  </div>
-                  <div>
-                    <small style={{ color: 'var(--kos-muted)', display: 'block' }}>Semantic Metadata Preloaded</small>
-                    <strong style={{ fontSize: '0.9rem', color: ingestionTrace.semanticMetadataIncluded ? 'var(--kos-green)' : 'var(--kos-muted)' }}>
-                      {ingestionTrace.semanticMetadataIncluded ? '✓ Tags & Collections Embedded' : 'Not available for legacy index'}
-                    </strong>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab: Reader */}
-      {tab === 'Reader' && (
-        <div className="kos-workspace-panel kos-workspace-reader">
-          <div className="kos-reader-toolbar">
-            <span>{content ? `${content.length} characters extracted` : 'Document text reader'}</span>
-            <Link
-              to={`/ask?resource=${resource.id}`}
-              className="kos-button kos-button--sm"
-            >
-              <BrainCircuit size={14} /> Ground with RAG
-            </Link>
-          </div>
-          {contentLoading ? (
-            <div className="kos-box-empty">
-              <Loader2 size={24} className="kos-spin-fast" />
-              <p>Đang tải và xử lý nội dung văn bản từ lưu trữ...</p>
-            </div>
-          ) : contentError ? (
-            <div className="kos-box-empty">
-              <BookOpen size={24} />
-              <p style={{ color: 'var(--kos-danger, #ef4444)' }}>{contentError}</p>
-              <button
-                type="button"
-                className="kos-button kos-button--sm"
-                onClick={handleRetryReader}
-                style={{ marginTop: '0.5rem' }}
-              >
-                <RefreshCw size={14} /> Thử lại
-              </button>
-            </div>
-          ) : content ? (
-            <pre className="kos-reader-content">{content}</pre>
-          ) : (
-            <div className="kos-box-empty">
-              <BookOpen size={24} />
-              <p>No text has been extracted for this resource yet.</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tab: Notes */}
-      {tab === 'Notes' && (
-        <div className="kos-workspace-panel">
-          <form className="kos-note-form" onSubmit={addNote}>
-            <textarea
-              value={draft}
-              onChange={e => setDraft(e.target.value)}
-              placeholder="Write a private note about this resource…"
-              rows={3}
-              required
-            />
-            <button
-              type="submit"
-              className="kos-button kos-button--primary"
-              disabled={noteBusy || !draft.trim()}
-            >
-              {noteBusy ? 'Saving…' : 'Save Note'}
-            </button>
-          </form>
-
-          <div className="kos-notes-list">
-            {notesLoading ? (
-              <div className="kos-box-empty">
-                <Loader2 size={20} className="kos-spin-fast" />
-                <p>Loading notes…</p>
-              </div>
-            ) : notes && notes.length > 0 ? (
-              notes.map(n => (
-                <div key={n.id} className="kos-note-card">
-                  <p className="kos-note-body">{n.content}</p>
-                  <div className="kos-note-footer">
-                    <small>{n.createdAt ? new Date(n.createdAt).toLocaleString() : '—'}</small>
-                    <button
-                      type="button"
-                      className="kos-icon-btn kos-icon-btn--danger"
-                      onClick={() => removeNote(n.id)}
-                      aria-label="Delete note"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="kos-box-empty">No notes yet. Add your first note above.</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab: Related */}
-      {tab === 'Related' && (
-        <div className="kos-workspace-panel">
-          <div className="kos-related-list">
-            {relatedLoading ? (
-              <div className="kos-box-empty">
-                <Loader2 size={20} className="kos-spin-fast" />
-                <p>Loading related resources…</p>
-              </div>
-            ) : related && related.length > 0 ? (
-              related.map(r => (
-                <div key={r.id} className="kos-related-card">
-                  <span className="kos-workspace-type-badge">{r.resourceType || 'DOCUMENT'}</span>
-                  <div className="kos-related-info">
-                    <h4>{r.title || 'Untitled'}</h4>
-                    <p>{r.description || 'No description'}</p>
-                  </div>
-                  <Link to={`/library/${r.id}`} className="kos-button kos-button--sm">
-                    Open
-                  </Link>
-                </div>
-              ))
-            ) : (
-              <p className="kos-box-empty">
-                No related resources found. Organize collections or tags to connect knowledge.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab: Activity */}
-      {tab === 'Activity' && (
-        <div className="kos-workspace-panel">
-          <div className="kos-activity-summary-card">
-            <h3>Reading Progress</h3>
-            <p>
-              Current progress: <strong>{progressVal !== null ? progressVal : (activity?.progressPercent ?? 0)}%</strong> · Notes:{' '}
-              <strong>{activity?.noteCount ?? 0}</strong>
-            </p>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={progressVal !== null ? progressVal : (activity?.progressPercent ?? 0)}
-              onChange={e => setProgressVal(Number(e.target.value))}
-              onPointerUp={() => {
-                if (progressVal !== null) {
-                  saveProgress(progressVal)
-                }
-              }}
-              onKeyUp={() => {
-                if (progressVal !== null) {
-                  saveProgress(progressVal)
-                }
-              }}
-              className="kos-range-slider"
-              style={{ maxWidth: '100%', width: '100%', margin: '.6rem 0' }}
-            />
-            <small style={{ color: 'var(--kos-muted)' }}>
-              Status: {activity?.processingStatus || resource.processingStatus || 'READY'} · Last updated:{' '}
-              {activity?.updatedAt ? new Date(activity.updatedAt).toLocaleString() : 'Not yet recorded'}
-            </small>
-          </div>
-
-          {/* Grounded Active Recall & Learning Studio Card */}
-          <div className="kos-quiz-pane" style={{ background: 'var(--kos-surface)', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--kos-line)' }}>
-            <div className="kos-quiz-header">
-              <div>
-                <span className="kos-banner-kicker">TOPIC DEEPDIVE & ACTIVE RECALL</span>
-                <h3 style={{ margin: '0.2rem 0' }}>🎯 Kiểm Tra Ghi Nhớ & Khái Niệm Chuyên Sâu</h3>
-                <p style={{ margin: 0, color: 'var(--kos-muted)', fontSize: '0.86rem' }}>
-                  Hệ thống trắc nghiệm và bóc tách khái niệm đối chứng 100% từ phân đoạn tài liệu nguồn
-                </p>
-              </div>
-            </div>
-
-            <div style={{ padding: '1.25rem', background: 'var(--kos-subtle)', borderRadius: '8px', marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--kos-ink)', lineHeight: '1.5' }}>
-                💡 Tài liệu này đã được phân đoạn (chunking) và vector hóa. Bạn có thể mở <strong>Topic Deepdive Studio</strong> để xây dựng lộ trình học tập theo khái niệm trọng tâm hoặc làm bài kiểm tra <strong>Active Recall 5 câu hỏi có đối chứng</strong>.
-              </p>
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                <Link to="/focus" className="kos-button kos-button--primary">
-                  <Compass size={16} /> Mở Topic Deepdive Studio
-                </Link>
-                <Link to={`/ask?resource=${resource.id}`} className="kos-button">
-                  <BrainCircuit size={16} /> Hỏi RAG AI về tài liệu này
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Embedded Knowledge Graph Section */}
-          <div style={{ background: 'var(--kos-surface)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--kos-line)' }}>
-            <h3 style={{ font: '700 1.05rem var(--kos-font-display)', margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-              <Network size={18} /> Sơ đồ Mạng lưới Tri thức Liên quan
-            </h3>
-            <KnowledgeGraphView
-              resources={related && related.length ? ([resource, ...related].filter(Boolean) as unknown as Resource[]) : (allResources || []).slice(0, 8)}
-              collections={collections || []}
-              tags={tags || []}
-            />
-          </div>
-        </div>
-      )}
-    </section>
-  )
+function MapSurface({ map, loading, error }: { map: ResourceKnowledgeMap | null; loading: boolean; error?: string }) {
+  if (loading) return <div className="kos-workspace-v2-surface"><div className="kos-workspace-section kos-loading-inline"><Loader2 size={22} className="kos-spin-fast" /> Loading Knowledge Map…</div></div>
+  if (error || !map) return <div className="kos-workspace-v2-surface"><div className="kos-workspace-section"><div className="kos-section-kicker">Knowledge Map</div><h2>Knowledge Map is unavailable</h2><p className="kos-muted">{error || 'The map could not be reached. It will not substitute arbitrary library links.'}</p></div></div>
+  return <div className="kos-workspace-v2-surface"><section className="kos-workspace-section"><div className="kos-section-heading"><div><div className="kos-section-kicker">Knowledge Map</div><h2>How this source connects</h2><p className="kos-muted">Only stored memberships, tags, and bounded related-resource links are shown.</p></div><Network size={21} /></div><KnowledgeGraphView map={map} /></section></div>
 }

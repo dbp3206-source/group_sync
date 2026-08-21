@@ -9,16 +9,27 @@ import org.springframework.web.bind.annotation.*;
 import com.groupsync.backend.auth.security.AuthenticatedUser;
 import com.groupsync.backend.knowledge.dto.*;
 import com.groupsync.backend.knowledge.service.KnowledgeWorkspaceService;
+import com.groupsync.backend.knowledge.service.DocumentUnderstandingService;
+import com.groupsync.backend.knowledge.service.LearningStudioService;
 import com.groupsync.backend.knowledge.service.OrganizationSuggestionService;
+import com.groupsync.backend.knowledge.service.ResourceKnowledgeMapService;
 
 @RestController
 public class KnowledgeWorkspaceController {
     private final KnowledgeWorkspaceService workspace;
     private final OrganizationSuggestionService organization;
+    private final DocumentUnderstandingService understanding;
+    private final LearningStudioService learningStudio;
+    private final ResourceKnowledgeMapService knowledgeMap;
 
-    public KnowledgeWorkspaceController(KnowledgeWorkspaceService workspace, OrganizationSuggestionService organization) {
+    public KnowledgeWorkspaceController(KnowledgeWorkspaceService workspace, OrganizationSuggestionService organization,
+                                        DocumentUnderstandingService understanding, LearningStudioService learningStudio,
+                                        ResourceKnowledgeMapService knowledgeMap) {
         this.workspace = workspace;
         this.organization = organization;
+        this.understanding = understanding;
+        this.learningStudio = learningStudio;
+        this.knowledgeMap = knowledgeMap;
     }
 
     @GetMapping("/api/collections")
@@ -96,6 +107,26 @@ public class KnowledgeWorkspaceController {
     @GetMapping("/api/resources/{resourceId}/tags")
     public List<TagResponse> resourceTags(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId) {
         return workspace.resourceTags(user.getId(), resourceId);
+    }
+
+    @GetMapping("/api/resources/{resourceId}/collections")
+    public List<CollectionResponse> resourceCollections(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId) {
+        return workspace.resourceCollections(user.getId(), resourceId);
+    }
+
+    @GetMapping("/api/resources/{resourceId}/understanding")
+    public ResourceUnderstandingResponse resourceUnderstanding(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId) {
+        return understanding.readForWorkspace(user.getId(), resourceId);
+    }
+
+    @GetMapping("/api/resources/{resourceId}/deep-dive")
+    public ResourceDeepDiveResponse resourceDeepDive(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId) {
+        return learningStudio.getResourceDeepDive(user.getId(), resourceId);
+    }
+
+    @GetMapping("/api/resources/{resourceId}/knowledge-map")
+    public ResourceKnowledgeMapResponse resourceKnowledgeMap(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId) {
+        return knowledgeMap.get(user.getId(), resourceId);
     }
 
     @PutMapping("/api/resources/{resourceId}/tags/{tagId}")

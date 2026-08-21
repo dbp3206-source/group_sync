@@ -94,6 +94,45 @@ export type KnowledgeCollection = { id: number; name: string; description: strin
 export type KnowledgeTag = { id: number; name: string; createdAt?: string }
 export type ResourceNote = { id: number; content: string; createdAt: string; updatedAt: string }
 export type ResourceActivity = { processingStatus: string; progressPercent: number; noteCount: number; createdAt: string; updatedAt: string; lastOpenedAt: string | null }
+export type ResourceUnderstanding = {
+  status: 'CURRENT' | 'FAILED' | 'UNSUPPORTED' | 'STALE' | 'NOT_AVAILABLE' | string
+  normalizedTitle: string | null
+  summary: string | null
+  keyIdeas: string[]
+  broadThemes: string[]
+  evidenceCount: number
+  updatedAt: string | null
+}
+export type ResourceDeepDive = {
+  available: boolean
+  topicId: number | null
+  topicTitle: string | null
+  goal: string | null
+  topicStatus: string | null
+  conceptCount: number
+  checkedCount: number
+  reviewNeededCount: number
+  learningCount: number
+  notStartedCount: number
+  updatedAt: string | null
+}
+export type ResourceKnowledgeMapNode = {
+  id: string
+  type: 'RESOURCE' | 'COLLECTION' | 'TAG' | string
+  label: string
+  resourceId: number | null
+  collectionId: number | null
+  tagId: number | null
+}
+export type ResourceKnowledgeMapEdge = {
+  source: string
+  target: string
+  relationType: string
+  reason: string
+  confidence: number | null
+  provenance: string
+}
+export type ResourceKnowledgeMap = { nodes: ResourceKnowledgeMapNode[]; edges: ResourceKnowledgeMapEdge[] }
 export type RecentActivity = { type: 'RESOURCE_OPENED' | 'ASK_ACTIVITY' | 'FOCUS_ACTIVITY' | 'RECALL_ACTIVITY'; title: string; occurredAt: string; resumeUrl: string; context: string }
 export type RelatedResource = { id: number; title: string; description: string | null; resourceType: string; processingStatus: string; relationType?: string; createdAt?: string }
 export type ChatSession = { id: number; title: string; scope: string; collectionId: number; updatedAt: string }
@@ -122,6 +161,10 @@ export async function deleteCollection(id:number) { await apiClient.delete(`/col
 export async function getTags() { return (await apiClient.get<KnowledgeTag[]>('/tags')).data }
 export async function createTag(name:string) { return (await apiClient.post<KnowledgeTag>('/tags', { name })).data }
 export async function getResourceTags(id:number) { return (await apiClient.get<KnowledgeTag[]>(`/resources/${id}/tags`)).data }
+export async function getResourceCollections(id:number) { return (await apiClient.get<KnowledgeCollection[]>(`/resources/${id}/collections`)).data }
+export async function getResourceUnderstanding(id:number) { return (await apiClient.get<ResourceUnderstanding>(`/resources/${id}/understanding`)).data }
+export async function getResourceDeepDive(id:number) { return (await apiClient.get<ResourceDeepDive>(`/resources/${id}/deep-dive`)).data }
+export async function getResourceKnowledgeMap(id:number) { return (await apiClient.get<ResourceKnowledgeMap>(`/resources/${id}/knowledge-map`)).data }
 export async function assignTagToResource(resourceId:number, tagId:number) { await apiClient.put(`/resources/${resourceId}/tags/${tagId}`) }
 export async function removeTagFromResource(resourceId:number, tagId:number) { await apiClient.delete(`/resources/${resourceId}/tags/${tagId}`) }
 export async function assignResourceToCollection(collectionId:number, resourceId:number) { await apiClient.put(`/collections/${collectionId}/resources/${resourceId}`) }

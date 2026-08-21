@@ -96,6 +96,16 @@ public class KnowledgeWorkspaceService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public List<CollectionResponse> resourceCollections(Long ownerId, Long resourceId) {
+        requireResource(ownerId, resourceId);
+        String sql = "select c.id,c.name,c.description,c.created_at,c.updated_at, "
+                + "(select count(*) from resource_collections rc2 where rc2.collection_id=c.id) as resource_count "
+                + "from collections c join resource_collections rc on rc.collection_id=c.id "
+                + "where c.owner_id=:owner and rc.resource_id=:resource order by c.name";
+        return jdbc.query(sql, Map.of("owner", ownerId, "resource", resourceId), this::mapCollection);
+    }
+
     @Transactional
     public void assignTag(Long ownerId, Long resourceId, Long tagId) {
         requireResource(ownerId, resourceId);

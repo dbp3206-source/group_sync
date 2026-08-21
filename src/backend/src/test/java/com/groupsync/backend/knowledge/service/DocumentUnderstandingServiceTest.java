@@ -12,6 +12,7 @@ import com.groupsync.backend.knowledge.rag.GeminiProperties;
 import com.groupsync.backend.knowledge.rag.LanguageModelClient;
 import com.groupsync.backend.knowledge.service.DocumentUnderstandingTransactionService.StoredUnderstanding;
 import com.groupsync.backend.knowledge.service.DocumentUnderstandingTransactionService.UnderstandingSource;
+import com.groupsync.backend.knowledge.service.DocumentUnderstandingTransactionService.WorkspaceUnderstanding;
 import com.groupsync.backend.knowledge.service.RepresentativeEvidenceSelector.EvidenceChunk;
 
 class DocumentUnderstandingServiceTest {
@@ -83,6 +84,41 @@ class DocumentUnderstandingServiceTest {
         var outcome = service.understand(1L, 10L);
         assertTrue(outcome.reused());
         verifyNoInteractions(languageModel);
+    }
+
+    @Test void workspaceReadReturnsCurrentArtifactWithoutCallingGemini() {
+        when(transactions.readForWorkspace(1L, 10L)).thenReturn(Optional.of(new WorkspaceUnderstanding(
+                "CURRENT", "Database Normalization", "A persisted source-grounded summary.",
+                "[\"Functional dependencies\"]", "[\"Database Systems\"]", 2, null)));
+
+        var response = service.readForWorkspace(1L, 10L);
+
+        assertEquals("CURRENT", response.status());
+        assertEquals("Database Normalization", response.normalizedTitle());
+        assertEquals(List.of("Functional dependencies"), response.keyIdeas());
+        assertEquals(2, response.evidenceCount());
+        verify(transactions).readForWorkspace(1L, 10L);
+        verifyNoInteractions(languageModel);
+    }
+
+    @Test void workspaceReadIsTruthfulWhenNoArtifactExists() {
+        when(transactions.readForWorkspace(1L, 10L)).thenReturn(Optional.empty());
+
+        var response = service.readForWorkspace(1L, 10L);
+
+        assertEquals("NOT_AVAILABLE", response.status());
+        assertNull(response.summary());
+        assertTrue(response.keyIdeas().isEmpty());
+        verifyNoInteractions(languageModel);
+    }
+
+    @Test void workspaceReadPassesOwnerScopeToStoredArtifactQuery() {
+        when(transactions.readForWorkspace(99L, 10L)).thenReturn(Optional.empty());
+
+        service.readForWorkspace(99L, 10L);
+
+        verify(transactions).readForWorkspace(99L, 10L);
+        verify(transactions, never()).readForWorkspace(1L, 10L);
     }
 
     @Test void checksumChangeTriggersRegeneration() {

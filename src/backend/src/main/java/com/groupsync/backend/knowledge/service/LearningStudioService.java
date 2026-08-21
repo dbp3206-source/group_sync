@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.groupsync.backend.knowledge.dto.FocusStudioDto.*;
+import com.groupsync.backend.knowledge.dto.ResourceDeepDiveResponse;
 import com.groupsync.backend.knowledge.model.*;
 import com.groupsync.backend.knowledge.rag.LanguageModelClient;
 import com.groupsync.backend.knowledge.repository.*;
@@ -123,6 +124,30 @@ public class LearningStudioService {
 
         return new StudyTopicDetailResponse(topic.getId(), topic.getTitle(), topic.getGoal(), topic.getStatus(),
                 resourceDtos, conceptDtos, checked, review, learning, notStarted, topic.getCreatedAt(), topic.getUpdatedAt());
+    }
+
+    @Transactional(readOnly = true)
+    public ResourceDeepDiveResponse getResourceDeepDive(Long ownerId, Long resourceId) {
+        resourceRepository.findByIdAndOwnerId(resourceId, ownerId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy tài liệu."));
+        List<StudyTopic> topics = topicRepository.findByOwnerIdAndResourceId(ownerId, resourceId);
+        if (topics.isEmpty()) return ResourceDeepDiveResponse.unavailable();
+
+        StudyTopic topic = topics.stream()
+                .max(Comparator.comparing(StudyTopic::getUpdatedAt, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .orElseThrow();
+        List<TopicConcept> concepts = conceptRepository.findByTopicIdOrderByPositionAsc(topic.getId());
+        int checked = 0, review = 0, learning = 0, notStarted = 0;
+        for (TopicConcept concept : concepts) {
+            switch (concept.getStudyStatus()) {
+                case "CHECKED" -> checked++;
+                case "REVIEW_NEEDED" -> review++;
+                case "LEARNING" -> learning++;
+                default -> notStarted++;
+            }
+        }
+        return new ResourceDeepDiveResponse(true, topic.getId(), topic.getTitle(), topic.getGoal(), topic.getStatus(),
+                concepts.size(), checked, review, learning, notStarted, topic.getUpdatedAt());
     }
 
     @Transactional

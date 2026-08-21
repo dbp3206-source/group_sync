@@ -31,6 +31,30 @@ public class DocumentUnderstandingTransactionService {
                                       String candidateTagsJson, String broadThemesJson, String difficultyLevel,
                                       List<Long> evidenceChunkIds, Instant updatedAt) { }
 
+    public record WorkspaceUnderstanding(String status, String normalizedTitle, String summary,
+                                         String keyIdeasJson, String broadThemesJson, int evidenceCount,
+                                         Instant updatedAt) { }
+
+    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
+    public Optional<WorkspaceUnderstanding> readForWorkspace(Long ownerId, Long resourceId) {
+        List<WorkspaceUnderstanding> rows = jdbc.query("""
+                select du.status,du.normalized_title,du.summary,
+                       du.key_ideas_json::text,du.broad_themes_json::text,
+                       (select count(*) from document_understanding_evidence due
+                        where due.understanding_id=du.id) as evidence_count,
+                       du.updated_at
+                from document_understandings du join resources r on r.id=du.resource_id
+                where du.resource_id=:resource and r.owner_id=:owner
+                order by du.updated_at desc, du.id desc
+                limit 1
+                """, Map.of("resource", resourceId, "owner", ownerId), (rs, rowNum) ->
+                new WorkspaceUnderstanding(rs.getString("status"), rs.getString("normalized_title"),
+                        rs.getString("summary"), rs.getString("key_ideas_json"),
+                        rs.getString("broad_themes_json"), rs.getInt("evidence_count"),
+                        toInstant(rs.getTimestamp("updated_at"))));
+        return rows.stream().findFirst();
+    }
+
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
     public UnderstandingSource readSource(Long ownerId, Long resourceId) {
         Map<String, Object> resource = jdbc.query("""

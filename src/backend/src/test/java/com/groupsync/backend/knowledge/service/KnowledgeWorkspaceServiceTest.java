@@ -145,4 +145,15 @@ class KnowledgeWorkspaceServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.assignResources(7L, 4L, List.of()));
         verifyNoInteractions(jdbc);
     }
+
+    @Test
+    void resourceCollectionsReadOnlyReturnsActualMemberships() {
+        when(jdbc.queryForObject(contains("resources"), anyMap(), eq(Integer.class))).thenReturn(1);
+        CollectionResponse membership = new CollectionResponse(8L, "Database Systems", "", null, null, 3L);
+        when(jdbc.query(contains("join resource_collections"), anyMap(), any(RowMapper.class)))
+                .thenReturn(List.of(membership));
+
+        assertEquals(List.of(membership), service.resourceCollections(7L, 11L));
+        verify(jdbc).query(contains("rc.resource_id=:resource"), anyMap(), any(RowMapper.class));
+    }
 }
