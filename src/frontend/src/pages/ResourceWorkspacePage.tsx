@@ -14,10 +14,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   autoOrganizeResource,
+  applyOrganization,
   createResourceNote,
   deleteResource,
   deleteResourceNote,
   getCollections,
+  getOrganizationSuggestions,
   getRelatedResources,
   getResource,
   getResourceActivity,
@@ -30,11 +32,13 @@ import {
   updateResourceProgress,
   type KnowledgeCollection,
   type KnowledgeTag,
+  type OrganizationSuggestions,
   type RelatedResource,
   type Resource,
   type ResourceActivity,
   type ResourceIngestionTrace,
   type ResourceNote,
+  type SemanticOrganizationResult,
 } from '../api/knowledge'
 import KnowledgeGraphView from '../components/KnowledgeGraphView'
 
@@ -76,6 +80,12 @@ export default function ResourceWorkspacePage() {
   const [draft, setDraft] = useState('')
   const [noteBusy, setNoteBusy] = useState(false)
   const [autoOrganizeMsg, setAutoOrganizeMsg] = useState('')
+  const [organizationResult, setOrganizationResult] = useState<SemanticOrganizationResult | null>(null)
+  const [organizationSuggestions, setOrganizationSuggestions] = useState<OrganizationSuggestions | null>(null)
+  const [suggestionError, setSuggestionError] = useState('')
+  const [selectedTagNames, setSelectedTagNames] = useState<string[]>([])
+  const [selectedCollectionKeys, setSelectedCollectionKeys] = useState<string[]>([])
+  const [suggestionBusy, setSuggestionBusy] = useState(false)
   const [organizing, setOrganizing] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -182,10 +192,11 @@ export default function ResourceWorkspacePage() {
     if (!resourceId || isNaN(resourceId)) return
     setOrganizing(true)
     setAutoOrganizeMsg('')
+    setOrganizationResult(null)
     try {
-      await autoOrganizeResource(resourceId)
-      setAutoOrganizeMsg('Đã tự động phân loại vào Collection & Tags phù hợp!')
-      setTimeout(() => setAutoOrganizeMsg(''), 4000)
+      const result = await autoOrganizeResource(resourceId)
+      setOrganizationResult(result)
+      setAutoOrganizeMsg(result.understandingStatus === 'CURRENT' ? 'Phân tích ngữ nghĩa đã hoàn tất.' : 'Không đủ bằng chứng để tự động phân loại an toàn.')
       if (related !== null) {
         getRelatedResources(resourceId).then(r => setRelated(r || [])).catch(() => {})
       }
@@ -193,6 +204,44 @@ export default function ResourceWorkspacePage() {
       setAutoOrganizeMsg('Không thể tự động phân loại.')
     } finally {
       setOrganizing(false)
+    }
+  }
+
+  async function loadOrganizationSuggestions() {
+    if (!resourceId || isNaN(resourceId)) return
+    setSuggestionBusy(true)
+    setSuggestionError('')
+    try {
+      const suggestions = await getOrganizationSuggestions(resourceId)
+      setOrganizationSuggestions(suggestions)
+      setSelectedTagNames([])
+      setSelectedCollectionKeys([])
+    } catch {
+      setSuggestionError('Không thể tải đề xuất tổ chức lúc này.')
+    } finally {
+      setSuggestionBusy(false)
+    }
+  }
+
+  async function applySelectedSuggestions() {
+    if (!resourceId || isNaN(resourceId) || !organizationSuggestions) return
+    setSuggestionBusy(true)
+    setSuggestionError('')
+    try {
+      const chosenCollections = organizationSuggestions.suggestedCollections.filter(item =>
+        selectedCollectionKeys.includes(item.existingCollectionId > 0 ? `existing:${item.existingCollectionId}` : `new:${item.name}`))
+      await applyOrganization(resourceId, {
+        tagNames: selectedTagNames,
+        collectionIds: chosenCollections.filter(item => item.existingCollectionId > 0).map(item => item.existingCollectionId),
+        newCollectionNames: chosenCollections.filter(item => item.existingCollectionId <= 0).map(item => item.name),
+        relatedResourceIds: [],
+      })
+      setAutoOrganizeMsg('Đã áp dụng các đề xuất bạn chọn.')
+      setOrganizationSuggestions(null)
+    } catch {
+      setSuggestionError('Không thể áp dụng đề xuất đã chọn.')
+    } finally {
+      setSuggestionBusy(false)
     }
   }
 
@@ -365,9 +414,54 @@ export default function ResourceWorkspacePage() {
                   {organizing ? 'Đang phân loại...' : 'Tự động phân loại vào Collection/Tag'}
                 </button>
                 {autoOrganizeMsg && (
-                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: 'var(--kos-green)' }}>
+                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: 'var(--kos-green)' }} aria-live="polite">
                     {autoOrganizeMsg}
                   </p>
+                )}
+                {organizationResult && (
+                  <div className="kos-semantic-resource-result">
+                    <span>{organizationResult.tagsAssigned.length} tags added</span>
+                    <span>{organizationResult.collectionsAssigned.length} strong collection matches applied</span>
+                    <span>{organizationResult.collectionSuggestions.length + organizationResult.newCollectionSuggestions.length} suggestions need review</span>
+                    {(organizationResult.collectionSuggestions.length + organizationResult.newCollectionSuggestions.length > 0) && (
+                      <button type="button" className="kos-button kos-button--quiet" disabled={suggestionBusy} onClick={() => void loadOrganizationSuggestions()}>
+                        {suggestionBusy ? 'Loading...' : 'Review suggestions'}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {suggestionError && <p className="kos-modal-error" role="alert">{suggestionError}</p>}
+                {organizationSuggestions && (
+                  <div className="kos-semantic-review" aria-label="Semantic organization suggestions">
+                    <h4>Review possible matches</h4>
+                    {organizationSuggestions.suggestedTags.length > 0 && (
+                      <fieldset>
+                        <legend>Semantic tags</legend>
+                        {organizationSuggestions.suggestedTags.map(tag => (
+                          <label key={`${tag.existingTagId}-${tag.name}`}>
+                            <input type="checkbox" checked={selectedTagNames.includes(tag.name)} onChange={event => setSelectedTagNames(current => event.target.checked ? [...current, tag.name] : current.filter(name => name !== tag.name))} />
+                            <span><strong>{tag.name}</strong><small>{tag.confidence >= 0.8 ? 'Strong match' : 'Possible match'}</small></span>
+                          </label>
+                        ))}
+                      </fieldset>
+                    )}
+                    {organizationSuggestions.suggestedCollections.length > 0 && (
+                      <fieldset>
+                        <legend>Collections</legend>
+                        {organizationSuggestions.suggestedCollections.map(collection => {
+                          const key = collection.existingCollectionId > 0 ? `existing:${collection.existingCollectionId}` : `new:${collection.name}`
+                          return <label key={key}>
+                            <input type="checkbox" checked={selectedCollectionKeys.includes(key)} onChange={event => setSelectedCollectionKeys(current => event.target.checked ? [...current, key] : current.filter(value => value !== key))} />
+                            <span><strong>{collection.name}</strong><small>{collection.existingCollectionId > 0 ? 'Existing collection' : 'New collection suggestion'} · {collection.confidence >= 0.8 ? 'Strong match' : 'Possible match'}</small></span>
+                          </label>
+                        })}
+                      </fieldset>
+                    )}
+                    <div className="kos-modal-actions">
+                      <button type="button" className="kos-button kos-button--quiet" onClick={() => setOrganizationSuggestions(null)}>Cancel</button>
+                      <button type="button" className="kos-button kos-button--primary" disabled={suggestionBusy || (selectedTagNames.length === 0 && selectedCollectionKeys.length === 0)} onClick={() => void applySelectedSuggestions()}>{suggestionBusy ? 'Applying...' : 'Apply selected'}</button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

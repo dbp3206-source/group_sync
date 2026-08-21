@@ -102,6 +102,8 @@ export type OrganizationTagSuggestion = { name: string; existingTagId: number; r
 export type OrganizationCollectionSuggestion = { name: string; existingCollectionId: number; reason: string; confidence: number }
 export type OrganizationRelatedSuggestion = { resourceId: number; title: string; reason: string; similarity: number }
 export type OrganizationSuggestions = { resourceId: number; suggestedTags: OrganizationTagSuggestion[]; suggestedCollections: OrganizationCollectionSuggestion[]; suggestedRelatedResources: OrganizationRelatedSuggestion[] }
+export type SemanticOrganizationResult = { resourceId: number; understandingStatus: string; tagsAssigned: string[]; collectionsAssigned: number[]; collectionSuggestions: OrganizationCollectionSuggestion[]; newCollectionSuggestions: OrganizationCollectionSuggestion[]; warnings: string[] }
+export type OrganizationBatchResult = { processed: number; assigned: number; suggested: number; skipped: number; failed: number; results: SemanticOrganizationResult[] }
 
 export async function getResources(q?: string, tagId?: number, collectionId?: number, page = 0, size = 24, sort = 'updated_desc') {
   return (await apiClient.get<PagedResponse<Resource>>('/resources', { params: { ...(q ? { q } : {}), ...(tagId ? { tagId } : {}), ...(collectionId ? { collectionId } : {}), page, size, sort } })).data
@@ -143,8 +145,8 @@ export async function deleteResource(id:number) { await apiClient.delete(`/resou
 export async function retryResource(id:number) { return (await apiClient.post<Resource>(`/resources/${id}/retry`)).data }
 export async function deleteResources(ids:number[]) { return (await apiClient.post<{ requestedCount:number; affectedCount:number }>('/resources/bulk-delete', { resourceIds: ids })).data }
 export async function updateResourceFavorite(id:number, favorite:boolean) { return (await apiClient.patch<Resource>(`/resources/${id}`, { favorite })).data }
-export async function autoOrganizeAll() { return (await apiClient.post<{ message: string }>('/resources/auto-organize-all')).data }
-export async function autoOrganizeResource(id: number) { return (await apiClient.post<{ message: string }>(`/resources/${id}/auto-organize`)).data }
+export async function autoOrganizeAll() { return (await apiClient.post<OrganizationBatchResult>('/resources/auto-organize-all')).data }
+export async function autoOrganizeResource(id: number) { return (await apiClient.post<SemanticOrganizationResult>(`/resources/${id}/auto-organize`)).data }
 export async function getResourceIngestionTrace(id: number) { return (await apiClient.get<ResourceIngestionTrace>(`/resources/${id}/rag-trace`)).data }
 
 // ==========================================

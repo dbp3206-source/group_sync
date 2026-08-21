@@ -19,4 +19,9 @@ public interface EmbeddingProvider {
     }
 
     BatchResult embedDocumentsWithBatchResult(List<String> texts);
+
+    /** Uses the production embedding space for symmetric semantic equivalence checks. */
+    default List<float[]> embedSemanticTexts(List<String> texts) {
+        return embedDocuments(texts);
+    }
 }

@@ -32,19 +32,16 @@ public class ResourceIngestionTransactionService {
     private final ResourceRepository resourceRepository;
     private final DocumentChunkRepository chunkRepository;
     private final GeminiProperties geminiProperties;
-    private final AutoOrganizationService autoOrganizationService;
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
     public ResourceIngestionTransactionService(
             ResourceRepository resourceRepository,
             DocumentChunkRepository chunkRepository,
             GeminiProperties geminiProperties,
-            AutoOrganizationService autoOrganizationService,
             NamedParameterJdbcTemplate jdbcTemplate) {
         this.resourceRepository = resourceRepository;
         this.chunkRepository = chunkRepository;
         this.geminiProperties = geminiProperties;
-        this.autoOrganizationService = autoOrganizationService;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -154,11 +151,6 @@ public class ResourceIngestionTransactionService {
         resource.markReady();
         resourceRepository.save(resource);
 
-        try {
-            autoOrganizationService.autoOrganize(resource.getOwner().getId(), resource.getId());
-        } catch (Exception e) {
-            log.warn("Auto-organization skipped for resource {}: {}", resourceId, e.getMessage());
-        }
     }
 
     /**
@@ -186,11 +178,6 @@ public class ResourceIngestionTransactionService {
         resource.markReady();
         resourceRepository.save(resource);
 
-        try {
-            autoOrganizationService.autoOrganize(resource.getOwner().getId(), resource.getId());
-        } catch (Exception e) {
-            log.warn("Auto-organization skipped for resource {}: {}", resourceId, e.getMessage());
-        }
     }
 
     /**

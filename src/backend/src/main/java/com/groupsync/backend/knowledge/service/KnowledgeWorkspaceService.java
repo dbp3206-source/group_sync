@@ -105,6 +105,22 @@ public class KnowledgeWorkspaceService {
     }
 
     @Transactional
+    public boolean assignTagIfMissing(Long ownerId, Long resourceId, Long tagId) {
+        requireResource(ownerId, resourceId);
+        requireTag(ownerId, tagId);
+        return jdbc.update("insert into resource_tags(resource_id,tag_id) values(:resource,:tag) on conflict do nothing",
+                Map.of("resource", resourceId, "tag", tagId)) > 0;
+    }
+
+    @Transactional(readOnly = true)
+    public TagResponse tag(Long ownerId, Long tagId) {
+        requireTag(ownerId, tagId);
+        return jdbc.queryForObject("select id,name,created_at from tags where id=:id and owner_id=:owner",
+                Map.of("id", tagId, "owner", ownerId),
+                (rs, rowNum) -> new TagResponse(rs.getLong("id"), rs.getString("name"), toInstant(rs.getTimestamp("created_at"))));
+    }
+
+    @Transactional
     public void removeTag(Long ownerId, Long resourceId, Long tagId) {
         requireResource(ownerId, resourceId);
         requireTag(ownerId, tagId);
@@ -172,6 +188,14 @@ public class KnowledgeWorkspaceService {
         requireResource(ownerId, resourceId);
         jdbc.update("insert into resource_collections(resource_id,collection_id) values(:resource,:collection) on conflict do nothing",
                 Map.of("resource", resourceId, "collection", collectionId));
+    }
+
+    @Transactional
+    public boolean assignResourceIfMissing(Long ownerId, Long collectionId, Long resourceId) {
+        requireCollection(ownerId, collectionId);
+        requireResource(ownerId, resourceId);
+        return jdbc.update("insert into resource_collections(resource_id,collection_id) values(:resource,:collection) on conflict do nothing",
+                Map.of("resource", resourceId, "collection", collectionId)) > 0;
     }
 
     @Transactional

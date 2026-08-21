@@ -36,6 +36,7 @@ import {
   uploadResource,
   type KnowledgeCollection,
   type KnowledgeTag,
+  type OrganizationBatchResult,
   type Resource,
 } from '../api/knowledge'
 import { getApiErrorMessage } from '../api/errors'
@@ -90,6 +91,7 @@ export default function KnowledgeLibraryPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [viewMode, setViewMode] = useState<'GRID' | 'GRAPH'>('GRID')
+  const [organizationResult, setOrganizationResult] = useState<OrganizationBatchResult | null>(null)
 
   const resourcesRef = useRef(resources)
   const filtersRef = useRef({ activeQuery, tagId, collectionId, sort })
@@ -166,6 +168,23 @@ export default function KnowledgeLibraryPage() {
       await refreshCollections()
     } catch (err) {
       setCollectionLoadError(getApiErrorMessage(err, 'Collections could not be loaded.'))
+    }
+  }
+
+  async function organizeLibrary() {
+    setBusy(true)
+    setActionError('')
+    setOrganizationResult(null)
+    try {
+      const result = await autoOrganizeAll()
+      setOrganizationResult(result)
+      await load()
+      await refreshCollections().catch(err => setCollectionLoadError(getApiErrorMessage(err, 'Collections could not be loaded.')))
+      await refreshTags().catch(err => setTagLoadError(getApiErrorMessage(err, 'Tags could not be loaded.')))
+    } catch (err) {
+      setActionError(getApiErrorMessage(err, 'Auto-organize could not be completed.'))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -464,11 +483,25 @@ export default function KnowledgeLibraryPage() {
         <label className="kos-filter"><Tags size={16} /><select aria-label="Filter by tag" disabled={Boolean(tagLoadError)} value={tagId ?? ''} onChange={event => { const next = event.target.value ? Number(event.target.value) : undefined; setTagId(next); void load(activeQuery, next, collectionId, 0, sort, false) }}><option value="">{tagLoadError ? 'Tags unavailable' : 'All tags'}</option>{tags.map(tag => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select></label>
         <label className="kos-filter"><FolderPlus size={16} /><select aria-label="Filter by collection" disabled={Boolean(collectionLoadError)} value={collectionId ?? ''} onChange={event => { const next = event.target.value ? Number(event.target.value) : undefined; setCollectionId(next); void load(activeQuery, tagId, next, 0, sort, false) }}><option value="">{collectionLoadError ? 'Collections unavailable' : 'All collections'}</option>{collections.map(collection => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label>
         <label className="kos-filter"><select aria-label="Sort resources" value={sort} onChange={event => { const nextSort = event.target.value; setSort(nextSort); void load(activeQuery, tagId, collectionId, 0, nextSort, false) }}><option value="updated_desc">Recently updated</option><option value="created_desc">Recently created</option><option value="title_asc">Title (A-Z)</option><option value="title_desc">Title (Z-A)</option></select></label>
-        <button type="button" className="kos-button" disabled={busy} onClick={async () => { setBusy(true); try { await autoOrganizeAll(); await load(); await refreshCollections().catch(err => setCollectionLoadError(getApiErrorMessage(err, 'Collections could not be loaded.'))); await refreshTags().catch(err => setTagLoadError(getApiErrorMessage(err, 'Tags could not be loaded.'))) } catch (err) { setActionError(getApiErrorMessage(err, 'Auto-organize could not be completed.')) } finally { setBusy(false) } }}><Sparkles size={15} /> Auto-Organize</button>
+        <button type="button" className="kos-button" disabled={busy} onClick={() => void organizeLibrary()}><Sparkles size={15} /> {busy ? 'Analyzing...' : 'Auto-Organize'}</button>
         {hasFilters && <button type="button" className="kos-button kos-button--ghost" onClick={clearFilters}><X size={15} /> {activeQuery && !tagId && !collectionId ? 'Clear search' : 'Clear all filters'}</button>}
         <div className="kos-view-switcher"><button type="button" className={`kos-view-btn ${viewMode === 'GRID' ? 'is-active' : ''}`} onClick={() => setViewMode('GRID')}><LayoutGrid size={15} /> Grid</button><button type="button" className={`kos-view-btn ${viewMode === 'GRAPH' ? 'is-active' : ''}`} onClick={() => setViewMode('GRAPH')}><Network size={15} /> Knowledge map</button></div>
         <span className="kos-library-counter">{totalItems} resources <span aria-hidden="true">·</span> {collections.length} collections <span aria-hidden="true">·</span> {tags.length} tags</span>
       </div>
+
+      {organizationResult && (
+        <section className="kos-semantic-result" aria-live="polite">
+          <div>
+            <strong>{organizationResult.processed} resources analyzed</strong>
+            <p>{organizationResult.assigned} organized automatically, {organizationResult.suggested} need review, {organizationResult.skipped} had no safe match, {organizationResult.failed} could not be analyzed.</p>
+          </div>
+          {organizationResult.suggested > 0 && (() => {
+            const review = organizationResult.results.find(result => result.collectionSuggestions.length + result.newCollectionSuggestions.length > 0)
+            return review ? <Link className="kos-button kos-button--quiet" to={`/library/${review.resourceId}`}>Review suggestions</Link> : null
+          })()}
+          <button type="button" className="kos-icon-btn" onClick={() => setOrganizationResult(null)} aria-label="Close organization result"><X size={15} /></button>
+        </section>
+      )}
 
       {tagLoadError && <div className="kos-library-dependency-warning" role="alert"><span>Tags are temporarily unavailable. Resource content is still available.</span><button type="button" className="kos-button kos-button--quiet" onClick={() => void retryTags()}>Retry tags</button></div>}
 

@@ -36,6 +36,7 @@ import com.groupsync.backend.knowledge.repository.DocumentChunkRepository;
 import com.groupsync.backend.knowledge.repository.ResourceRepository;
 import com.groupsync.backend.knowledge.service.KnowledgeChatService;
 import com.groupsync.backend.knowledge.service.KnowledgeChatTransactionService;
+import com.groupsync.backend.knowledge.service.AutoOrganizationService;
 import com.groupsync.backend.knowledge.service.ResourceIngestionService;
 import com.groupsync.backend.knowledge.service.ResourceIngestionTransactionService;
 import com.groupsync.backend.knowledge.service.ResourceService;
@@ -102,6 +103,7 @@ class KnowledgeContextSmokeTest {
         @Bean DocumentChunkRepository documentChunkRepository() { return mock(DocumentChunkRepository.class); }
         @Bean ResourceParserRegistry resourceParserRegistry() { return mock(ResourceParserRegistry.class); }
         @Bean EmbeddingProvider embeddingProvider() { return mock(EmbeddingProvider.class); }
+        @Bean AutoOrganizationService autoOrganizationService() { return mock(AutoOrganizationService.class); }
         @Bean ResourceIngestionTransactionService resourceIngestionTransactionService() { return mock(ResourceIngestionTransactionService.class); }
         @Bean KnowledgeChatTransactionService knowledgeChatTransactionService() { return mock(KnowledgeChatTransactionService.class); }
         @Bean ChatSessionRepository chatSessionRepository() { return mock(ChatSessionRepository.class); }

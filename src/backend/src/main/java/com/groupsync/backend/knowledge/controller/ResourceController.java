@@ -126,16 +126,14 @@ public class ResourceController {
     }
 
     @PostMapping("/auto-organize-all")
-    public ResponseEntity<MessageResponse> autoOrganizeAll(@AuthenticationPrincipal AuthenticatedUser user) {
-        autoOrganizationService.autoOrganizeAll(user.getId());
-        return ResponseEntity.ok(new MessageResponse("All resources organized into relevant collections and tags."));
+    public ResponseEntity<OrganizationBatchResult> autoOrganizeAll(@AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(autoOrganizationService.autoOrganizeAll(user.getId()));
     }
 
     @PostMapping("/{resourceId}/auto-organize")
-    public ResponseEntity<MessageResponse> autoOrganize(
+    public ResponseEntity<SemanticOrganizationResult> autoOrganize(
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable Long resourceId) {
-        autoOrganizationService.autoOrganize(user.getId(), resourceId);
-        return ResponseEntity.ok(new MessageResponse("Resource organized into relevant collections and tags."));
+        return ResponseEntity.ok(autoOrganizationService.autoOrganize(user.getId(), resourceId));
     }
 }

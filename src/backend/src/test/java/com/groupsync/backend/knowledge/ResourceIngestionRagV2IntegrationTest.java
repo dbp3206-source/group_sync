@@ -26,6 +26,7 @@ import com.groupsync.backend.knowledge.rag.EmbeddingTextBuilder.SemanticMetadata
 import com.groupsync.backend.knowledge.repository.ResourceRepository;
 import com.groupsync.backend.knowledge.service.ResourceIngestionService;
 import com.groupsync.backend.knowledge.service.ResourceIngestionTransactionService;
+import com.groupsync.backend.knowledge.service.AutoOrganizationService;
 import com.groupsync.backend.knowledge.storage.StorageService;
 import com.groupsync.backend.user.model.UserAccount;
 
@@ -45,6 +46,7 @@ class ResourceIngestionRagV2IntegrationTest {
     @Mock private EmbeddingTextBuilder embeddingTextBuilder;
     @Mock private ResourceIngestionTransactionService transactionService;
     @Mock private ResourceParser resourceParser;
+    @Mock private AutoOrganizationService autoOrganizationService;
 
     private ResourceIngestionService ingestionService;
 
@@ -57,7 +59,8 @@ class ResourceIngestionRagV2IntegrationTest {
         ingestionService = new ResourceIngestionService(
                 resourceRepository, parserRegistry, chunkingStrategy,
                 storageService, embeddingProvider, embeddingTextBuilder, transactionService,
-                new com.groupsync.backend.knowledge.rag.GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000)
+                new com.groupsync.backend.knowledge.rag.GeminiProperties("", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-embedding-001", 768, 16, 5, 2, 12, 60, 30000),
+                autoOrganizationService
         );
 
         owner = new UserAccount("author@knowledgeos.io", "hash", "Author");

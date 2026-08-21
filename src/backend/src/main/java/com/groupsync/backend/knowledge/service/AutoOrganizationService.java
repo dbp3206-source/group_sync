@@ -1,158 +1,127 @@
 package com.groupsync.backend.knowledge.service;
 
 import java.util.*;
-import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import com.groupsync.backend.knowledge.dto.*;
+import com.groupsync.backend.knowledge.service.DocumentUnderstandingService.Outcome;
+import com.groupsync.backend.knowledge.service.SemanticCollectionOrganizationService.CollectionPlan;
+import com.groupsync.backend.knowledge.service.SemanticTaggingService.TagDecision;
 
-/**
- * Automatically organizes resources into relevant Collections and Tags
- * based on keyword, semantic, and topic extraction upon ingestion.
- */
+/** Coordinates the one shared semantic policy used by ingestion, Library and suggestions. */
 @Service
 public class AutoOrganizationService {
-    private static final Pattern NON_ALPHANUM = Pattern.compile("[^\\p{L}\\p{N}]+", Pattern.UNICODE_CHARACTER_CLASS);
-
-    private record TopicRule(String collectionName, String collectionDesc, List<String> tagNames, List<String> keywords) {}
-
-    private static final List<TopicRule> TOPIC_RULES = List.of(
-            new TopicRule(
-                    "Database Systems",
-                    "Relational database design, normalization, functional dependencies, SQL, and indexing.",
-                    List.of("database", "functional-dependency", "normalization", "sql"),
-                    List.of("functional dependency", "armstrong", "database", "normalization", "relation", "closure", "bcnf", "3nf", "sql", "superkey")
-            ),
-            new TopicRule(
-                    "Software Engineering",
-                    "OOP principles, design patterns, clean architecture, refactoring, and system design.",
-                    List.of("oop", "design-patterns", "architecture", "software-engineering"),
-                    List.of("oop", "encapsulation", "polymorphism", "inheritance", "abstraction", "strategy pattern", "design patterns", "clean architecture", "acid", "solid")
-            ),
-            new TopicRule(
-                    "AI & Security",
-                    "AI safety, prompt injection defense, vulnerability research, CVEs, and security standards.",
-                    List.of("ai-security", "cve", "prompt-injection", "vulnerability"),
-                    List.of("cve", "prompt injection", "security", "vulnerability", "cvss", "rfc-9421", "jailbreak", "adversarial", "anti-hallucination", "rag")
-            ),
-            new TopicRule(
-                    "Macroeconomics & Finance",
-                    "Economic indicators, GDP growth, inflation, monetary policy, and foreign direct investment.",
-                    List.of("economics", "macroeconomics", "finance", "gdp"),
-                    List.of("gdp", "inflation", "cpi", "fdi", "macroeconomic", "interest rate", "economic", "export", "import", "monetary")
-            ),
-            new TopicRule(
-                    "Medical & Healthcare",
-                    "Clinical trial protocols, cardiology, pharmacological therapies, and medical research.",
-                    List.of("medical", "clinical-trials", "healthcare", "cardiology"),
-                    List.of("clinical", "trial", "cardiotrex", "hfref", "ejection fraction", "cardiology", "placebo", "protocol", "medical", "patient")
-            ),
-            new TopicRule(
-                    "Knowledge Management",
-                    "Knowledge retrieval, RAG architectures, knowledge graph, and documentation lifecycle.",
-                    List.of("knowledge-management", "rag", "vector-search", "embeddings"),
-                    List.of("knowledge", "quản trị tri thức", "retrieval", "hybrid rag", "pgvector", "hnsw", "fts", "rrf")
-            )
-    );
-
+    private static final Logger log = LoggerFactory.getLogger(AutoOrganizationService.class);
+    private static final int MAX_BATCH_SIZE = 25;
     private final NamedParameterJdbcTemplate jdbc;
-    private final KnowledgeWorkspaceService workspaceService;
+    private final DocumentUnderstandingService understandingService;
+    private final SemanticTaggingService taggingService;
+    private final SemanticCollectionOrganizationService collectionService;
+    private final KnowledgeWorkspaceService workspace;
 
-    public AutoOrganizationService(NamedParameterJdbcTemplate jdbc, KnowledgeWorkspaceService workspaceService) {
+    public AutoOrganizationService(NamedParameterJdbcTemplate jdbc,
+                                   DocumentUnderstandingService understandingService,
+                                   SemanticTaggingService taggingService,
+                                   SemanticCollectionOrganizationService collectionService,
+                                   KnowledgeWorkspaceService workspace) {
         this.jdbc = jdbc;
-        this.workspaceService = workspaceService;
+        this.understandingService = understandingService;
+        this.taggingService = taggingService;
+        this.collectionService = collectionService;
+        this.workspace = workspace;
     }
 
-    /**
-     * Automatically classifies a resource into 1 or more relevant collections and tags.
-     */
-    @Transactional
-    public void autoOrganize(Long ownerId, Long resourceId) {
-        if (ownerId == null || resourceId == null) {
-            return;
+    public SemanticOrganizationResult autoOrganize(Long ownerId, Long resourceId) {
+        long started = System.nanoTime();
+        SemanticPlan plan = preview(ownerId, resourceId);
+        if (plan.understanding().result() == null) {
+            return new SemanticOrganizationResult(resourceId, plan.understanding().status(), List.of(), List.of(),
+                    List.of(), List.of(), plan.understanding().warnings());
         }
 
-        // Fetch resource title, description, and concatenated chunk content
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT title, coalesce(description, '') as description FROM resources WHERE id = :id AND owner_id = :ownerId",
-                Map.of("id", resourceId, "ownerId", ownerId)
-        );
-        if (rows.isEmpty()) {
-            return;
+        List<String> assignedTags = new ArrayList<>();
+        for (TagDecision decision : plan.tags()) {
+            TagResponse tag = decision.existingTagId() == null
+                    ? workspace.findOrCreateTag(ownerId, decision.canonicalLabel())
+                    : workspace.tag(ownerId, decision.existingTagId());
+            if (workspace.assignTagIfMissing(ownerId, resourceId, tag.id())) assignedTags.add(tag.name());
         }
 
-        Map<String, Object> resource = rows.get(0);
-        String title = String.valueOf(resource.get("title"));
-        String description = String.valueOf(resource.get("description"));
+        List<Long> assignedCollections = new ArrayList<>();
+        for (OrganizationCollectionSuggestionResponse match : plan.collections().strongMatches()) {
+            if (workspace.assignResourceIfMissing(ownerId, match.existingCollectionId(), resourceId)) {
+                assignedCollections.add(match.existingCollectionId());
+            }
+        }
 
-        String chunkContent = jdbc.queryForObject(
-                "SELECT coalesce(string_agg(content, ' '), '') FROM document_chunks WHERE resource_id = :resourceId",
-                Map.of("resourceId", resourceId),
-                String.class
-        );
+        log.info("Semantic organization completed resourceId={} stage=ORGANIZE durationMs={} tagsAssigned={} collectionsAssigned={} suggestions={}",
+                resourceId, (System.nanoTime() - started) / 1_000_000L, assignedTags.size(),
+                assignedCollections.size(), plan.collections().possibleMatches().size() + plan.collections().newSuggestions().size());
+        return new SemanticOrganizationResult(resourceId, plan.understanding().status(), assignedTags,
+                assignedCollections, plan.collections().possibleMatches(), plan.collections().newSuggestions(),
+                plan.understanding().warnings());
+    }
 
-        String fullCorpus = (title + " " + description + " " + (chunkContent != null ? chunkContent : "")).toLowerCase(Locale.ROOT);
+    public SemanticOrganizationResult autoOrganizeByResourceId(Long resourceId) {
+        Long ownerId = jdbc.query("select owner_id from resources where id=:resource",
+                Map.of("resource", resourceId), rs -> rs.next() ? rs.getLong(1) : null);
+        if (ownerId == null) throw new IllegalArgumentException("Resource not found.");
+        return autoOrganize(ownerId, resourceId);
+    }
 
-        Set<String> matchedCollections = new LinkedHashSet<>();
-        Set<String> matchedTags = new LinkedHashSet<>();
-
-        for (TopicRule rule : TOPIC_RULES) {
-            boolean matched = false;
-            for (String kw : rule.keywords()) {
-                if (fullCorpus.contains(kw)) {
-                    matched = true;
-                    break;
+    public OrganizationBatchResult autoOrganizeAll(Long ownerId) {
+        List<Long> resourceIds = jdbc.queryForList("""
+                select id from resources where owner_id=:owner and processing_status='READY'
+                order by updated_at desc limit :limit
+                """, Map.of("owner", ownerId, "limit", MAX_BATCH_SIZE), Long.class);
+        List<SemanticOrganizationResult> results = new ArrayList<>();
+        int assigned = 0, suggested = 0, skipped = 0, failed = 0;
+        for (Long resourceId : resourceIds) {
+            try {
+                SemanticOrganizationResult result = autoOrganize(ownerId, resourceId);
+                results.add(result);
+                if ("FAILED".equals(result.understandingStatus())) {
+                    failed++;
+                } else {
+                    if (result.assignedAnything()) assigned++;
+                    if (result.hasSuggestions()) suggested++;
+                    if (!result.assignedAnything() && !result.hasSuggestions()) skipped++;
                 }
-            }
-            if (matched) {
-                matchedCollections.add(rule.collectionName());
-                matchedTags.addAll(rule.tagNames());
-            }
-        }
-
-        // Default fallback if no specific rule matched
-        if (matchedCollections.isEmpty()) {
-            matchedCollections.add("General Knowledge");
-            matchedTags.add("general");
-        }
-
-        // Assign tags
-        for (String tagName : matchedTags) {
-            try {
-                com.groupsync.backend.knowledge.dto.TagResponse tag = workspaceService.findOrCreateTag(ownerId, tagName);
-                Long tagId = tag.id();
-                workspaceService.assignTag(ownerId, resourceId, tagId);
-            } catch (Exception e) {
-                org.slf4j.LoggerFactory.getLogger(AutoOrganizationService.class).warn("Failed to assign tag {}: {}", tagName, e.getMessage(), e);
+            } catch (RuntimeException exception) {
+                failed++;
+                results.add(new SemanticOrganizationResult(resourceId, "FAILED", List.of(), List.of(),
+                        List.of(), List.of(), List.of("Semantic organization failed.")));
+                log.warn("Semantic organization failed resourceId={} category={}", resourceId,
+                        exception.getClass().getSimpleName());
             }
         }
-
-        // Assign collections
-        for (String colName : matchedCollections) {
-            try {
-                TopicRule rule = TOPIC_RULES.stream().filter(r -> r.collectionName().equalsIgnoreCase(colName)).findFirst().orElse(null);
-                String colDesc = rule != null ? rule.collectionDesc() : "Curated topic collection.";
-                com.groupsync.backend.knowledge.dto.CollectionResponse collection = workspaceService.findOrCreateCollection(ownerId, colName, colDesc);
-                Long colId = collection.id();
-                workspaceService.assignResource(ownerId, colId, resourceId);
-            } catch (Exception e) {
-                org.slf4j.LoggerFactory.getLogger(AutoOrganizationService.class).warn("Failed to assign collection {}: {}", colName, e.getMessage(), e);
-            }
-        }
+        return new OrganizationBatchResult(resourceIds.size(), assigned, suggested, skipped, failed, results);
     }
 
-    /**
-     * Re-runs auto-organization for all resources of the given owner.
-     */
-    @Transactional
-    public void autoOrganizeAll(Long ownerId) {
-        List<Long> resourceIds = jdbc.queryForList(
-                "SELECT id FROM resources WHERE owner_id = :ownerId",
-                Map.of("ownerId", ownerId),
-                Long.class
-        );
-        for (Long resId : resourceIds) {
-            autoOrganize(ownerId, resId);
-        }
+    public OrganizationSuggestionsResponse suggestions(Long ownerId, Long resourceId) {
+        SemanticPlan plan = preview(ownerId, resourceId);
+        List<OrganizationTagSuggestionResponse> tags = plan.tags().stream()
+                .map(tag -> new OrganizationTagSuggestionResponse(tag.canonicalLabel(),
+                        tag.existingTagId() == null ? 0L : tag.existingTagId(),
+                        tag.existingTagId() == null ? "Useful semantic tag" : "Equivalent existing tag",
+                        tag.confidence())).toList();
+        List<OrganizationCollectionSuggestionResponse> collections = new ArrayList<>();
+        collections.addAll(plan.collections().strongMatches());
+        collections.addAll(plan.collections().possibleMatches());
+        collections.addAll(plan.collections().newSuggestions());
+        return new OrganizationSuggestionsResponse(resourceId, tags, collections, List.of());
     }
+
+    SemanticPlan preview(Long ownerId, Long resourceId) {
+        Outcome understanding = understandingService.understand(ownerId, resourceId);
+        if (understanding.result() == null) {
+            return new SemanticPlan(understanding, List.of(), new CollectionPlan(List.of(), List.of(), List.of()));
+        }
+        return new SemanticPlan(understanding, taggingService.plan(ownerId, understanding.result()),
+                collectionService.plan(ownerId, understanding.result()));
+    }
+
+    record SemanticPlan(Outcome understanding, List<TagDecision> tags, CollectionPlan collections) { }
 }

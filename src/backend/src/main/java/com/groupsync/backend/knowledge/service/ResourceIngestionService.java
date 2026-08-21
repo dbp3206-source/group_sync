@@ -42,6 +42,7 @@ public class ResourceIngestionService {
     private final EmbeddingTextBuilder embeddingTextBuilder;
     private final ResourceIngestionTransactionService transactionService;
     private final GeminiProperties geminiProperties;
+    private final AutoOrganizationService autoOrganizationService;
 
     @Autowired
     public ResourceIngestionService(
@@ -52,7 +53,8 @@ public class ResourceIngestionService {
             EmbeddingProvider embeddingProvider,
             EmbeddingTextBuilder embeddingTextBuilder,
             ResourceIngestionTransactionService transactionService,
-            GeminiProperties geminiProperties) {
+            GeminiProperties geminiProperties,
+            AutoOrganizationService autoOrganizationService) {
         this.resourceRepository = resourceRepository;
         this.parserRegistry = parserRegistry;
         this.chunkingStrategy = chunkingStrategy;
@@ -61,6 +63,7 @@ public class ResourceIngestionService {
         this.embeddingTextBuilder = embeddingTextBuilder;
         this.transactionService = transactionService;
         this.geminiProperties = Objects.requireNonNull(geminiProperties, "geminiProperties must not be null");
+        this.autoOrganizationService = autoOrganizationService;
     }
 
     @Async
@@ -164,6 +167,14 @@ public class ResourceIngestionService {
         } catch (Exception exception) {
             log.error("Resource processing failed for id {}: {}", resourceId, exception.getMessage(), exception);
             transactionService.markFailed(resourceId, safeMessage(exception));
+            return;
+        }
+
+        try {
+            autoOrganizationService.autoOrganizeByResourceId(resourceId);
+        } catch (Exception exception) {
+            log.warn("Post-ingestion semantic organization skipped resourceId={} category={}",
+                    resourceId, exception.getClass().getSimpleName());
         }
     }
 

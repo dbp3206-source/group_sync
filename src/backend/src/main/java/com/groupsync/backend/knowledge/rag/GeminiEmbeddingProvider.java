@@ -38,13 +38,22 @@ public class GeminiEmbeddingProvider implements EmbeddingProvider {
 
     @Override
     public BatchResult embedDocumentsWithBatchResult(List<String> texts) {
+        return embedBatch(texts, "RETRIEVAL_DOCUMENT");
+    }
+
+    @Override
+    public List<float[]> embedSemanticTexts(List<String> texts) {
+        return embedBatch(texts, "SEMANTIC_SIMILARITY").embeddings();
+    }
+
+    private BatchResult embedBatch(List<String> texts, String taskType) {
         if (texts == null || texts.isEmpty()) {
             return new BatchResult(List.of(), 0, 0);
         }
         Client client = getClient();
         EmbedContentConfig config = EmbedContentConfig.builder()
                 .outputDimensionality(properties.embeddingDimensions())
-                .taskType("RETRIEVAL_DOCUMENT")
+                .taskType(taskType)
                 .build();
 
         List<float[]> allResults = new ArrayList<>(texts.size());

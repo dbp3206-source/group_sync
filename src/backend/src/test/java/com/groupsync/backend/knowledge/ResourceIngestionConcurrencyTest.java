@@ -60,7 +60,7 @@ class ResourceIngestionConcurrencyTest {
     @Test
     void transactionServiceClaimReturnsTrueOnFirstAttemptAndFalseOnSubsequentAttempt() {
         ResourceIngestionTransactionService txService = new ResourceIngestionTransactionService(
-                resourceRepository, chunkRepository, geminiProperties, autoOrganizationService, jdbcTemplate);
+                resourceRepository, chunkRepository, geminiProperties, jdbcTemplate);
 
         Long resourceId = 100L;
 
@@ -119,7 +119,7 @@ class ResourceIngestionConcurrencyTest {
     @Test
     void saveReadyDeletesExistingChunksFirstToPreventDuplicateChunks() {
         ResourceIngestionTransactionService txService = new ResourceIngestionTransactionService(
-                resourceRepository, chunkRepository, geminiProperties, autoOrganizationService, jdbcTemplate);
+                resourceRepository, chunkRepository, geminiProperties, jdbcTemplate);
 
         Long resourceId = 300L;
         UserAccount owner = new UserAccount("user@example.com", "hash", "User");

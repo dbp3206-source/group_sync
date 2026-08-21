@@ -145,6 +145,47 @@
   font-size: .84rem;
 }
 
+.kos-semantic-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: .9rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--kos-green) 30%, var(--kos-line));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--kos-green) 7%, var(--kos-surface));
+}
+
+.kos-semantic-result p { margin: .25rem 0 0; color: var(--kos-muted); font-size: .84rem; }
+
+.kos-semantic-resource-result {
+  display: grid;
+  gap: .4rem;
+  margin-top: .75rem;
+  color: var(--kos-muted);
+  font-size: .82rem;
+}
+
+.kos-semantic-resource-result .kos-button { justify-self: start; margin-top: .25rem; }
+
+.kos-semantic-review {
+  display: grid;
+  gap: .9rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--kos-line);
+  border-radius: 6px;
+  background: var(--kos-subtle);
+}
+
+.kos-semantic-review h4 { margin: 0; color: var(--kos-ink); }
+.kos-semantic-review fieldset { display: grid; gap: .55rem; margin: 0; padding: 0; border: 0; }
+.kos-semantic-review legend { margin-bottom: .45rem; color: var(--kos-muted); font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.kos-semantic-review label { display: flex; align-items: flex-start; gap: .65rem; padding: .55rem .65rem; border: 1px solid var(--kos-line); border-radius: 5px; background: var(--kos-surface); cursor: pointer; }
+.kos-semantic-review label span { display: grid; gap: .15rem; }
+.kos-semantic-review label small { color: var(--kos-muted); }
+
 .kos-collection-resource-list { margin-top: 1rem; }
 
 .kos-collection-resource-row {
@@ -371,6 +412,8 @@
   .kos-bulk-bar select { width: 100%; }
   .kos-library-alert { align-items: flex-start; flex-direction: column; }
   .kos-library-dependency-warning { align-items: flex-start; flex-direction: column; }
+  .kos-semantic-result { grid-template-columns: 1fr auto; align-items: flex-start; }
+  .kos-semantic-result > div { grid-column: 1 / -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
