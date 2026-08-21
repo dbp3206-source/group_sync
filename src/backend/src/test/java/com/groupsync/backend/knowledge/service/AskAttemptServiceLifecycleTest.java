@@ -214,8 +214,14 @@ class AskAttemptServiceLifecycleTest {
         AskAttempt attempt = attempt(30L, AskAttemptStatus.PENDING);
         CountDownLatch finished = new CountDownLatch(1);
         CountDownLatch failurePersisted = new CountDownLatch(1);
+        CountDownLatch failedAttemptPersisted = new CountDownLatch(1);
         when(transactionService.prepareConversation(1L, request)).thenReturn(preparation);
-        when(attemptRepository.save(any(AskAttempt.class))).thenAnswer(inv -> { AskAttempt value = inv.getArgument(0); ReflectionTestUtils.setField(value, "id", 30L); return value; });
+        when(attemptRepository.save(any(AskAttempt.class))).thenAnswer(inv -> {
+            AskAttempt value = inv.getArgument(0);
+            ReflectionTestUtils.setField(value, "id", 30L);
+            if (value.getStatus() == AskAttemptStatus.FAILED) failedAttemptPersisted.countDown();
+            return value;
+        });
         when(attemptRepository.findById(30L)).thenReturn(Optional.of(attempt));
         when(attemptRepository.claimExecution(30L, AskAttemptStatus.PENDING, AskAttemptStatus.RUNNING)).thenReturn(1);
         doAnswer(inv -> { failurePersisted.countDown(); return null; }).when(transactionService).markUserFailed(20L, expected);
@@ -225,6 +231,7 @@ class AskAttemptServiceLifecycleTest {
 
         assertTrue(finished.await(3, TimeUnit.SECONDS));
         assertTrue(failurePersisted.await(3, TimeUnit.SECONDS));
+        assertTrue(failedAttemptPersisted.await(3, TimeUnit.SECONDS));
         verify(transactionService).markUserFailed(20L, expected);
         verify(transactionService, never()).persistAssistantResult(anyLong(), anyLong(), anyString(), anyList());
         assertEquals(AskAttemptStatus.FAILED, attempt.getStatus());
