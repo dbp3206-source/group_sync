@@ -15,6 +15,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.util.unit.DataSize;
 import com.groupsync.backend.knowledge.ingestion.ResourceParserRegistry;
+import com.groupsync.backend.knowledge.dto.CreateNoteResourceRequest;
 import com.groupsync.backend.knowledge.model.ResourceType;
 import com.groupsync.backend.knowledge.repository.CitationRepository;
 import com.groupsync.backend.knowledge.repository.DocumentChunkRepository;
@@ -75,6 +76,16 @@ class ResourceUploadValidationTest {
                 resourceService.upload(1L, file, "Empty File", null)
         );
         assertTrue(ex.getMessage().contains("Choose a resource"));
+    }
+
+    @Test
+    void rejectsBlankNoteContentBeforeCreatingStorage() {
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                resourceService.createNote(1L, new CreateNoteResourceRequest("Empty note", "   ", null))
+        );
+
+        assertEquals("Add note content before saving.", ex.getMessage());
+        verifyNoInteractions(storageService, resourceRepository, events);
     }
 
     @Test

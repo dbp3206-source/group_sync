@@ -108,6 +108,12 @@ public class ResourceService {
 
     @Transactional
     public ResourceResponse createNote(Long ownerId, CreateNoteResourceRequest request) {
+        if (request == null || request.title() == null || request.title().isBlank()) {
+            throw new BadRequestException("Add a title before saving the note.");
+        }
+        if (request.content() == null || request.content().isBlank()) {
+            throw new BadRequestException("Add note content before saving.");
+        }
         byte[] content = (request.content() == null ? "" : request.content()).getBytes(StandardCharsets.UTF_8);
         try {
             StorageService.StoredFile stored = storageService.store(ownerId, request.title() + ".md", new ByteArrayInputStream(content));
