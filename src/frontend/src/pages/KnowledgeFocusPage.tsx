@@ -277,11 +277,14 @@ function ConceptDetail(props: { concept: TopicConcept; onStatus: (concept: Topic
 
 function RecallPanel({ quiz, answers, setAnswers, result, busy, onSubmit }: { quiz: QuizAttemptResponse; answers: Record<number, number>
   setAnswers: React.Dispatch<React.SetStateAction<Record<number, number>>>; result: SubmitQuizAnswersResponse | null; busy: boolean; onSubmit: () => void }) {
-  return <section className="kos-learning-recall" aria-live="polite"><h4>Recall</h4>{quiz.questions.map((question, index) => <fieldset key={question.id}><legend>{index + 1}. {question.question}</legend>
-    {question.options.map((option, optionIndex) => <label key={option}><input type="radio" name={`question-${question.id}`} disabled={Boolean(result)}
-      checked={answers[question.id] === optionIndex} onChange={() => setAnswers(previous => ({ ...previous, [question.id]: optionIndex }))} /><span>{option}</span></label>)}
-    {result && <div className="kos-learning-recall__explanation"><strong>{question.correctOption === answers[question.id] ? 'Chính xác' : 'Cần ôn lại'}</strong>
-      <p>{question.explanation}</p>{question.sourceSnippet && <small>Nguồn: {question.sourceSnippet}</small>}</div>}</fieldset>)}
+  return <section className="kos-learning-recall" aria-live="polite"><h4>Recall</h4>{quiz.questions.map((question, index) => {
+    const revealedQuestion = result?.results.find(item => item.id === question.id) ?? question
+    return <fieldset key={question.id}><legend>{index + 1}. {question.question}</legend>
+      {question.options.map((option, optionIndex) => <label key={option}><input type="radio" name={`question-${question.id}`} disabled={Boolean(result)}
+        checked={answers[question.id] === optionIndex} onChange={() => setAnswers(previous => ({ ...previous, [question.id]: optionIndex }))} /><span>{option}</span></label>)}
+      {result && <div className="kos-learning-recall__explanation"><strong>{revealedQuestion.correctOption === answers[question.id] ? 'Chính xác' : 'Cần ôn lại'}</strong>
+        <p>{revealedQuestion.explanation}</p>{revealedQuestion.sourceSnippet && <small>Nguồn: {revealedQuestion.sourceSnippet}</small>}</div>}</fieldset>
+  })}
     {!result ? <button type="button" className="kos-button kos-button--primary" disabled={busy || Object.keys(answers).length < quiz.questions.length} onClick={onSubmit}>Nộp Recall</button>
       : <p className="kos-learning-recall__score">Kết quả: {result.scoreCorrect}/{result.totalQuestions}</p>}</section>
 }

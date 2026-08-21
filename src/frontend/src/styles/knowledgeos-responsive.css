@@ -126,6 +126,31 @@
 .kos-workspace-error-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
 .kos-workspace-loading { display: grid; justify-items: center; gap: 10px; padding: 64px 20px; text-align: center; }
 
+/* Keep the live trace bounded so every backend stage remains reachable. */
+.kos-reasoning-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+  max-height: min(430px, calc(100dvh - 180px));
+  overflow: hidden;
+}
+.kos-reasoning-card > .kos-box-header,
+.kos-reasoning-card > .kos-trace-intro,
+.kos-reasoning-card > .kos-trace-advanced,
+.kos-reasoning-card > .kos-box-footer { flex: 0 0 auto; }
+.kos-reasoning-card > .kos-reasoning-scroll-content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--kos-blue) var(--kos-surface-2);
+}
+.kos-reasoning-card > .kos-reasoning-scroll-content::-webkit-scrollbar { width: 7px; }
+.kos-reasoning-card > .kos-reasoning-scroll-content::-webkit-scrollbar-track { background: var(--kos-surface-2); }
+.kos-reasoning-card > .kos-reasoning-scroll-content::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--kos-blue);
+}
+
 @media (max-width: 880px) {
   .kos-workspace-v2-header { align-items: flex-start; flex-direction: column; }
   .kos-workspace-header-actions { justify-content: flex-start; }
@@ -248,6 +273,11 @@
   .app-shell--signed-in { display: block; }
   .app-sidebar { display: none; }
   .app-main { padding: 28px 20px 98px; }
+  .kos-ask-layout { grid-template-columns: minmax(0, 1fr); min-width: 0; width: 100%; }
+  .kos-ask-sidebar,
+  .kos-ask-stage,
+  .kos-ask-form,
+  .kos-ask-scope { min-width: 0; width: 100%; }
   .mobile-app-header { position: sticky; z-index: 12; top: 0; display: flex; align-items: center; justify-content: space-between; min-height: 62px; padding: 10px 18px; border-bottom: 1px solid var(--color-line); background: color-mix(in srgb, var(--color-surface) 96%, transparent); backdrop-filter: blur(10px); }
   .mobile-account-menu { position: relative; }
   .mobile-account-menu summary { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 9px; color: var(--color-ink); cursor: pointer; list-style: none; }
