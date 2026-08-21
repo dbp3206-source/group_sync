@@ -12,7 +12,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.groupsync.backend.knowledge.dto.FocusStudioDto.*;
 import com.groupsync.backend.knowledge.model.*;
-import com.groupsync.backend.knowledge.rag.LanguageModelClient;
 import com.groupsync.backend.knowledge.repository.*;
 import com.groupsync.backend.knowledge.service.LearningStudioService;
 import com.groupsync.backend.shared.exception.BadRequestException;
@@ -26,9 +25,7 @@ class LearningStudioServiceTest {
     @Mock private StudyTopicRepository topicRepository;
     @Mock private TopicConceptRepository conceptRepository;
     @Mock private ResourceRepository resourceRepository;
-    @Mock private DocumentChunkRepository chunkRepository;
     @Mock private UserAccountRepository userRepository;
-    @Mock private LanguageModelClient languageModelClient;
 
     private LearningStudioService studioService;
     private UserAccount owner;
@@ -38,7 +35,7 @@ class LearningStudioServiceTest {
     void setUp() {
         studioService = new LearningStudioService(
                 topicRepository, conceptRepository, resourceRepository,
-                chunkRepository, userRepository, languageModelClient);
+                userRepository);
 
         owner = new UserAccount("owner@example.com", "hash", "Owner User");
         otherUser = new UserAccount("other@example.com", "hash", "Other User");

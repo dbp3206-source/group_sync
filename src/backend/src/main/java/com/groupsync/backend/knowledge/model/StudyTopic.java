@@ -27,6 +27,27 @@ public class StudyTopic {
     @Column(nullable = false, length = 30)
     private String status = "ACTIVE";
 
+    @Column(name = "collection_id")
+    private Long collectionId;
+
+    @Column(name = "learning_area_type", nullable = false, length = 30)
+    private String learningAreaType = "LEGACY";
+
+    @Column(name = "refresh_status", nullable = false, length = 40)
+    private String refreshStatus = "CURRENT";
+
+    @Column(name = "current_version", nullable = false)
+    private int currentVersion;
+
+    @Column(name = "source_signature", length = 64)
+    private String sourceSignature;
+
+    @Column(name = "generation_failure", length = 500)
+    private String generationFailure;
+
+    @Column(name = "last_refreshed_at")
+    private Instant lastRefreshedAt;
+
     @ManyToMany
     @JoinTable(
         name = "study_topic_resources",
@@ -64,6 +85,13 @@ public class StudyTopic {
     public void setGoal(String goal) { this.goal = goal; this.updatedAt = Instant.now(); }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; this.updatedAt = Instant.now(); }
+    public Long getCollectionId() { return collectionId; }
+    public String getLearningAreaType() { return learningAreaType; }
+    public String getRefreshStatus() { return refreshStatus; }
+    public int getCurrentVersion() { return currentVersion; }
+    public String getSourceSignature() { return sourceSignature; }
+    public String getGenerationFailure() { return generationFailure; }
+    public Instant getLastRefreshedAt() { return lastRefreshedAt; }
     public Set<Resource> getResources() { return resources; }
     public Set<TopicConcept> getConcepts() { return concepts; }
     public Instant getCreatedAt() { return createdAt; }

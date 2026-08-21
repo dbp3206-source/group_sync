@@ -1,6 +1,8 @@
 package com.groupsync.backend.knowledge.dto;
 
 import java.time.Instant;
+import java.util.List;
+import com.groupsync.backend.knowledge.dto.FocusStudioDto.DeepDiveAreaDto;
 
 public record ResourceDeepDiveResponse(
         boolean available,
@@ -13,9 +15,10 @@ public record ResourceDeepDiveResponse(
         int reviewNeededCount,
         int learningCount,
         int notStartedCount,
-        Instant updatedAt) {
+        Instant updatedAt,
+        List<DeepDiveAreaDto> learningAreas) {
 
     public static ResourceDeepDiveResponse unavailable() {
-        return new ResourceDeepDiveResponse(false, null, null, null, null, 0, 0, 0, 0, 0, null);
+        return new ResourceDeepDiveResponse(false, null, null, null, null, 0, 0, 0, 0, 0, null, List.of());
     }
 }

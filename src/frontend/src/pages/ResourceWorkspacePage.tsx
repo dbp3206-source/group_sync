@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   ArrowLeft,
   Check,
   ChevronDown,
@@ -366,8 +367,19 @@ function NotesDrawer(props: OverviewProps) {
 function DeepDiveSurface({ deepDive, loading, error }: { deepDive: ResourceDeepDive | null; loading: boolean; error?: string }) {
   if (loading) return <div className="kos-workspace-v2-surface"><div className="kos-workspace-section kos-loading-inline"><Loader2 size={22} className="kos-spin-fast" /> Loading Deep Dive…</div></div>
   if (error || !deepDive) return <div className="kos-workspace-v2-surface"><div className="kos-workspace-section"><div className="kos-section-kicker">Deep Dive</div><h2>Deep Dive is unavailable</h2><p className="kos-muted">{error || 'The learning studio could not be reached. The rest of this Workspace remains available.'}</p></div></div>
-  const percent = deepDive.conceptCount > 0 ? Math.round((deepDive.checkedCount / deepDive.conceptCount) * 100) : 0
-  return <div className="kos-workspace-v2-surface"><section className="kos-workspace-section kos-deep-dive-hero"><div className="kos-section-kicker">Deep Dive</div>{deepDive.available ? <><h2>{deepDive.topicTitle}</h2><p className="kos-brief-copy">{deepDive.goal}</p><div className="kos-deep-dive-progress"><div><span>Checked concepts</span><strong>{percent}%</strong></div><div className="kos-progress-track"><span style={{ width: `${percent}%` }} /></div><small>{deepDive.checkedCount} of {deepDive.conceptCount} concepts checked. Derived from the current concept statuses.</small></div><div className="kos-deep-dive-stats"><TraceItem label="Checked" value={String(deepDive.checkedCount)} /><TraceItem label="Review needed" value={String(deepDive.reviewNeededCount)} /><TraceItem label="Learning" value={String(deepDive.learningCount)} /><TraceItem label="Not started" value={String(deepDive.notStartedCount)} /></div><Link to="/focus" className="kos-button kos-button--primary">Continue in Deep Dive</Link></> : <><h2>Build a source-grounded learning path</h2><p className="kos-muted">No Study Topic currently includes this resource. Build Deep Dive in the existing Learning Studio when you are ready.</p><Link to="/focus" className="kos-button kos-button--primary"><Sparkles size={15} /> Build Deep Dive</Link></>}</section></div>
+  const areas = deepDive.learningAreas ?? []
+  return <div className="kos-workspace-v2-surface"><section className="kos-workspace-section kos-deep-dive-hero"><div className="kos-section-kicker">Deep Dive</div>{areas.length === 1 ? <>
+    <h2>{areas[0].title}</h2><p className="kos-brief-copy">{areas[0].moduleTitle ? `Continue with ${areas[0].moduleTitle}.` : deepDive.goal}</p>
+    <div className="kos-deep-dive-stats"><TraceItem label="Checked" value={String(deepDive.checkedCount)} /><TraceItem label="Review needed" value={String(deepDive.reviewNeededCount)} />
+      <TraceItem label="Learning" value={String(deepDive.learningCount)} /><TraceItem label="Not started" value={String(deepDive.notStartedCount)} /></div>
+    <Link to={`/focus?area=${areas[0].learningAreaId}`} className="kos-button kos-button--primary">Continue Learning</Link></>
+    : areas.length > 1 ? <><h2>This source supports several Learning Areas</h2><p className="kos-muted">Choose the knowledge context you want to continue.</p>
+      <div className="kos-workspace-list">{areas.map(area => <Link key={area.learningAreaId} to={`/focus?area=${area.learningAreaId}`} className="kos-workspace-list-row">
+        <span><strong>{area.title}</strong><small>{area.moduleTitle || `${area.conceptCount} concepts`}</small></span><ArrowRight size={16} /></Link>)}</div></>
+    : deepDive.available ? <><h2>{deepDive.topicTitle}</h2><p className="kos-brief-copy">{deepDive.goal}</p><p className="kos-muted">This is a preserved Legacy Topic. Its mastery and Recall history remain available.</p>
+      <Link to={`/focus?topicId=${deepDive.topicId}`} className="kos-button kos-button--primary">Open Legacy Topic</Link></>
+    : <><h2>Connect this source to a Learning Area</h2><p className="kos-muted">Add it to a Collection in Library, then build or continue that Collection in Focus.</p>
+      <Link to="/library" className="kos-button kos-button--primary"><Sparkles size={15} /> Open Library</Link></>}</section></div>
 }
 
 function MapSurface({ map, loading, error }: { map: ResourceKnowledgeMap | null; loading: boolean; error?: string }) {

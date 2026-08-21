@@ -32,6 +32,12 @@ public class TopicConcept {
     @Column(nullable = false)
     private int position = 0;
 
+    @Column(name = "stable_key", length = 240)
+    private String stableKey;
+
+    @Column(name = "lifecycle_status", nullable = false, length = 20)
+    private String lifecycleStatus = "ACTIVE";
+
     @ManyToMany
     @JoinTable(
         name = "topic_concept_sources",
@@ -71,6 +77,8 @@ public class TopicConcept {
     public void setStudyStatus(String studyStatus) { this.studyStatus = studyStatus; this.updatedAt = Instant.now(); }
     public int getPosition() { return position; }
     public void setPosition(int position) { this.position = position; }
+    public String getStableKey() { return stableKey; }
+    public String getLifecycleStatus() { return lifecycleStatus; }
     public Set<DocumentChunk> getSourceChunks() { return sourceChunks; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

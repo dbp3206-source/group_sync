@@ -144,6 +144,18 @@ export type ResourceDeepDive = {
   learningCount: number
   notStartedCount: number
   updatedAt: string | null
+  learningAreas: DeepDiveArea[]
+}
+export type DeepDiveArea = {
+  learningAreaId: number
+  collectionId: number
+  title: string
+  refreshStatus: LearningPathStatus
+  moduleId: number | null
+  moduleTitle: string | null
+  conceptCount: number
+  checkedCount: number
+  reviewNeededCount: number
 }
 export type ResourceKnowledgeMapNode = {
   id: string
@@ -335,6 +347,84 @@ export type ReviewQueueItem = {
   summary: string
   whyItMatters: string
   updatedAt: string
+}
+
+export type LearningPathStatus = 'NOT_BUILT' | 'BUILDING' | 'CURRENT' | 'NEW_KNOWLEDGE_AVAILABLE' | 'REFRESHING' | 'FAILED'
+
+export type LearningArea = {
+  id: number | null
+  collectionId: number
+  title: string
+  goal: string
+  sourceCount: number
+  moduleCount: number
+  conceptCount: number
+  checkedCount: number
+  reviewNeededCount: number
+  learningCount: number
+  notStartedCount: number
+  refreshStatus: LearningPathStatus
+  newSourceCount: number
+  currentVersion: number
+  generationFailure: string | null
+  updatedAt: string
+}
+
+export type ModuleResource = { id: number; title: string; resourceType: string; role: 'PRIMARY' | 'SUPPORTING' }
+
+export type LearningModule = {
+  id: number
+  position: number
+  stage: 'FOUNDATION' | 'CORE' | 'APPLICATION' | 'ADVANCED'
+  title: string
+  objective: string
+  conceptCount: number
+  checkedCount: number
+  reviewNeededCount: number
+  primaryResources: ModuleResource[]
+  supportingResources: ModuleResource[]
+  concepts: TopicConcept[]
+}
+
+export type LearningAreaDetail = {
+  area: LearningArea
+  resources: TopicResource[]
+  modules: LearningModule[]
+  retiredConcepts: TopicConcept[]
+}
+
+export type LearningAreaSourceMap = {
+  learningAreaId: number
+  nodes: Array<{ id: string; type: 'COLLECTION' | 'RESOURCE' | 'CONCEPT' | string; label: string; resourceId: number | null; collectionId: number | null; conceptId: number | null }>
+  edges: Array<{ source: string; target: string; relationType: string; reason: string }>
+  selectedSourceCount: number
+  bounded: boolean
+}
+
+export async function getLearningAreas() {
+  return (await apiClient.get<LearningArea[]>('/focus/learning-areas')).data
+}
+
+export async function initializeLearningArea(collectionId: number) {
+  return (await apiClient.post<LearningAreaDetail>(`/focus/collections/${collectionId}/initialize`)).data
+}
+
+export async function getLearningArea(id: number) {
+  return (await apiClient.get<LearningAreaDetail>(`/focus/learning-areas/${id}`)).data
+}
+
+export async function buildLearningArea(id: number) {
+  return (await apiClient.post<LearningAreaDetail>(`/focus/learning-areas/${id}/build`)).data
+}
+
+export async function refreshLearningArea(id: number) {
+  return (await apiClient.post<LearningAreaDetail>(`/focus/learning-areas/${id}/refresh`)).data
+}
+
+export async function getLearningAreaSourceMap(id: number, resourceIds: number[]) {
+  return (await apiClient.get<LearningAreaSourceMap>(`/focus/learning-areas/${id}/source-map`, {
+    params: resourceIds.length ? { resourceIds: resourceIds.join(',') } : {},
+  })).data
 }
 
 export async function getStudyTopics() {

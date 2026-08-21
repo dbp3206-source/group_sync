@@ -121,4 +121,87 @@ public class FocusStudioDto {
         String whyItMatters,
         Instant updatedAt
     ) {}
+
+    public record LearningAreaResponse(
+        Long id,
+        Long collectionId,
+        String title,
+        String goal,
+        int sourceCount,
+        int moduleCount,
+        int conceptCount,
+        int checkedCount,
+        int reviewNeededCount,
+        int learningCount,
+        int notStartedCount,
+        String refreshStatus,
+        int newSourceCount,
+        int currentVersion,
+        String generationFailure,
+        Instant updatedAt
+    ) {}
+
+    public record ModuleResourceDto(
+        Long id,
+        String title,
+        String resourceType,
+        String role
+    ) {}
+
+    public record LearningModuleResponse(
+        Long id,
+        int position,
+        String stage,
+        String title,
+        String objective,
+        int conceptCount,
+        int checkedCount,
+        int reviewNeededCount,
+        List<ModuleResourceDto> primaryResources,
+        List<ModuleResourceDto> supportingResources,
+        List<TopicConceptDto> concepts
+    ) {}
+
+    public record LearningAreaDetailResponse(
+        LearningAreaResponse area,
+        List<TopicResourceDto> resources,
+        List<LearningModuleResponse> modules,
+        List<TopicConceptDto> retiredConcepts
+    ) {}
+
+    public record SourceMapNodeDto(
+        String id,
+        String type,
+        String label,
+        Long resourceId,
+        Long collectionId,
+        Long conceptId
+    ) {}
+
+    public record SourceMapEdgeDto(
+        String source,
+        String target,
+        String relationType,
+        String reason
+    ) {}
+
+    public record LearningAreaSourceMapResponse(
+        Long learningAreaId,
+        List<SourceMapNodeDto> nodes,
+        List<SourceMapEdgeDto> edges,
+        int selectedSourceCount,
+        boolean bounded
+    ) {}
+
+    public record DeepDiveAreaDto(
+        Long learningAreaId,
+        Long collectionId,
+        String title,
+        String refreshStatus,
+        Long moduleId,
+        String moduleTitle,
+        int conceptCount,
+        int checkedCount,
+        int reviewNeededCount
+    ) {}
 }

@@ -10,7 +10,7 @@ import com.groupsync.backend.auth.security.AuthenticatedUser;
 import com.groupsync.backend.knowledge.dto.*;
 import com.groupsync.backend.knowledge.service.KnowledgeWorkspaceService;
 import com.groupsync.backend.knowledge.service.DocumentUnderstandingService;
-import com.groupsync.backend.knowledge.service.LearningStudioService;
+import com.groupsync.backend.knowledge.service.CollectionLearningPathService;
 import com.groupsync.backend.knowledge.service.OrganizationSuggestionService;
 import com.groupsync.backend.knowledge.service.ResourceKnowledgeMapService;
 
@@ -19,16 +19,16 @@ public class KnowledgeWorkspaceController {
     private final KnowledgeWorkspaceService workspace;
     private final OrganizationSuggestionService organization;
     private final DocumentUnderstandingService understanding;
-    private final LearningStudioService learningStudio;
+    private final CollectionLearningPathService learningPaths;
     private final ResourceKnowledgeMapService knowledgeMap;
 
     public KnowledgeWorkspaceController(KnowledgeWorkspaceService workspace, OrganizationSuggestionService organization,
-                                        DocumentUnderstandingService understanding, LearningStudioService learningStudio,
+                                        DocumentUnderstandingService understanding, CollectionLearningPathService learningPaths,
                                         ResourceKnowledgeMapService knowledgeMap) {
         this.workspace = workspace;
         this.organization = organization;
         this.understanding = understanding;
-        this.learningStudio = learningStudio;
+        this.learningPaths = learningPaths;
         this.knowledgeMap = knowledgeMap;
     }
 
@@ -121,7 +121,7 @@ public class KnowledgeWorkspaceController {
 
     @GetMapping("/api/resources/{resourceId}/deep-dive")
     public ResourceDeepDiveResponse resourceDeepDive(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long resourceId) {
-        return learningStudio.getResourceDeepDive(user.getId(), resourceId);
+        return learningPaths.resourceDeepDive(user.getId(), resourceId);
     }
 
     @GetMapping("/api/resources/{resourceId}/knowledge-map")

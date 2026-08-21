@@ -9,6 +9,7 @@ import com.groupsync.backend.auth.security.AuthenticatedUser;
 import com.groupsync.backend.knowledge.dto.FocusStudioDto.*;
 import com.groupsync.backend.knowledge.dto.UpdateConceptStatusRequest;
 import com.groupsync.backend.knowledge.service.LearningStudioService;
+import com.groupsync.backend.knowledge.service.CollectionLearningPathService;
 import com.groupsync.backend.knowledge.service.RecallCheckService;
 
 @RestController
@@ -17,10 +18,55 @@ public class LearningStudioController {
 
     private final LearningStudioService studioService;
     private final RecallCheckService recallCheckService;
+    private final CollectionLearningPathService learningPathService;
 
-    public LearningStudioController(LearningStudioService studioService, RecallCheckService recallCheckService) {
+    public LearningStudioController(LearningStudioService studioService, RecallCheckService recallCheckService,
+                                    CollectionLearningPathService learningPathService) {
         this.studioService = studioService;
         this.recallCheckService = recallCheckService;
+        this.learningPathService = learningPathService;
+    }
+
+    @GetMapping("/learning-areas")
+    public List<LearningAreaResponse> listLearningAreas(@AuthenticationPrincipal AuthenticatedUser user) {
+        return learningPathService.list(user.getId());
+    }
+
+    @PostMapping("/collections/{collectionId}/initialize")
+    public LearningAreaDetailResponse initializeLearningArea(
+            @AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long collectionId) {
+        return learningPathService.initialize(user.getId(), collectionId);
+    }
+
+    @GetMapping("/learning-areas/{id}")
+    public LearningAreaDetailResponse getLearningArea(
+            @AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id) {
+        return learningPathService.detail(user.getId(), id);
+    }
+
+    @PostMapping("/learning-areas/{id}/build")
+    public LearningAreaDetailResponse buildLearningArea(
+            @AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id) {
+        return learningPathService.buildOrRefresh(user.getId(), id);
+    }
+
+    @PostMapping("/learning-areas/{id}/refresh")
+    public LearningAreaDetailResponse refreshLearningArea(
+            @AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id) {
+        return learningPathService.buildOrRefresh(user.getId(), id);
+    }
+
+    @GetMapping("/learning-areas/{id}/modules/{moduleId}")
+    public LearningModuleResponse getLearningModule(
+            @AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id, @PathVariable Long moduleId) {
+        return learningPathService.module(user.getId(), id, moduleId);
+    }
+
+    @GetMapping("/learning-areas/{id}/source-map")
+    public LearningAreaSourceMapResponse sourceMap(
+            @AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id,
+            @RequestParam(required = false) List<Long> resourceIds) {
+        return learningPathService.sourceMap(user.getId(), id, resourceIds);
     }
 
     @GetMapping("/topics")
