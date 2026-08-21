@@ -1,2 +1,7 @@
 package com.groupsync.backend.knowledge.rag;
-public interface LanguageModelClient { String answer(String groundedPrompt); }
+import java.util.Optional;
+
+public interface LanguageModelClient {
+    String answer(String groundedPrompt);
+    default Optional<TokenUsage> lastUsage() { return Optional.empty(); }
+}

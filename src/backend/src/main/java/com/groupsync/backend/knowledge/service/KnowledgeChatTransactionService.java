@@ -53,6 +53,7 @@ public class KnowledgeChatTransactionService {
 
     public record ChatPreparation(
             Long sessionId,
+            Long userMessageId,
             RetrievalScope scopeType,
             Long collectionId,
             List<Long> selectedResourceIds,
@@ -75,7 +76,7 @@ public class KnowledgeChatTransactionService {
         }
 
         // Save current user message inside this short transaction
-        messageRepository.save(new ChatMessage(session, ChatMessageRole.USER, request.question().trim()));
+        ChatMessage userMessage = messageRepository.save(new ChatMessage(session, ChatMessageRole.USER, request.question().trim(), ChatMessageStatus.PENDING));
 
         List<Long> selectedIds = session.getResources().stream().map(Resource::getId).toList();
         Long thisResourceId = session.getScopeType() == RetrievalScope.THIS_RESOURCE
@@ -83,6 +84,7 @@ public class KnowledgeChatTransactionService {
 
         return new ChatPreparation(
                 session.getId(),
+                userMessage.getId(),
                 session.getScopeType(),
                 session.getCollectionId(),
                 selectedIds,
@@ -93,15 +95,65 @@ public class KnowledgeChatTransactionService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public ChatPreparation prepareRetry(Long ownerId, Long sessionId, Long userMessageId) {
+        ChatSession session = sessionRepository.findByIdAndOwnerId(sessionId, ownerId)
+                .orElseThrow(() -> new NotFoundException("Chat session not found."));
+        ChatMessage userMessage = messageRepository.findById(userMessageId)
+                .filter(message -> message.getSession().getId().equals(sessionId) && message.getRole() == ChatMessageRole.USER)
+                .orElseThrow(() -> new NotFoundException("Question turn not found."));
+        userMessage.markPending();
+        messageRepository.save(userMessage);
+        List<ChatMessage> allMessages = messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+        List<ChatMessage> previousMessages = allMessages.stream().filter(message -> !message.getId().equals(userMessageId)).toList();
+        List<GroundedPromptBuilder.ConversationTurn> historyTurns = previousMessages.stream()
+                .skip(Math.max(0, previousMessages.size() - 4))
+                .map(msg -> new GroundedPromptBuilder.ConversationTurn(msg.getRole().name(), msg.getContent()))
+                .toList();
+        List<Long> selectedIds = session.getResources().stream().map(Resource::getId).toList();
+        Long thisResourceId = session.getScopeType() == RetrievalScope.THIS_RESOURCE ? selectedIds.stream().findFirst().orElse(null) : null;
+        return new ChatPreparation(session.getId(), userMessage.getId(), session.getScopeType(), session.getCollectionId(), selectedIds, thisResourceId, historyTurns, previousMessages);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markUserComplete(Long userMessageId) {
+        if (userMessageId == null) return;
+        messageRepository.findById(userMessageId).ifPresent(message -> { message.markComplete(); messageRepository.save(message); });
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markUserFailed(Long userMessageId, AskFailureCategory category) {
+        if (userMessageId == null) return;
+        messageRepository.findById(userMessageId).ifPresent(message -> { message.markFailed(category); messageRepository.save(message); });
+    }
+
+    @Transactional(readOnly = true)
+    public String questionForMessage(Long userMessageId) {
+        return messageRepository.findById(userMessageId)
+                .map(ChatMessage::getContent)
+                .orElseThrow(() -> new NotFoundException("Question turn not found."));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AskKnowledgeResponse persistInsufficientContext(Long sessionId) {
+        return persistInsufficientContext(sessionId, null);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AskKnowledgeResponse persistInsufficientContext(Long sessionId, Long userMessageId) {
         ChatSession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new NotFoundException("Chat session not found."));
         messageRepository.save(new ChatMessage(session, ChatMessageRole.ASSISTANT, INSUFFICIENT_CONTEXT));
+        markUserComplete(userMessageId);
         return new AskKnowledgeResponse(session.getId(), INSUFFICIENT_CONTEXT, false, List.of());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AskKnowledgeResponse persistAssistantResult(Long sessionId, String answer, List<RetrievedChunk> chunks) {
+        return persistAssistantResult(sessionId, null, answer, chunks);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AskKnowledgeResponse persistAssistantResult(Long sessionId, Long userMessageId, String answer, List<RetrievedChunk> chunks) {
         ChatSession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new NotFoundException("Chat session not found."));
         ChatMessage assistantMessage = messageRepository.save(new ChatMessage(session, ChatMessageRole.ASSISTANT, answer));
@@ -123,6 +175,7 @@ public class KnowledgeChatTransactionService {
                     chunk.section(), index, 1 - chunk.distance(), excerpt(chunk.content())));
         }
 
+        markUserComplete(userMessageId);
         return new AskKnowledgeResponse(session.getId(), answer, true, citations);
     }
 

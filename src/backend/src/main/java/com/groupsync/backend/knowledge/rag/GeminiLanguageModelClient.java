@@ -16,6 +16,7 @@ public class GeminiLanguageModelClient implements LanguageModelClient {
 
     private final GeminiProperties properties;
     private final Client sharedClient;
+    private final ThreadLocal<TokenUsage> lastUsage = new ThreadLocal<>();
 
     public GeminiLanguageModelClient(GeminiProperties properties, @Autowired(required = false) Client sharedClient) {
         this.properties = properties;
@@ -40,17 +41,29 @@ public class GeminiLanguageModelClient implements LanguageModelClient {
         if (groundedPrompt == null || groundedPrompt.isBlank()) {
             throw new IllegalArgumentException("A grounded prompt is required.");
         }
+        lastUsage.remove();
         Client client = getClient();
 
         GenerateContentResponse response = executeWithRetry(() ->
                 client.models.generateContent(properties.chatModel(), groundedPrompt, null)
         );
 
+        response.usageMetadata().ifPresent(usage -> lastUsage.set(new TokenUsage(
+                usage.promptTokenCount().orElse(null),
+                usage.candidatesTokenCount().orElse(null),
+                usage.totalTokenCount().orElse(null)
+        )));
+
         String answer = response.text();
         if (answer == null || answer.isBlank()) {
             throw new IllegalStateException("Gemini did not return answer text.");
         }
         return answer.trim();
+    }
+
+    @Override
+    public java.util.Optional<TokenUsage> lastUsage() {
+        return java.util.Optional.ofNullable(lastUsage.get());
     }
 
     @FunctionalInterface

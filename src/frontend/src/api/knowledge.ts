@@ -103,6 +103,34 @@ export type ResourceUnderstanding = {
   evidenceCount: number
   updatedAt: string | null
 }
+export type AskTraceTechnicalDetails = {
+  mode: string | null
+  operation: string | null
+  semanticCandidates: number | null
+  lexicalCandidates: number | null
+  totalCandidates: number | null
+  selectedChildren: number | null
+  parentsUsed: number | null
+  charactersUsed: number | null
+  maxCharactersBudget: number | null
+  citationsVerified: number | null
+  model: string | null
+  failureCategory: string | null
+}
+export type AskTraceEvent = {
+  attemptId: number
+  sequence: number
+  stage: string
+  status: 'RUNNING' | 'COMPLETE' | 'FAILED'
+  occurredAt: string
+  durationMs: number
+  beginnerMessage: string
+  technicalSummary: string
+  technicalDetails: AskTraceTechnicalDetails
+}
+export type AskAttempt = { attemptId: number; sessionId: number; userMessageId: number; status: 'PENDING' | 'RUNNING' | 'COMPLETE' | 'FAILED'; failureCategory: string | null; createdAt: string; completedAt: string | null }
+export type AskPreflight = { heavy: boolean; estimatedInputTokens: number; estimatedContextCharacters: number; estimateBasis: string; providerQuotaVisible: boolean; providerQuotaState: string; resetAt: string | null }
+export type AiUsage = { completedRequests: number; rateLimitCount: number; failedRequests: number; promptTokens: number; outputTokens: number; totalTokens: number; exactProviderQuotaVisible: boolean; providerQuotaState: string; resetAt: string | null; lastRecordedAt: string | null }
 export type ResourceDeepDive = {
   available: boolean
   topicId: number | null
@@ -136,7 +164,7 @@ export type ResourceKnowledgeMap = { nodes: ResourceKnowledgeMapNode[]; edges: R
 export type RecentActivity = { type: 'RESOURCE_OPENED' | 'ASK_ACTIVITY' | 'FOCUS_ACTIVITY' | 'RECALL_ACTIVITY'; title: string; occurredAt: string; resumeUrl: string; context: string }
 export type RelatedResource = { id: number; title: string; description: string | null; resourceType: string; processingStatus: string; relationType?: string; createdAt?: string }
 export type ChatSession = { id: number; title: string; scope: string; collectionId: number; updatedAt: string }
-export type ChatDetail = ChatSession & { resourceIds: number[]; messages: { id:number; role:'USER'|'ASSISTANT'; content:string; citations:Citation[] }[] }
+export type ChatDetail = ChatSession & { resourceIds: number[]; messages: { id:number; role:'USER'|'ASSISTANT'; content:string; citations:Citation[]; status?:'PENDING'|'COMPLETE'|'FAILED'; failureCategory?:string|null }[] }
 export type OrganizationTagSuggestion = { name: string; existingTagId: number; reason: string; confidence: number }
 export type OrganizationCollectionSuggestion = { name: string; existingCollectionId: number; reason: string; confidence: number }
 export type OrganizationRelatedSuggestion = { resourceId: number; title: string; reason: string; similarity: number }
@@ -154,6 +182,18 @@ export async function getInsights() { return (await apiClient.get<InsightOvervie
 export async function createNote(title: string, content: string) { return (await apiClient.post<Resource>('/resources/notes', { title, content })).data }
 export async function uploadResource(file: File, title?: string) { const body = new FormData(); body.append('file', file); if (title) body.append('title', title); return (await apiClient.post<Resource>('/resources', body)).data }
 export async function askKnowledge(input: AskInput) { return (await apiClient.post<AskResponse>('/ask', input)).data }
+export async function preflightAsk(input: AskInput) { return (await apiClient.post<AskPreflight>('/ask/preflight', input)).data }
+export async function startAskAttempt(input: AskInput) { return (await apiClient.post<AskAttempt>('/ask/attempts', input)).data }
+export async function retryAskAttempt(attemptId: number) { return (await apiClient.post<AskAttempt>(`/ask/attempts/${attemptId}/retry`)).data }
+export async function getAskUsage() { return (await apiClient.get<AiUsage>('/ask/usage')).data }
+export function subscribeAskTrace(attemptId: number, onEvent: (event: AskTraceEvent) => void, onError: () => void) {
+  const source = new EventSource(`/api/ask/attempts/${attemptId}/events`, { withCredentials: true })
+  source.addEventListener('ask-trace', event => {
+    try { onEvent(JSON.parse((event as MessageEvent).data) as AskTraceEvent) } catch { /* malformed telemetry is ignored by the UI */ }
+  })
+  source.onerror = onError
+  return () => source.close()
+}
 export async function getCollections() { return (await apiClient.get<KnowledgeCollection[]>('/collections')).data }
 export async function createCollection(name:string, description='') { return (await apiClient.post<KnowledgeCollection>('/collections', { name, description })).data }
 export async function updateCollection(id:number, name:string, description='') { return (await apiClient.patch<KnowledgeCollection>(`/collections/${id}`, { name, description })).data }

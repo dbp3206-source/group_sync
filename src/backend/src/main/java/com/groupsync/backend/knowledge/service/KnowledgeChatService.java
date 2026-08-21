@@ -64,11 +64,31 @@ public class KnowledgeChatService {
     }
 
     public AskKnowledgeResponse ask(Long ownerId, AskKnowledgeRequest request) {
-        long startMs = System.currentTimeMillis();
-
-        // Step 1: Prepare session and save user message in a short, isolated transaction
         KnowledgeChatTransactionService.ChatPreparation prep =
                 chatTransactionService.prepareConversation(ownerId, request);
+        try {
+            return askPrepared(ownerId, request, prep);
+        } catch (Throwable error) {
+            chatTransactionService.markUserFailed(prep.userMessageId(), classifyFailure(error));
+            if (error instanceof RuntimeException runtime) throw runtime;
+            if (error instanceof Error fatal) throw fatal;
+            throw new IllegalStateException("KnowledgeOS Ask failed.", error);
+        }
+    }
+
+    private AskFailureCategory classifyFailure(Throwable error) {
+        String message = error.getMessage() == null ? "" : error.getMessage().toLowerCase(Locale.ROOT);
+        if (message.contains("429") || message.contains("quota") || message.contains("resource_exhausted")) return AskFailureCategory.RATE_LIMIT;
+        if (message.contains("timeout") || message.contains("timed out")) return AskFailureCategory.TIMEOUT;
+        if (message.contains("retriev") || message.contains("vector") || message.contains("database")) return AskFailureCategory.RETRIEVAL;
+        if (error instanceof IllegalArgumentException) return AskFailureCategory.VALIDATION;
+        return AskFailureCategory.PROVIDER;
+    }
+
+    public AskKnowledgeResponse askPrepared(Long ownerId, AskKnowledgeRequest request,
+                                            KnowledgeChatTransactionService.ChatPreparation prep) {
+        long startMs = System.currentTimeMillis();
+        AskTraceContext.emit(AskTraceStage.QUERY_RECEIVED, new AskTraceTechnicalDetails(null, null, null, null, null, null, null, null, null, null, null, null));
 
         // Multi-turn conversational contextualization
         String contextualQuestion = contextualizeSearchQuery(request.question().trim(), prep.previousMessages());
@@ -100,13 +120,18 @@ public class KnowledgeChatService {
                 plan.filters() != null && plan.filters().createdAfter() != null ? plan.filters().createdAfter().toString() : null,
                 plan.filters() != null && plan.filters().createdBefore() != null ? plan.filters().createdBefore().toString() : null
         );
+        AskTraceContext.emit(AskTraceStage.PLAN_READY, new AskTraceTechnicalDetails(plan.mode().name(), plan.operation().name(), null, null, null, null, null, null, null, null, null, null));
+        if (plan.mode() == QueryMode.FILTERED_HYBRID && hasActualFilters(plan.filters())) {
+            AskTraceContext.emit(AskTraceStage.FILTERS_APPLIED, new AskTraceTechnicalDetails(plan.mode().name(), plan.operation().name(), null, null, null, null, null, null, null, null, null, null));
+        }
 
         // Step 3: Handle Structured Queries (COUNT, LIST) directly from PostgreSQL relational facts
         if (plan.mode() == QueryMode.STRUCTURED) {
             StructuredKnowledgeQueryService.StructuredResult result = structuredQueryService.execute(
                     ownerId, plan, prep.scopeType(), prep.thisResourceId(), prep.selectedResourceIds(), prep.collectionId()
             );
-            AskKnowledgeResponse saved = chatTransactionService.persistAssistantResult(prep.sessionId(), result.textResponse(), List.of());
+            AskKnowledgeResponse saved = chatTransactionService.persistAssistantResult(prep.sessionId(), prep.userMessageId(), result.textResponse(), List.of());
+            AskTraceContext.emit(AskTraceStage.STRUCTURED_OPERATION_COMPLETE, new AskTraceTechnicalDetails(plan.mode().name(), plan.operation().name(), null, null, null, null, null, null, null, 0, null, null));
             long durationMs = System.currentTimeMillis() - startMs;
             RagExecutionTrace trace = RagExecutionTrace.forStructured(plannerTrace, filterTrace, durationMs);
             return new AskKnowledgeResponse(saved.sessionId(), saved.answer(), saved.grounded(), saved.citations(), trace);
@@ -135,6 +160,7 @@ public class KnowledgeChatService {
                     candidateChildren.size()
             );
             fusionTrace = null;
+            AskTraceContext.emit(AskTraceStage.SEMANTIC_RETRIEVAL_COMPLETE, new AskTraceTechnicalDetails(plan.mode().name(), plan.operation().name(), candidateChildren.size(), 0, candidateChildren.size(), null, null, null, null, null, null, null));
         } else {
             // Filtered Hybrid Retrieval (pgvector + FTS + RRF)
             HybridExecutionDetails hybridDetails = retrievalStrategy.retrieveWithTrace(
@@ -157,10 +183,13 @@ public class KnowledgeChatService {
                     candidateChildren.size(),
                     hybridDetails.rrfK()
             );
+            AskTraceContext.emit(AskTraceStage.SEMANTIC_RETRIEVAL_COMPLETE, new AskTraceTechnicalDetails(plan.mode().name(), plan.operation().name(), hybridDetails.semanticCandidateCount(), null, null, null, null, null, null, null, null, null));
+            AskTraceContext.emit(AskTraceStage.LEXICAL_RETRIEVAL_COMPLETE, new AskTraceTechnicalDetails(plan.mode().name(), plan.operation().name(), null, hybridDetails.keywordCandidateCount(), null, null, null, null, null, null, null, null));
+            AskTraceContext.emit(AskTraceStage.RRF_COMPLETE, new AskTraceTechnicalDetails(plan.mode().name(), plan.operation().name(), hybridDetails.semanticCandidateCount(), hybridDetails.keywordCandidateCount(), hybridDetails.totalInputCandidates(), hybridDetails.fusedChunks().size(), null, null, null, null, null, null));
         }
 
         if (candidateChildren.isEmpty() || candidateChildren.getFirst().distance() > 1.0 - MIN_RELEVANCE) {
-            AskKnowledgeResponse saved = chatTransactionService.persistInsufficientContext(prep.sessionId());
+            AskKnowledgeResponse saved = chatTransactionService.persistInsufficientContext(prep.sessionId(), prep.userMessageId());
             long durationMs = System.currentTimeMillis() - startMs;
             RagExecutionTrace trace = new RagExecutionTrace(
                     plan.mode(), plan.operation(), plannerTrace, filterTrace, retrievalTrace, fusionTrace,
@@ -181,19 +210,24 @@ public class KnowledgeChatService {
                 expanded.uniqueParentsFound(),
                 expanded.duplicateParentsDeduplicated()
         );
+        AskTraceContext.emit(AskTraceStage.PARENT_CONTEXT_COMPLETE, new AskTraceTechnicalDetails(plan.mode().name(), plan.operation().name(), null, null, null, candidateChildren.size(), expanded.uniqueParentsFound(), expanded.charactersUsed(), parentChildExpander.getMaxContextChars(), null, null, null));
 
         ContextBudgetTrace contextBudgetTrace = new ContextBudgetTrace(
                 expanded.uniqueParentsFound(),
                 expanded.charactersUsed(),
                 parentChildExpander.getMaxContextChars()
         );
+        AskTraceContext.emit(AskTraceStage.CONTEXT_READY, new AskTraceTechnicalDetails(plan.mode().name(), plan.operation().name(), null, null, null, promptChunks.size(), expanded.uniqueParentsFound(), expanded.charactersUsed(), parentChildExpander.getMaxContextChars(), null, null, null));
 
         // Step 6: Grounded Prompt Generation & Gemini LLM synthesis
         String groundedPrompt = GroundedPromptBuilder.build(request.question().trim(), promptChunks, prep.historyTurns());
+        AskTraceContext.emit(AskTraceStage.GENERATION_STARTED, new AskTraceTechnicalDetails(plan.mode().name(), plan.operation().name(), null, null, null, promptChunks.size(), null, null, null, null, geminiProperties.chatModel(), null));
         String answer = languageModelClient.answer(groundedPrompt);
+        AskTraceContext.emit(AskTraceStage.GENERATION_COMPLETE, new AskTraceTechnicalDetails(plan.mode().name(), plan.operation().name(), null, null, null, promptChunks.size(), null, null, null, null, geminiProperties.chatModel(), null));
 
         // Step 7: Persist assistant message and verified citations
-        AskKnowledgeResponse saved = chatTransactionService.persistAssistantResult(prep.sessionId(), answer, promptChunks);
+        AskKnowledgeResponse saved = chatTransactionService.persistAssistantResult(prep.sessionId(), prep.userMessageId(), answer, promptChunks);
+        AskTraceContext.emit(AskTraceStage.CITATIONS_VERIFIED, new AskTraceTechnicalDetails(plan.mode().name(), plan.operation().name(), null, null, null, promptChunks.size(), null, null, null, saved.citations().size(), geminiProperties.chatModel(), null));
 
         String modelName = geminiProperties.chatModel();
         GenerationTrace generationTrace = new GenerationTrace(
@@ -209,6 +243,14 @@ public class KnowledgeChatService {
         );
 
         return new AskKnowledgeResponse(saved.sessionId(), saved.answer(), saved.grounded(), saved.citations(), trace);
+    }
+
+    private boolean hasActualFilters(KnowledgeQueryFilters filters) {
+        return filters != null && (filters.resourceType() != null || filters.favorite() != null
+                || (filters.collectionIds() != null && !filters.collectionIds().isEmpty())
+                || (filters.tagIds() != null && !filters.tagIds().isEmpty())
+                || (filters.resourceIds() != null && !filters.resourceIds().isEmpty())
+                || filters.createdAfter() != null || filters.createdBefore() != null);
     }
 
     private static final Pattern FOLLOW_UP_PATTERN = Pattern.compile(
@@ -279,7 +321,9 @@ public class KnowledgeChatService {
                     message.getRole().name(),
                     message.getContent(),
                     message.getCreatedAt(),
-                    citations
+                    citations,
+                    message.getStatus(),
+                    message.getFailureCategory()
             );
         }).toList();
         return new ChatSessionDetailResponse(
