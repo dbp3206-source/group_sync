@@ -179,10 +179,13 @@ public class KnowledgeWorkspaceService {
         List<Long> ids = normalizedIds(resourceIds);
         requireCollection(ownerId, collectionId);
         ids.forEach(resourceId -> requireResource(ownerId, resourceId));
-        ids.forEach(resourceId -> jdbc.update(
-                "insert into resource_collections(resource_id,collection_id) values(:resource,:collection) on conflict do nothing",
-                Map.of("resource", resourceId, "collection", collectionId)));
-        return new BulkOperationResponse(ids.size(), ids.size());
+        int affected = 0;
+        for (Long resourceId : ids) {
+            affected += jdbc.update(
+                    "insert into resource_collections(resource_id,collection_id) values(:resource,:collection) on conflict do nothing",
+                    Map.of("resource", resourceId, "collection", collectionId));
+        }
+        return new BulkOperationResponse(ids.size(), affected);
     }
 
     @Transactional

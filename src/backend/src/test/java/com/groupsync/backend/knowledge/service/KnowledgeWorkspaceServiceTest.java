@@ -103,12 +103,32 @@ class KnowledgeWorkspaceServiceTest {
     @Test
     void bulkAssignIsIdempotentAndValidatesAllResourcesBeforeWriting() {
         when(jdbc.queryForObject(anyString(), anyMap(), eq(Integer.class))).thenReturn(1);
-        when(jdbc.update(contains("insert into resource_collections"), anyMap())).thenReturn(1);
+        when(jdbc.update(contains("insert into resource_collections"), anyMap())).thenReturn(1, 1, 1);
 
-        BulkOperationResponse result = service.assignResources(7L, 4L, List.of(11L, 12L));
+        BulkOperationResponse result = service.assignResources(7L, 4L, List.of(11L, 12L, 13L));
 
-        assertEquals(new BulkOperationResponse(2, 2), result);
-        verify(jdbc, times(2)).update(contains("on conflict do nothing"), anyMap());
+        assertEquals(new BulkOperationResponse(3, 3), result);
+        verify(jdbc, times(3)).update(contains("on conflict do nothing"), anyMap());
+    }
+
+    @Test
+    void bulkAssignReportsOnlyNewMembershipsAsAffected() {
+        when(jdbc.queryForObject(anyString(), anyMap(), eq(Integer.class))).thenReturn(1);
+        when(jdbc.update(contains("insert into resource_collections"), anyMap())).thenReturn(1, 0, 1);
+
+        BulkOperationResponse result = service.assignResources(7L, 4L, List.of(11L, 12L, 13L));
+
+        assertEquals(new BulkOperationResponse(3, 2), result);
+    }
+
+    @Test
+    void bulkAssignReportsZeroWhenEveryMembershipAlreadyExists() {
+        when(jdbc.queryForObject(anyString(), anyMap(), eq(Integer.class))).thenReturn(1);
+        when(jdbc.update(contains("insert into resource_collections"), anyMap())).thenReturn(0, 0, 0);
+
+        BulkOperationResponse result = service.assignResources(7L, 4L, List.of(11L, 12L, 13L));
+
+        assertEquals(new BulkOperationResponse(3, 0), result);
     }
 
     @Test

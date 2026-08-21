@@ -68,6 +68,10 @@ export default function KnowledgeLibraryPage() {
   const [hasNext, setHasNext] = useState(false)
   const [initialLoadComplete, setInitialLoadComplete] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [resourceError, setResourceError] = useState('')
+  const [collectionLoadError, setCollectionLoadError] = useState('')
+  const [tagLoadError, setTagLoadError] = useState('')
+  const [actionError, setActionError] = useState('')
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [noteOpen, setNoteOpen] = useState(false)
@@ -75,6 +79,8 @@ export default function KnowledgeLibraryPage() {
   const [editingCollection, setEditingCollection] = useState<KnowledgeCollection | null>(null)
   const [collectionName, setCollectionName] = useState('')
   const [collectionDescription, setCollectionDescription] = useState('')
+  const [collectionError, setCollectionError] = useState('')
+  const [collectionBusy, setCollectionBusy] = useState(false)
   const [detailCollection, setDetailCollection] = useState<KnowledgeCollection | null>(null)
   const [detailResources, setDetailResources] = useState<Resource[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
@@ -82,7 +88,6 @@ export default function KnowledgeLibraryPage() {
   const [bulkCollectionId, setBulkCollectionId] = useState<number | undefined>()
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
-  const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [viewMode, setViewMode] = useState<'GRID' | 'GRAPH'>('GRID')
 
@@ -101,9 +106,9 @@ export default function KnowledgeLibraryPage() {
     append = false,
   ) => {
     if (!append && resourcesRef.current.length === 0) setLoading(true)
-    setError('')
     try {
       const response = await getResources(q, nextTag, nextCollection, nextPage, 24, nextSort)
+      setResourceError('')
       setResources(current => append ? mergeResources(current, response.items) : response.items)
       setPage(response.page)
       setTotalPages(response.totalPages)
@@ -111,7 +116,7 @@ export default function KnowledgeLibraryPage() {
       setHasNext(response.hasNext)
       if (!append) setSelectedIds([])
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Your library could not be loaded.'))
+      setResourceError(getApiErrorMessage(err, 'Your library could not be loaded.'))
     } finally {
       setInitialLoadComplete(true)
       setLoading(false)
@@ -139,14 +144,39 @@ export default function KnowledgeLibraryPage() {
   const refreshCollections = useCallback(async () => {
     const values = await getCollections()
     setCollections(values)
+    setCollectionLoadError('')
     setDetailCollection(current => current ? values.find(collection => collection.id === current.id) ?? null : null)
+  }, [])
+
+  const refreshTags = useCallback(async () => {
+    const values = await getTags()
+    setTags(values)
+    setTagLoadError('')
   }, [])
 
   useEffect(() => {
     void load()
-    void refreshCollections().catch(err => setError(getApiErrorMessage(err, 'Collections could not be loaded.')))
-    getTags().then(setTags).catch(err => setError(getApiErrorMessage(err, 'Tags could not be loaded.')))
-  }, [load, refreshCollections])
+    void refreshCollections().catch(err => setCollectionLoadError(getApiErrorMessage(err, 'Collections could not be loaded.')))
+    void refreshTags().catch(err => setTagLoadError(getApiErrorMessage(err, 'Tags could not be loaded.')))
+  }, [load, refreshCollections, refreshTags])
+
+  async function retryCollections() {
+    setCollectionLoadError('')
+    try {
+      await refreshCollections()
+    } catch (err) {
+      setCollectionLoadError(getApiErrorMessage(err, 'Collections could not be loaded.'))
+    }
+  }
+
+  async function retryTags() {
+    setTagLoadError('')
+    try {
+      await refreshTags()
+    } catch (err) {
+      setTagLoadError(getApiErrorMessage(err, 'Tags could not be loaded.'))
+    }
+  }
 
   async function saveNote(event: FormEvent) {
     event.preventDefault()
@@ -158,7 +188,7 @@ export default function KnowledgeLibraryPage() {
       setNoteOpen(false)
       await load()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'The note could not be saved.'))
+      setActionError(getApiErrorMessage(err, 'The note could not be saved.'))
     } finally {
       setBusy(false)
     }
@@ -183,7 +213,7 @@ export default function KnowledgeLibraryPage() {
     setResources(current => [temporaryResource, ...current])
     setTotalItems(current => current + 1)
     setBusy(true)
-    setError('')
+    setActionError('')
     try {
       const uploaded = await uploadResource(file)
       setResources(current => [uploaded, ...current.filter(resource => resource.id !== temporaryId && resource.id !== uploaded.id)])
@@ -191,7 +221,7 @@ export default function KnowledgeLibraryPage() {
     } catch (err) {
       setResources(current => current.filter(resource => resource.id !== temporaryId))
       setTotalItems(current => Math.max(0, current - 1))
-      setError(getApiErrorMessage(err, 'The resource could not be imported. Please verify file format and size.'))
+      setActionError(getApiErrorMessage(err, 'The resource could not be imported. Please verify file format and size.'))
     } finally {
       setBusy(false)
     }
@@ -201,6 +231,7 @@ export default function KnowledgeLibraryPage() {
     setEditingCollection(null)
     setCollectionName('')
     setCollectionDescription('')
+    setCollectionError('')
     setCollectionModal('CREATE')
   }
 
@@ -208,12 +239,14 @@ export default function KnowledgeLibraryPage() {
     setEditingCollection(collection)
     setCollectionName(collection.name)
     setCollectionDescription(collection.description ?? '')
+    setCollectionError('')
     setCollectionModal('EDIT')
   }
 
   async function saveCollection(event: FormEvent) {
     event.preventDefault()
-    setBusy(true)
+    setCollectionBusy(true)
+    setCollectionError('')
     try {
       const saved = editingCollection
         ? await updateCollection(editingCollection.id, collectionName.trim(), collectionDescription)
@@ -223,10 +256,11 @@ export default function KnowledgeLibraryPage() {
         : [saved, ...current])
       if (detailCollection?.id === saved.id) setDetailCollection(saved)
       setCollectionModal(null)
+      setCollectionError('')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'The collection could not be saved.'))
+      setCollectionError(getApiErrorMessage(err, 'The collection could not be saved.'))
     } finally {
-      setBusy(false)
+      setCollectionBusy(false)
     }
   }
 
@@ -236,7 +270,7 @@ export default function KnowledgeLibraryPage() {
     try {
       setDetailResources(await getCollectionResources(collection.id))
     } catch (err) {
-      setError(getApiErrorMessage(err, 'The collection could not be opened.'))
+      setActionError(getApiErrorMessage(err, 'The collection could not be opened.'))
     } finally {
       setDetailLoading(false)
     }
@@ -256,7 +290,7 @@ export default function KnowledgeLibraryPage() {
         await load(activeQuery, tagId, undefined, 0, sort, false)
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, 'The collection could not be deleted.'))
+      setActionError(getApiErrorMessage(err, 'The collection could not be deleted.'))
     } finally {
       setBusy(false)
       setConfirmAction(null)
@@ -268,7 +302,7 @@ export default function KnowledgeLibraryPage() {
       await assignResourceToCollection(collection, resource)
       await refreshCollections()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'The resource could not be added to that collection.'))
+      setActionError(getApiErrorMessage(err, 'The resource could not be added to that collection.'))
     }
   }
 
@@ -281,7 +315,7 @@ export default function KnowledgeLibraryPage() {
         ? { ...collection, resourceCount: Math.max(0, (collection.resourceCount ?? 1) - 1) }
         : collection))
     } catch (err) {
-      setError(getApiErrorMessage(err, 'The resource could not be removed from that collection.'))
+      setActionError(getApiErrorMessage(err, 'The resource could not be removed from that collection.'))
     }
   }
 
@@ -295,7 +329,7 @@ export default function KnowledgeLibraryPage() {
       await refreshCollections()
       if (detailCollection) setDetailResources(current => current.filter(value => value.id !== resource.id))
     } catch (err) {
-      setError(getApiErrorMessage(err, 'The resource could not be deleted.'))
+      setActionError(getApiErrorMessage(err, 'The resource could not be deleted.'))
     } finally {
       setBusy(false)
       setConfirmAction(null)
@@ -311,7 +345,7 @@ export default function KnowledgeLibraryPage() {
       setBulkCollectionId(undefined)
       await refreshCollections()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'The selected resources could not be added.'))
+      setActionError(getApiErrorMessage(err, 'The selected resources could not be added.'))
     } finally {
       setBusy(false)
     }
@@ -327,7 +361,7 @@ export default function KnowledgeLibraryPage() {
       setSelectedIds([])
       await refreshCollections()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'The selected resources could not be deleted.'))
+      setActionError(getApiErrorMessage(err, 'The selected resources could not be deleted.'))
     } finally {
       setBusy(false)
       setBulkDeleteOpen(false)
@@ -339,7 +373,7 @@ export default function KnowledgeLibraryPage() {
       const updated = await retryResource(resource.id)
       setResources(current => current.map(value => value.id === updated.id ? updated : value))
     } catch (err) {
-      setError(getApiErrorMessage(err, 'The resource could not be retried.'))
+      setActionError(getApiErrorMessage(err, 'The resource could not be retried.'))
     }
   }
 
@@ -360,7 +394,7 @@ export default function KnowledgeLibraryPage() {
   const hasFilters = Boolean(activeQuery || tagId || collectionId)
   const currentIds = resources.filter(resource => resource.id > 0).map(resource => resource.id)
   const allCurrentSelected = currentIds.length > 0 && currentIds.every(id => selectedIds.includes(id))
-  const libraryState: LibraryState = !initialLoadComplete ? 'INITIAL_LOADING' : error && resources.length === 0 ? 'ERROR' : resources.length === 0 ? 'EMPTY' : 'CONTENT'
+  const libraryState: LibraryState = !initialLoadComplete ? 'INITIAL_LOADING' : resourceError ? 'ERROR' : resources.length === 0 ? 'EMPTY' : 'CONTENT'
 
   function toggleSelection(resourceId: number) {
     setSelectedIds(current => current.includes(resourceId) ? current.filter(id => id !== resourceId) : [...current, resourceId])
@@ -390,7 +424,9 @@ export default function KnowledgeLibraryPage() {
           <div><p className="kos-kicker">ORGANIZE</p><h2>Collections</h2></div>
           <button type="button" className="kos-button kos-button--quiet" onClick={openCreateCollection}><Plus size={15} /> New collection</button>
         </div>
-        {collections.length ? (
+        {collectionLoadError ? (
+          <div className="kos-library-dependency-warning" role="alert"><span>Collections are temporarily unavailable. Resource content is still available.</span><button type="button" className="kos-button kos-button--quiet" onClick={() => void retryCollections()}>Retry collections</button></div>
+        ) : collections.length ? (
           <div className="kos-collection-grid">
             {collections.map(collection => (
               <article key={collection.id} className={`kos-collection-card ${detailCollection?.id === collection.id ? 'is-selected' : ''}`}>
@@ -425,18 +461,21 @@ export default function KnowledgeLibraryPage() {
 
       <div className="kos-library-toolbar">
         <label className="kos-search-field"><Search size={18} /><input aria-label="Search resource titles" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => event.key === 'Enter' && applySearch()} placeholder="Search titles, then press Enter" /></label>
-        <label className="kos-filter"><Tags size={16} /><select aria-label="Filter by tag" value={tagId ?? ''} onChange={event => { const next = event.target.value ? Number(event.target.value) : undefined; setTagId(next); void load(activeQuery, next, collectionId, 0, sort, false) }}><option value="">All tags</option>{tags.map(tag => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select></label>
-        <label className="kos-filter"><FolderPlus size={16} /><select aria-label="Filter by collection" value={collectionId ?? ''} onChange={event => { const next = event.target.value ? Number(event.target.value) : undefined; setCollectionId(next); void load(activeQuery, tagId, next, 0, sort, false) }}><option value="">All collections</option>{collections.map(collection => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label>
+        <label className="kos-filter"><Tags size={16} /><select aria-label="Filter by tag" disabled={Boolean(tagLoadError)} value={tagId ?? ''} onChange={event => { const next = event.target.value ? Number(event.target.value) : undefined; setTagId(next); void load(activeQuery, next, collectionId, 0, sort, false) }}><option value="">{tagLoadError ? 'Tags unavailable' : 'All tags'}</option>{tags.map(tag => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select></label>
+        <label className="kos-filter"><FolderPlus size={16} /><select aria-label="Filter by collection" disabled={Boolean(collectionLoadError)} value={collectionId ?? ''} onChange={event => { const next = event.target.value ? Number(event.target.value) : undefined; setCollectionId(next); void load(activeQuery, tagId, next, 0, sort, false) }}><option value="">{collectionLoadError ? 'Collections unavailable' : 'All collections'}</option>{collections.map(collection => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label>
         <label className="kos-filter"><select aria-label="Sort resources" value={sort} onChange={event => { const nextSort = event.target.value; setSort(nextSort); void load(activeQuery, tagId, collectionId, 0, nextSort, false) }}><option value="updated_desc">Recently updated</option><option value="created_desc">Recently created</option><option value="title_asc">Title (A-Z)</option><option value="title_desc">Title (Z-A)</option></select></label>
-        <button type="button" className="kos-button" disabled={busy} onClick={async () => { setBusy(true); try { await autoOrganizeAll(); await Promise.all([load(), refreshCollections(), getTags().then(setTags)]) } catch (err) { setError(getApiErrorMessage(err, 'Auto-organize could not be completed.')) } finally { setBusy(false) } }}><Sparkles size={15} /> Auto-Organize</button>
+        <button type="button" className="kos-button" disabled={busy} onClick={async () => { setBusy(true); try { await autoOrganizeAll(); await load(); await refreshCollections().catch(err => setCollectionLoadError(getApiErrorMessage(err, 'Collections could not be loaded.'))); await refreshTags().catch(err => setTagLoadError(getApiErrorMessage(err, 'Tags could not be loaded.'))) } catch (err) { setActionError(getApiErrorMessage(err, 'Auto-organize could not be completed.')) } finally { setBusy(false) } }}><Sparkles size={15} /> Auto-Organize</button>
         {hasFilters && <button type="button" className="kos-button kos-button--ghost" onClick={clearFilters}><X size={15} /> {activeQuery && !tagId && !collectionId ? 'Clear search' : 'Clear all filters'}</button>}
         <div className="kos-view-switcher"><button type="button" className={`kos-view-btn ${viewMode === 'GRID' ? 'is-active' : ''}`} onClick={() => setViewMode('GRID')}><LayoutGrid size={15} /> Grid</button><button type="button" className={`kos-view-btn ${viewMode === 'GRAPH' ? 'is-active' : ''}`} onClick={() => setViewMode('GRAPH')}><Network size={15} /> Knowledge map</button></div>
         <span className="kos-library-counter">{totalItems} resources <span aria-hidden="true">·</span> {collections.length} collections <span aria-hidden="true">·</span> {tags.length} tags</span>
       </div>
 
+      {tagLoadError && <div className="kos-library-dependency-warning" role="alert"><span>Tags are temporarily unavailable. Resource content is still available.</span><button type="button" className="kos-button kos-button--quiet" onClick={() => void retryTags()}>Retry tags</button></div>}
+
       {selectedIds.length > 0 && <div className="kos-bulk-bar" role="region" aria-label="Bulk resource actions"><strong>{selectedIds.length} selected</strong><label><span className="sr-only">Collection for selected resources</span><select value={bulkCollectionId ?? ''} onChange={event => setBulkCollectionId(event.target.value ? Number(event.target.value) : undefined)}><option value="">Add to collection...</option>{collections.map(collection => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label><button type="button" className="kos-button kos-button--primary" disabled={!bulkCollectionId || busy} onClick={() => void bulkAdd()}>Add to collection</button><button type="button" className="kos-button kos-button--danger" disabled={busy} onClick={() => setBulkDeleteOpen(true)}><Trash2 size={15} /> Delete selected</button><button type="button" className="kos-button kos-button--quiet" onClick={() => setSelectedIds([])}>Clear selection</button></div>}
 
-      {error && <div className="kos-error kos-library-alert" role="alert"><span>{error}</span><div><button type="button" className="kos-button kos-button--sm" onClick={() => void load()}>Try again</button><button type="button" className="kos-icon-btn" onClick={() => setError('')} aria-label="Close error"><X size={15} /></button></div></div>}
+      {resourceError && <div className="kos-error kos-library-alert" role="alert"><span>{resourceError}</span><div><button type="button" className="kos-button kos-button--sm" onClick={() => void load()}>Retry resources</button></div></div>}
+      {actionError && <div className="kos-error kos-library-alert" role="alert"><span>{actionError}</span><button type="button" className="kos-icon-btn" onClick={() => setActionError('')} aria-label="Close action error"><X size={15} /></button></div>}
 
       {libraryState === 'INITIAL_LOADING' && <div className="kos-resource-grid kos-resource-grid--skeleton" aria-label="Loading library">{Array.from({ length: 6 }, (_, index) => <div key={index} className="kos-resource-skeleton" />)}</div>}
       {libraryState === 'ERROR' && <div className="kos-empty"><FileText size={28} /><h2>Library unavailable</h2><p>We could not load your resources. Try again when the workspace is reachable.</p><button type="button" className="kos-button" onClick={() => void load()}>Try again</button></div>}
@@ -459,7 +498,7 @@ export default function KnowledgeLibraryPage() {
 
       {noteOpen && <div className="kos-modal" role="dialog" aria-modal="true" aria-labelledby="note-modal-title"><form onSubmit={saveNote}><button className="kos-modal-close" type="button" onClick={() => setNoteOpen(false)} aria-label="Close note dialog"><X size={18} /></button><p className="kos-kicker">NEW NOTE</p><h2 id="note-modal-title">Save a thought</h2><label>Title<input value={title} onChange={event => setTitle(event.target.value)} required /></label><label>Thoughts<textarea value={content} onChange={event => setContent(event.target.value)} required /></label><button className="kos-button kos-button--primary" disabled={busy}>{busy ? 'Saving...' : 'Save note'}</button></form></div>}
 
-      {collectionModal && <div className="kos-modal" role="dialog" aria-modal="true" aria-labelledby="collection-modal-title"><form onSubmit={saveCollection}><button className="kos-modal-close" type="button" onClick={() => setCollectionModal(null)} aria-label="Close collection dialog"><X size={18} /></button><p className="kos-kicker">{collectionModal === 'EDIT' ? 'EDIT COLLECTION' : 'NEW COLLECTION'}</p><h2 id="collection-modal-title">{collectionModal === 'EDIT' ? 'Shape the shelf' : 'Create a shelf'}</h2><label>Name<input value={collectionName} onChange={event => setCollectionName(event.target.value)} required /></label><label>Description <span className="kos-label-optional">optional</span><textarea value={collectionDescription} onChange={event => setCollectionDescription(event.target.value)} rows={4} /></label><div className="kos-modal-actions"><button type="button" className="kos-button kos-button--quiet" onClick={() => setCollectionModal(null)}>Cancel</button><button className="kos-button kos-button--primary" disabled={busy}>{collectionModal === 'EDIT' ? 'Save changes' : 'Create collection'}</button></div></form></div>}
+      {collectionModal && <div className="kos-modal" role="dialog" aria-modal="true" aria-labelledby="collection-modal-title"><form onSubmit={saveCollection}><button className="kos-modal-close" type="button" onClick={() => { setCollectionModal(null); setCollectionError('') }} aria-label="Close collection dialog"><X size={18} /></button><p className="kos-kicker">{collectionModal === 'EDIT' ? 'EDIT COLLECTION' : 'NEW COLLECTION'}</p><h2 id="collection-modal-title">{collectionModal === 'EDIT' ? 'Shape the shelf' : 'Create a shelf'}</h2>{collectionError && <div className="kos-modal-error" role="alert">{collectionError}</div>}<label>Name<input value={collectionName} onChange={event => setCollectionName(event.target.value)} required /></label><label>Description <span className="kos-label-optional">optional</span><textarea value={collectionDescription} onChange={event => setCollectionDescription(event.target.value)} rows={4} /></label><div className="kos-modal-actions"><button type="button" className="kos-button kos-button--quiet" onClick={() => { setCollectionModal(null); setCollectionError('') }}>Cancel</button><button className="kos-button kos-button--primary" disabled={collectionBusy}>{collectionBusy ? 'Saving...' : collectionModal === 'EDIT' ? 'Save changes' : 'Create collection'}</button></div></form></div>}
 
       {confirmAction && <div className="kos-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title"><form onSubmit={event => { event.preventDefault(); if (confirmAction.type === 'RESOURCE') void deleteSingleResource(confirmAction.resource); else void confirmCollectionDelete(confirmAction.collection) }}><button className="kos-modal-close" type="button" onClick={() => setConfirmAction(null)} aria-label="Close confirmation"><X size={18} /></button><p className="kos-kicker">CONFIRM ACTION</p><h2 id="confirm-modal-title">{confirmAction.type === 'RESOURCE' ? 'Delete this resource?' : `Delete ${confirmAction.collection.name}?`}</h2><p>{confirmAction.type === 'RESOURCE' ? 'The stored file and its library membership will be removed. This cannot be undone.' : 'The collection will be removed, but its resources will stay in your library.'}</p><div className="kos-modal-actions"><button type="button" className="kos-button kos-button--quiet" onClick={() => setConfirmAction(null)}>Cancel</button><button className="kos-button kos-button--danger" disabled={busy}>{busy ? 'Deleting...' : 'Delete'}</button></div></form></div>}
 
