@@ -23,6 +23,7 @@ import com.groupsync.backend.auth.dto.RegisterRequest;
 import com.groupsync.backend.auth.dto.UserResponse;
 import com.groupsync.backend.auth.security.AuthenticatedUser;
 import com.groupsync.backend.auth.service.AuthService;
+import com.groupsync.backend.user.service.UserProfileService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,15 +36,18 @@ public class AuthController {
     private final AuthService authService;
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository securityContextRepository;
+    private final UserProfileService userProfileService;
 
     public AuthController(
         AuthService authService,
         AuthenticationManager authenticationManager,
-        SecurityContextRepository securityContextRepository
+        SecurityContextRepository securityContextRepository,
+        UserProfileService userProfileService
     ) {
         this.authService = authService;
         this.authenticationManager = authenticationManager;
         this.securityContextRepository = securityContextRepository;
+        this.userProfileService = userProfileService;
     }
 
     @GetMapping("/csrf")
@@ -61,7 +65,7 @@ public class AuthController {
         Authentication authentication = authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(authService.normalizeEmail(request.email()), request.password()));
         saveAuthentication(authentication, httpRequest, httpResponse);
-        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(authService.getUser(authenticatedUser(authentication).getId())));
+        return ResponseEntity.status(HttpStatus.CREATED).body(userProfileService.getProfile(authenticatedUser(authentication).getId()));
     }
 
     @PostMapping("/login")
@@ -74,12 +78,12 @@ public class AuthController {
         Authentication authentication = authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(email, request.password()));
         saveAuthentication(authentication, httpRequest, httpResponse);
-        return UserResponse.from(authService.getUser(authenticatedUser(authentication).getId()));
+        return userProfileService.getProfile(authenticatedUser(authentication).getId());
     }
 
     @GetMapping("/me")
     public UserResponse currentUser(Authentication authentication) {
-        return UserResponse.from(authService.getUser(authenticatedUser(authentication).getId()));
+        return userProfileService.getProfile(authenticatedUser(authentication).getId());
     }
 
     @GetMapping("/current-user")

@@ -51,6 +51,7 @@ public class UserAccount {
         this.email = email;
         this.passwordHash = passwordHash;
         this.displayName = displayName;
+        this.profileCompleted = hasRequiredProfileFields();
     }
 
     @PreUpdate
@@ -63,7 +64,7 @@ public class UserAccount {
     public String getPasswordHash() { return passwordHash; }
     public String getDisplayName() { return displayName; }
     public String getTimeZone() { return timeZone; }
-    public boolean isProfileCompleted() { return profileCompleted; }
+    public boolean isProfileCompleted() { return hasRequiredProfileFields(); }
     public SystemRole getSystemRole() { return systemRole; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
@@ -71,17 +72,14 @@ public class UserAccount {
     public void updateProfile(String displayName, String timeZone) {
         this.displayName = displayName;
         this.timeZone = timeZone;
+        this.profileCompleted = hasRequiredProfileFields();
     }
 
     public void changePassword(String passwordHash) {
         this.passwordHash = passwordHash;
     }
 
-    public void markProfileCompleted() {
-        this.profileCompleted = true;
-    }
-
-    public void markProfileIncomplete() {
-        this.profileCompleted = false;
+    private boolean hasRequiredProfileFields() {
+        return displayName != null && !displayName.isBlank();
     }
 }

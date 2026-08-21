@@ -40,7 +40,7 @@ public class UserProfileController {
 
     @GetMapping("/me/profile")
     public UserResponse profile(@AuthenticationPrincipal AuthenticatedUser user) {
-        return UserResponse.from(userProfileService.getUser(user.getId()));
+        return userProfileService.getProfile(user.getId());
     }
 
     @PatchMapping("/me/profile")
@@ -48,7 +48,8 @@ public class UserProfileController {
         @AuthenticationPrincipal AuthenticatedUser user,
         @Valid @RequestBody UpdateProfileRequest request
     ) {
-        return UserResponse.from(userProfileService.updateProfile(user.getId(), request));
+        userProfileService.updateProfile(user.getId(), request);
+        return userProfileService.getProfile(user.getId());
     }
 
     @PutMapping("/me/password")
@@ -66,7 +67,7 @@ public class UserProfileController {
         @RequestParam("file") MultipartFile file
     ) {
         userProfileService.saveAvatar(user.getId(), file);
-        return UserResponse.from(userProfileService.getUser(user.getId()));
+        return userProfileService.getProfile(user.getId());
     }
 
     @DeleteMapping("/me/avatar")

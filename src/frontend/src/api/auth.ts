@@ -7,7 +7,7 @@ export type User = {
   systemRole: string
   timeZone: string
   profileCompleted: boolean
-  avatarUrl: string
+  avatarUrl: string | null
 }
 
 export type RegisterInput = {

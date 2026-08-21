@@ -1,4 +1,4 @@
-import { ArrowUpRight, BookOpenText, BrainCircuit, Clock3, Search } from 'lucide-react'
+import { ArrowUpRight, BookOpenText, BrainCircuit, Clock3, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import hero from '../assets/knowledgeos-hero.png'
@@ -43,6 +43,6 @@ export default function KnowledgeHomePage() {
         <Link to="/library">Import your first source <ArrowUpRight size={16} /></Link>
       </>}
     </aside>
-    <div className="kos-home-band"><Link to="/library"><BookOpenText size={22}/><span><b>Library</b><small>Resources that stay findable.</small></span></Link><Link to="/ask"><BrainCircuit size={22}/><span><b>Ask</b><small>Answers grounded in evidence.</small></span></Link><Link to="/insights"><Search size={22}/><span><b>Discover</b><small>See what connects.</small></span></Link></div>
+    <div className="kos-home-band"><Link to="/library"><BookOpenText size={22}/><span><b>Library</b><small>Resources that stay findable.</small></span></Link><Link to="/ask"><BrainCircuit size={22}/><span><b>Ask</b><small>Answers grounded in evidence.</small></span></Link><Link to="/focus"><Sparkles size={22}/><span><b>Focus</b><small>Turn sources into a learning path.</small></span></Link></div>
   </section>
 }

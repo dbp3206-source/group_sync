@@ -51,7 +51,7 @@ function RegisterPage() {
           <datalist id="saved-register-emails">{getEmailHistory().map((savedEmail) => <option key={savedEmail} value={savedEmail} />)}</datalist>
           <label htmlFor="register-password">Mật khẩu<span className="password-field"><input id="register-password" type={showPassword ? 'text' : 'password'} name="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} maxLength={72} required /><button type="button" className="password-toggle" onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? 'Ẩn' : 'Hiện'}</button></span></label>
           <label htmlFor="register-confirm-password">Xác nhận mật khẩu<input id="register-confirm-password" type={showPassword ? 'text' : 'password'} name="confirmPassword" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} maxLength={72} required /></label>
-          <p className="auth-help">At least 8 characters. This is a KnowledgeOS password; Gmail and OAuth sign-in are not used.</p>
+          <p className="auth-help">At least 8 characters. This password is used only for your KnowledgeOS account.</p>
           <button className="button button--primary" disabled={saving}>{saving ? 'Đang tạo tài khoản…' : 'Tạo tài khoản'}</button>
         </form>
         <p className="auth-switch">Đã có tài khoản? <Link to="/login">Đăng nhập</Link></p>

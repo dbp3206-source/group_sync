@@ -1,6 +1,7 @@
 package com.groupsync.backend.auth.dto;
 
 import com.groupsync.backend.user.model.UserAccount;
+import com.groupsync.backend.user.model.UserAvatar;
 
 public record UserResponse(
     Long id,
@@ -12,6 +13,10 @@ public record UserResponse(
     String avatarUrl
 ) {
     public static UserResponse from(UserAccount user) {
+        return from(user, null);
+    }
+
+    public static UserResponse from(UserAccount user, UserAvatar avatar) {
         return new UserResponse(
             user.getId(),
             user.getEmail(),
@@ -19,7 +24,7 @@ public record UserResponse(
             user.getSystemRole().name(),
             user.getTimeZone(),
             user.isProfileCompleted(),
-            user.isProfileCompleted() ? "/api/users/" + user.getId() + "/avatar" : null
+            avatar == null ? null : "/api/users/" + user.getId() + "/avatar?v=" + avatar.getUpdatedAt().toEpochMilli()
         );
     }
 }

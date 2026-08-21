@@ -13,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.groupsync.backend.shared.exception.BadRequestException;
 import com.groupsync.backend.shared.exception.ForbiddenException;
 import com.groupsync.backend.shared.exception.NotFoundException;
+import com.groupsync.backend.auth.dto.UserResponse;
 import com.groupsync.backend.user.dto.ChangePasswordRequest;
 import com.groupsync.backend.user.dto.UpdateProfileRequest;
 import com.groupsync.backend.user.model.UserAccount;
@@ -41,6 +42,12 @@ public class UserProfileService {
     @Transactional(readOnly = true)
     public UserAccount getUser(Long userId) {
         return userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found."));
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse getProfile(Long userId) {
+        UserAccount user = getUser(userId);
+        return UserResponse.from(user, avatarRepository.findByUserId(userId).orElse(null));
     }
 
     @Transactional
@@ -76,10 +83,12 @@ public class UserProfileService {
             byte[] imageBytes = file.getBytes();
             String contentType = detectImageType(imageBytes);
             UserAccount user = getUser(userId);
-            UserAvatar avatar = avatarRepository.findByUserId(userId)
-                .orElseGet(() -> new UserAvatar(user, contentType, imageBytes));
-            avatar.replace(contentType, imageBytes);
-            user.markProfileCompleted();
+            UserAvatar avatar = avatarRepository.findByUserId(userId).orElse(null);
+            if (avatar == null) {
+                avatar = new UserAvatar(user, contentType, imageBytes);
+            } else {
+                avatar.replace(contentType, imageBytes);
+            }
             return avatarRepository.save(avatar);
         } catch (java.io.IOException exception) {
             throw new BadRequestException("Could not read the uploaded image.");
@@ -93,8 +102,8 @@ public class UserProfileService {
 
     @Transactional
     public void deleteAvatar(Long userId) {
+        getUser(userId);
         avatarRepository.deleteByUserId(userId);
-        getUser(userId).markProfileIncomplete();
     }
 
     public String avatarEtag(UserAvatar avatar) {

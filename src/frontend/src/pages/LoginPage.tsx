@@ -55,7 +55,7 @@ function LoginPage() {
       <p className="eyebrow">PERSONAL KNOWLEDGE INTELLIGENCE</p>
       <h1>A place for what you are learning.</h1>
       <p className="intro">Keep your resources connected, retrieve the evidence later, and return to the work that deserves your attention.</p>
-      <div className="auth-value-list" aria-label="GroupSync giúp bạn">
+      <div className="auth-value-list" aria-label="What KnowledgeOS helps you do">
         <span><b>01</b> Keep your sources in one personal library</span>
         <span><b>02</b> Ask questions grounded in stored evidence</span>
         <span><b>03</b> Decide what to study next</span>
