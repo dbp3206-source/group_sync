@@ -1,5 +1,6 @@
 package com.groupsync.backend.knowledge.service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
@@ -26,6 +27,7 @@ public class AskAttemptService {
     private final UserAccountRepository userRepository;
     private final LanguageModelClient languageModelClient;
     private final GeminiPropertiesAdapter modelConfig;
+    private final LocalUsageClassifier usageClassifier;
     private final ConcurrentMap<Long, RuntimeAttempt> runtimes = new ConcurrentHashMap<>();
 
     public AskAttemptService(KnowledgeChatService chatService,
@@ -34,10 +36,12 @@ public class AskAttemptService {
                              AiUsageEventRepository usageRepository,
                              UserAccountRepository userRepository,
                              LanguageModelClient languageModelClient,
-                             com.groupsync.backend.knowledge.rag.GeminiProperties properties) {
+                             com.groupsync.backend.knowledge.rag.GeminiProperties properties,
+                             LocalUsageClassifier usageClassifier) {
         this.chatService = chatService; this.transactionService = transactionService; this.attemptRepository = attemptRepository;
         this.usageRepository = usageRepository; this.userRepository = userRepository; this.languageModelClient = languageModelClient;
         this.modelConfig = new GeminiPropertiesAdapter(properties.chatModel());
+        this.usageClassifier = usageClassifier;
     }
 
     public AskAttemptResponse start(Long ownerId, AskKnowledgeRequest request) {
@@ -54,20 +58,21 @@ public class AskAttemptService {
     public AskAttemptResponse retry(Long ownerId, Long attemptId) {
         AskAttempt attempt = attemptRepository.findByIdAndOwnerId(attemptId, ownerId)
                 .orElseThrow(() -> new NotFoundException("Ask attempt not found."));
-        synchronized (attempt) {
-            if (attempt.getStatus() != AskAttemptStatus.FAILED) {
-                return response(attempt);
-            }
-            KnowledgeChatTransactionService.ChatPreparation prep = transactionService.prepareRetry(ownerId, attempt.getSessionId(), attempt.getUserMessageId());
-            attempt.resetForRetry();
-            attemptRepository.save(attempt);
-            RuntimeAttempt runtime = runtimes.computeIfAbsent(attemptId, RuntimeAttempt::new);
-            execute(ownerId, new AskKnowledgeRequest(attempt.getSessionId(), prepQuestion(prep, attempt), prep.scopeType(),
-                    prep.scopeType() == com.groupsync.backend.knowledge.rag.RetrievalScope.THIS_RESOURCE ? prep.thisResourceId() : null,
-                    prep.scopeType() == com.groupsync.backend.knowledge.rag.RetrievalScope.SELECTED_RESOURCES ? prep.selectedResourceIds() : List.of(),
-                    prep.collectionId(), null), prep, attemptId, runtime);
-            return response(attempt);
+        if (attempt.getStatus() != AskAttemptStatus.FAILED) return response(attempt);
+
+        int claimed = attemptRepository.claimRetry(attemptId, ownerId, AskAttemptStatus.FAILED, AskAttemptStatus.PENDING);
+        if (claimed != 1) {
+            return response(attemptRepository.findByIdAndOwnerId(attemptId, ownerId).orElse(attempt));
         }
+        KnowledgeChatTransactionService.ChatPreparation prep = transactionService.prepareRetry(ownerId, attempt.getSessionId(), attempt.getUserMessageId());
+        RuntimeAttempt runtime = new RuntimeAttempt(attemptId);
+        runtimes.put(attemptId, runtime);
+        AskKnowledgeRequest request = new AskKnowledgeRequest(attempt.getSessionId(), prepQuestion(prep, attempt), prep.scopeType(),
+                prep.scopeType() == com.groupsync.backend.knowledge.rag.RetrievalScope.THIS_RESOURCE ? prep.thisResourceId() : null,
+                prep.scopeType() == com.groupsync.backend.knowledge.rag.RetrievalScope.SELECTED_RESOURCES ? prep.selectedResourceIds() : List.of(),
+                prep.collectionId(), null);
+        execute(ownerId, request, prep, attemptId, runtime);
+        return response(attemptRepository.findByIdAndOwnerId(attemptId, ownerId).orElse(attempt));
     }
 
     private String prepQuestion(KnowledgeChatTransactionService.ChatPreparation prep, AskAttempt attempt) {
@@ -80,17 +85,19 @@ public class AskAttemptService {
             long start = System.currentTimeMillis();
             AskAttempt attempt = attemptRepository.findById(attemptId).orElse(null);
             if (attempt == null) return;
-            attempt.markRunning(); attemptRepository.save(attempt);
+            if (attemptRepository.claimExecution(attemptId, AskAttemptStatus.PENDING, AskAttemptStatus.RUNNING) != 1) return;
             try (AskTraceContext.Scope ignored = AskTraceContext.open((stage, details) -> runtime.publish(stage, details, start))) {
                 AskKnowledgeResponse response = chatService.askPrepared(ownerId, request, prep);
                 QueryMode mode = response.trace() == null ? null : response.trace().mode();
                 runtime.publish(AskTraceStage.COMPLETE, detailsFrom(response, mode), start);
-                attempt.markComplete(mode); attemptRepository.save(attempt);
+                AskAttempt current = attemptRepository.findById(attemptId).orElse(attempt);
+                current.markComplete(mode); attemptRepository.save(current);
                 persistUsage(ownerId, attemptId, response, null, System.currentTimeMillis() - start);
             } catch (Throwable error) {
-                AskFailureCategory category = classify(error);
+                AskFailureCategory category = AskFailureClassifier.classify(error);
                 transactionService.markUserFailed(prep.userMessageId(), category);
-                attempt.markFailed(category, null); attemptRepository.save(attempt);
+                AskAttempt current = attemptRepository.findById(attemptId).orElse(attempt);
+                current.markFailed(category, null); attemptRepository.save(current);
                 runtime.publish(AskTraceStage.FAILED, new AskTraceTechnicalDetails(null, null, null, null, null, null, null, null, null, null, modelConfig.chatModel(), category.name()), start);
                 persistUsage(ownerId, attemptId, null, category, System.currentTimeMillis() - start);
             }
@@ -103,7 +110,13 @@ public class AskAttemptService {
         RuntimeAttempt runtime = runtimes.get(attemptId);
         SseEmitter emitter = new SseEmitter(0L);
         if (runtime == null) {
-            try { emitter.send(SseEmitter.event().id("1").name("ask-trace").data(new AskTraceEvent(attemptId, 1, attempt.getStatus() == AskAttemptStatus.FAILED ? AskTraceStage.FAILED : AskTraceStage.COMPLETE, attempt.getStatus() == AskAttemptStatus.FAILED ? AskTraceStatus.FAILED : AskTraceStatus.COMPLETE, Instant.now(), 0, attempt.getStatus() == AskAttemptStatus.FAILED ? "Câu hỏi chưa hoàn tất." : "Lần hỏi đã hoàn tất.", "persisted_terminal_state", new AskTraceTechnicalDetails(null, null, null, null, null, null, null, null, null, null, modelConfig.chatModel(), attempt.getFailureCategory() == null ? null : attempt.getFailureCategory().name())))); emitter.complete(); }
+            AskAttempt recovered = recoverMissingRuntime(ownerId, attempt);
+            try {
+                if (parseLastEventId(lastEventId) < 1) {
+                    emitter.send(SseEmitter.event().id("1").name("ask-trace").data(persistedTerminalEvent(attemptId, recovered)));
+                }
+                emitter.complete();
+            }
             catch (Exception ignored) { emitter.completeWithError(ignored); }
             return emitter;
         }
@@ -118,14 +131,18 @@ public class AskAttemptService {
     }
 
     public AiUsageResponse usage(Long ownerId) {
-        List<AiUsageEvent> events = usageRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId);
+        Instant from = Instant.now().minus(Duration.ofHours(24));
+        List<AiUsageEvent> events = usageRepository.findByOwnerIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(ownerId, from);
         long completed = events.stream().filter(e -> "COMPLETE".equals(e.getRequestStatus())).count();
         long rateLimits = events.stream().filter(e -> e.getFailureCategory() == AskFailureCategory.RATE_LIMIT).count();
         long failed = events.stream().filter(e -> "FAILED".equals(e.getRequestStatus())).count();
         long prompt = events.stream().filter(e -> e.getPromptTokens() != null).mapToLong(e -> e.getPromptTokens()).sum();
         long output = events.stream().filter(e -> e.getOutputTokens() != null).mapToLong(e -> e.getOutputTokens()).sum();
         long total = events.stream().filter(e -> e.getTotalTokens() != null).mapToLong(e -> e.getTotalTokens()).sum();
-        return new AiUsageResponse(completed, rateLimits, failed, prompt, output, total, false, "UNKNOWN", null, events.isEmpty() ? null : events.getFirst().getCreatedAt());
+        LocalUsageStatus localStatus = usageClassifier.classify(events, Instant.now());
+        return new AiUsageResponse(completed, rateLimits, failed, prompt, output, total, false, "UNKNOWN", null,
+                events.isEmpty() ? null : events.getFirst().getCreatedAt(), localStatus,
+                LocalUsageClassifier.WINDOW, "GENERATION_CALL_ONLY");
     }
 
     private void persistUsage(Long ownerId, Long attemptId, AskKnowledgeResponse response, AskFailureCategory failure, long durationMs) {
@@ -153,18 +170,29 @@ public class AskAttemptService {
 
     private AskAttemptResponse response(AskAttempt attempt) { return new AskAttemptResponse(attempt.getId(), attempt.getSessionId(), attempt.getUserMessageId(), attempt.getStatus(), attempt.getFailureCategory(), attempt.getCreatedAt(), attempt.getCompletedAt()); }
     private long parseLastEventId(String value) { try { return value == null ? 0 : Long.parseLong(value); } catch (NumberFormatException ignored) { return 0; } }
-    private AskFailureCategory classify(Throwable error) {
-        String message = error.getMessage() == null ? "" : error.getMessage().toLowerCase(Locale.ROOT);
-        if (message.contains("429") || message.contains("quota") || message.contains("resource_exhausted")) return AskFailureCategory.RATE_LIMIT;
-        if (message.contains("timeout") || message.contains("timed out")) return AskFailureCategory.TIMEOUT;
-        if (message.contains("retriev") || message.contains("vector") || message.contains("database")) return AskFailureCategory.RETRIEVAL;
-        if (error instanceof IllegalArgumentException) return AskFailureCategory.VALIDATION;
-        return AskFailureCategory.PROVIDER;
+    private AskAttempt recoverMissingRuntime(Long ownerId, AskAttempt attempt) {
+        if (attempt.getStatus() == AskAttemptStatus.PENDING || attempt.getStatus() == AskAttemptStatus.RUNNING) {
+            int recovered = attemptRepository.markInterruptedIfActive(attempt.getId(), ownerId,
+                    AskAttemptStatus.PENDING, AskAttemptStatus.RUNNING, AskAttemptStatus.FAILED,
+                    AskFailureCategory.INTERRUPTED);
+            if (recovered == 1) transactionService.markUserFailed(attempt.getUserMessageId(), AskFailureCategory.INTERRUPTED);
+        }
+        return attemptRepository.findByIdAndOwnerId(attempt.getId(), ownerId).orElse(attempt);
+    }
+
+    private AskTraceEvent persistedTerminalEvent(Long attemptId, AskAttempt attempt) {
+        boolean complete = attempt.getStatus() == AskAttemptStatus.COMPLETE;
+        AskTraceStage stage = complete ? AskTraceStage.COMPLETE : AskTraceStage.FAILED;
+        AskTraceStatus status = complete ? AskTraceStatus.COMPLETE : AskTraceStatus.FAILED;
+        String message = complete ? "Lần hỏi đã hoàn tất." : "Lượt hỏi chưa hoàn tất; câu hỏi vẫn được giữ lại để thử lại.";
+        return new AskTraceEvent(attemptId, 1, stage, status, Instant.now(), 0, message,
+                "persisted_terminal_state", new AskTraceTechnicalDetails(null, null, null, null, null, null, null, null, null, null,
+                modelConfig.chatModel(), attempt.getFailureCategory() == null ? null : attempt.getFailureCategory().name()));
     }
 
     private record GeminiPropertiesAdapter(String chatModel) { }
 
-    private static final class RuntimeAttempt {
+    static final class RuntimeAttempt {
         private final Long attemptId; private final AtomicLong sequence = new AtomicLong(); private final List<AskTraceEvent> events = new CopyOnWriteArrayList<>(); private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
         RuntimeAttempt(Long attemptId) { this.attemptId = attemptId; }
         void publish(AskTraceStage stage, AskTraceTechnicalDetails details, long startedAt) {

@@ -7,5 +7,8 @@ public record AskPreflightResponse(
         String estimateBasis,
         boolean providerQuotaVisible,
         String providerQuotaState,
-        String resetAt
+        String resetAt,
+        LocalUsageStatus localUsageStatus,
+        String usageWindow,
+        String warningLevel
 ) { }

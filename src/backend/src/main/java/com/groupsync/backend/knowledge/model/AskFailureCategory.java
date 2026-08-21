@@ -6,5 +6,6 @@ public enum AskFailureCategory {
     RETRIEVAL,
     PROVIDER,
     VALIDATION,
+    INTERRUPTED,
     UNKNOWN
 }

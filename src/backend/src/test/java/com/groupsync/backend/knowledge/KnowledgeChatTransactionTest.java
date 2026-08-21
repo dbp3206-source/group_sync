@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,7 +76,16 @@ class KnowledgeChatTransactionTest {
 
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
         when(sessionRepository.save(any(ChatSession.class))).thenReturn(session);
-        when(messageRepository.save(any(ChatMessage.class))).thenAnswer(inv -> inv.getArgument(0));
+        AtomicReference<ChatMessage> persistedUser = new AtomicReference<>();
+        when(messageRepository.save(any(ChatMessage.class))).thenAnswer(inv -> {
+            ChatMessage message = inv.getArgument(0);
+            if (message.getRole() == ChatMessageRole.USER) {
+                ReflectionTestUtils.setField(message, "id", 500L);
+                persistedUser.set(message);
+            }
+            return message;
+        });
+        when(messageRepository.findById(500L)).thenAnswer(inv -> Optional.ofNullable(persistedUser.get()));
 
         when(queryPlanner.plan(anyLong(), anyString(), any(), any(), any(), any()))
                 .thenReturn(new QueryPlan(QueryMode.HYBRID, QueryOperation.SEARCH, "Why is my query failing?", KnowledgeQueryFilters.empty(), "test"));
@@ -94,11 +104,14 @@ class KnowledgeChatTransactionTest {
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> chatService.ask(ownerId, request));
         assertEquals("Gemini API connection timeout", ex.getMessage());
 
-        // Verify only ONE message (the user message) was saved, NO assistant message was saved
+        // The retained user message is explicitly failed, and no assistant message is saved.
         ArgumentCaptor<ChatMessage> messageCaptor = ArgumentCaptor.forClass(ChatMessage.class);
-        verify(messageRepository, times(1)).save(messageCaptor.capture());
-        assertEquals(ChatMessageRole.USER, messageCaptor.getValue().getRole());
-        assertEquals("Why is my query failing?", messageCaptor.getValue().getContent());
+        verify(messageRepository, times(2)).save(messageCaptor.capture());
+        assertTrue(messageCaptor.getAllValues().stream().allMatch(message -> message.getRole() == ChatMessageRole.USER));
+        ChatMessage failedMessage = messageCaptor.getAllValues().getLast();
+        assertEquals("Why is my query failing?", failedMessage.getContent());
+        assertEquals(ChatMessageStatus.FAILED, failedMessage.getStatus());
+        assertEquals(AskFailureCategory.TIMEOUT, failedMessage.getFailureCategory());
     }
 
     @Test

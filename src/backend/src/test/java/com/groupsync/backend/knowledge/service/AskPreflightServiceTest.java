@@ -18,11 +18,24 @@ class AskPreflightServiceTest {
         assertFalse(first.providerQuotaVisible());
         assertEquals("UNKNOWN", first.providerQuotaState());
         assertNull(first.resetAt());
+        assertEquals("UNKNOWN", first.localUsageStatus().name());
+        assertEquals("ROLLING_24_HOURS", first.usageWindow());
+        assertEquals("STANDARD", first.warningLevel());
     }
 
     @Test
     void longQuestionIsWarnedByLocalHeuristic() {
         AskKnowledgeRequest request = new AskKnowledgeRequest(null, "x".repeat(700), RetrievalScope.THIS_RESOURCE, 1L, List.of(), null, null);
         assertTrue(service.estimate(request).heavy());
+    }
+
+    @Test
+    void heavyPreflightUsesStrongerLocalSignalWithoutProviderQuotaClaim() {
+        AskKnowledgeRequest request = new AskKnowledgeRequest(null, "x".repeat(700), RetrievalScope.THIS_RESOURCE, 1L, List.of(), null, null);
+        var result = service.estimate(request);
+        assertEquals("UNKNOWN", result.localUsageStatus().name());
+        assertEquals("STANDARD", result.warningLevel());
+        assertFalse(result.providerQuotaVisible());
+        assertNull(result.resetAt());
     }
 }

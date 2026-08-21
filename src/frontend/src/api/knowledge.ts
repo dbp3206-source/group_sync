@@ -129,8 +129,9 @@ export type AskTraceEvent = {
   technicalDetails: AskTraceTechnicalDetails
 }
 export type AskAttempt = { attemptId: number; sessionId: number; userMessageId: number; status: 'PENDING' | 'RUNNING' | 'COMPLETE' | 'FAILED'; failureCategory: string | null; createdAt: string; completedAt: string | null }
-export type AskPreflight = { heavy: boolean; estimatedInputTokens: number; estimatedContextCharacters: number; estimateBasis: string; providerQuotaVisible: boolean; providerQuotaState: string; resetAt: string | null }
-export type AiUsage = { completedRequests: number; rateLimitCount: number; failedRequests: number; promptTokens: number; outputTokens: number; totalTokens: number; exactProviderQuotaVisible: boolean; providerQuotaState: string; resetAt: string | null; lastRecordedAt: string | null }
+export type LocalUsageStatus = 'COMFORTABLE' | 'MODERATE' | 'LOW' | 'RATE_LIMITED' | 'UNKNOWN'
+export type AskPreflight = { heavy: boolean; estimatedInputTokens: number; estimatedContextCharacters: number; estimateBasis: string; providerQuotaVisible: boolean; providerQuotaState: string; resetAt: string | null; localUsageStatus: LocalUsageStatus; usageWindow: string; warningLevel: 'NONE' | 'SOFT' | 'STANDARD' | 'STRONG' | string }
+export type AiUsage = { completedRequests: number; rateLimitCount: number; failedRequests: number; promptTokens: number; outputTokens: number; totalTokens: number; exactProviderQuotaVisible: boolean; providerQuotaState: string; resetAt: string | null; lastRecordedAt: string | null; localUsageStatus: LocalUsageStatus; usageWindow: string; tokenScope: 'GENERATION_CALL_ONLY' | string }
 export type ResourceDeepDive = {
   available: boolean
   topicId: number | null

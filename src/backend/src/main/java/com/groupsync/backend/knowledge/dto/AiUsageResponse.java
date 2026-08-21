@@ -12,5 +12,8 @@ public record AiUsageResponse(
         boolean exactProviderQuotaVisible,
         String providerQuotaState,
         String resetAt,
-        Instant lastRecordedAt
+        Instant lastRecordedAt,
+        LocalUsageStatus localUsageStatus,
+        String usageWindow,
+        String tokenScope
 ) { }

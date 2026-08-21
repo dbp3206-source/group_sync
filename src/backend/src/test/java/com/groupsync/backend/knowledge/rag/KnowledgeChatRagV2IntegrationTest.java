@@ -255,4 +255,58 @@ class KnowledgeChatRagV2IntegrationTest {
         assertNull(response.trace().parentChild());
         assertNull(response.trace().generation());
     }
+
+    @Test
+    void ask_emitsActualModeStagesAndKeepsPublicTraceFreeOfChainOfThought() {
+        RetrievedChunk child = new RetrievedChunk(301L, 10L, "Trace Doc", 1, 1, "Trace", "Trace child", 0.05d);
+        RetrievedChunk parent = new RetrievedChunk(300L, 10L, "Trace Doc", 0, 1, "Trace", "Trace parent", 0.05d);
+        ExpandedContext expanded = new ExpandedContext(List.of(parent), List.of(child), 1, 0, 80);
+        when(parentChildExpander.expand(anyList())).thenReturn(expanded);
+        when(parentChildExpander.getMaxContextChars()).thenReturn(6000);
+        when(languageModelClient.answer(anyString())).thenReturn("Evidence answer");
+        when(semanticRetrievalStrategy.retrieve(anyLong(), anyString(), any(), any(), anyList(), any(), any(), anyInt()))
+                .thenReturn(List.of(child));
+        when(retrievalStrategy.retrieveWithTrace(anyLong(), anyString(), any(), any(), anyList(), any(), any()))
+                .thenReturn(new HybridExecutionDetails(List.of(child), 3, 2, 5, 60));
+        KnowledgeQueryFilters filtered = new KnowledgeQueryFilters(null, null, null, ResourceType.PDF, null, null, null);
+        when(queryPlanner.plan(eq(ownerId), anyString(), eq(RetrievalScope.LIBRARY), isNull(), anyList(), isNull()))
+                .thenAnswer(invocation -> switch ((String) invocation.getArgument(1)) {
+                    case "structured trace" -> new QueryPlan(QueryMode.STRUCTURED, QueryOperation.COUNT, null, KnowledgeQueryFilters.empty(), "count");
+                    case "semantic trace" -> new QueryPlan(QueryMode.SEMANTIC, QueryOperation.SEARCH, "semantic trace", KnowledgeQueryFilters.empty(), "semantic");
+                    case "filtered trace" -> new QueryPlan(QueryMode.FILTERED_HYBRID, QueryOperation.SEARCH, "filtered trace", filtered, "filtered");
+                    default -> new QueryPlan(QueryMode.HYBRID, QueryOperation.SEARCH, "hybrid trace", KnowledgeQueryFilters.empty(), "hybrid");
+                });
+        when(structuredQueryService.execute(anyLong(), any(), any(), any(), any(), any()))
+                .thenReturn(new StructuredKnowledgeQueryService.StructuredResult("count", 1L, List.of()));
+        Resource resource = new Resource(owner, "Trace Doc", null, ResourceType.PDF, "trace.pdf", "application/pdf", 100L, "10/trace.pdf", "hash");
+        DocumentChunk persisted = new DocumentChunk(resource, 0, 1, "Trace", "Trace parent");
+        ReflectionTestUtils.setField(persisted, "id", 300L);
+        when(chunkRepository.findAllById(anyList())).thenReturn(List.of(persisted));
+
+        List<AskTraceStage> structuredStages = stagesFor("structured trace");
+        List<AskTraceStage> semanticStages = stagesFor("semantic trace");
+        List<AskTraceStage> hybridStages = stagesFor("hybrid trace");
+        List<AskTraceStage> filteredStages = stagesFor("filtered trace");
+
+        assertTrue(structuredStages.contains(AskTraceStage.STRUCTURED_OPERATION_COMPLETE));
+        assertFalse(structuredStages.contains(AskTraceStage.SEMANTIC_RETRIEVAL_COMPLETE));
+        assertFalse(structuredStages.contains(AskTraceStage.LEXICAL_RETRIEVAL_COMPLETE));
+        assertFalse(structuredStages.contains(AskTraceStage.RRF_COMPLETE));
+        assertTrue(semanticStages.contains(AskTraceStage.SEMANTIC_RETRIEVAL_COMPLETE));
+        assertFalse(semanticStages.contains(AskTraceStage.LEXICAL_RETRIEVAL_COMPLETE));
+        assertFalse(semanticStages.contains(AskTraceStage.RRF_COMPLETE));
+        assertTrue(hybridStages.containsAll(List.of(AskTraceStage.SEMANTIC_RETRIEVAL_COMPLETE, AskTraceStage.LEXICAL_RETRIEVAL_COMPLETE, AskTraceStage.RRF_COMPLETE)));
+        assertTrue(filteredStages.indexOf(AskTraceStage.FILTERS_APPLIED) < filteredStages.indexOf(AskTraceStage.SEMANTIC_RETRIEVAL_COMPLETE));
+        assertTrue(filteredStages.indexOf(AskTraceStage.CITATIONS_VERIFIED) > filteredStages.indexOf(AskTraceStage.GENERATION_COMPLETE));
+        assertTrue(java.util.Arrays.stream(AskTraceTechnicalDetails.class.getDeclaredFields()).noneMatch(field -> field.getName().toLowerCase().contains("thought")));
+    }
+
+    private List<AskTraceStage> stagesFor(String question) {
+        List<AskTraceStage> stages = new java.util.ArrayList<>();
+        AskKnowledgeRequest request = new AskKnowledgeRequest(null, question, RetrievalScope.LIBRARY, null, null, null, null);
+        try (var ignored = com.groupsync.backend.knowledge.service.AskTraceContext.open((stage, details) -> stages.add(stage))) {
+            chatService.ask(ownerId, request);
+        }
+        return stages;
+    }
 }

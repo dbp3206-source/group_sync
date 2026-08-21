@@ -69,21 +69,13 @@ public class KnowledgeChatService {
         try {
             return askPrepared(ownerId, request, prep);
         } catch (Throwable error) {
-            chatTransactionService.markUserFailed(prep.userMessageId(), classifyFailure(error));
+            chatTransactionService.markUserFailed(prep.userMessageId(), AskFailureClassifier.classify(error));
             if (error instanceof RuntimeException runtime) throw runtime;
             if (error instanceof Error fatal) throw fatal;
             throw new IllegalStateException("KnowledgeOS Ask failed.", error);
         }
     }
 
-    private AskFailureCategory classifyFailure(Throwable error) {
-        String message = error.getMessage() == null ? "" : error.getMessage().toLowerCase(Locale.ROOT);
-        if (message.contains("429") || message.contains("quota") || message.contains("resource_exhausted")) return AskFailureCategory.RATE_LIMIT;
-        if (message.contains("timeout") || message.contains("timed out")) return AskFailureCategory.TIMEOUT;
-        if (message.contains("retriev") || message.contains("vector") || message.contains("database")) return AskFailureCategory.RETRIEVAL;
-        if (error instanceof IllegalArgumentException) return AskFailureCategory.VALIDATION;
-        return AskFailureCategory.PROVIDER;
-    }
 
     public AskKnowledgeResponse askPrepared(Long ownerId, AskKnowledgeRequest request,
                                             KnowledgeChatTransactionService.ChatPreparation prep) {

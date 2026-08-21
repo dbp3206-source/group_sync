@@ -32,7 +32,7 @@ public class KnowledgeChatController {
 
     @PostMapping("/preflight")
     public AskPreflightResponse preflight(@AuthenticationPrincipal AuthenticatedUser user, @Valid @RequestBody AskKnowledgeRequest request) {
-        return preflightService.estimate(request);
+        return preflightService.estimate(user.getId(), request);
     }
 
     @PostMapping("/attempts")
